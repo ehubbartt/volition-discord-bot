@@ -16,7 +16,6 @@ function getShopMenuRow() {
         .setPlaceholder('Select an item to buy')
         .addOptions([
             { label: 'Mute-A-Friend', value: 'mute-a-friend', description: 'Mute a friend (or foe) in voice chat! Cost: 5 VP.' },
-            { label: 'Spin the Volition Wheel!', value: 'spin-the-wheel', description: 'Spin the Volition Wheel! Cost: 40 VP.' }
         ]);
     return new ActionRowBuilder().addComponents(shopMenu);
 }
@@ -58,10 +57,6 @@ module.exports = {
             await interaction.update({ components: [getShopMenuRow()] });
             await interaction.followUp({ content: 'Select a user to mute:', components: [row], ephemeral: true });
 
-        } else if (selectedItem === 'spin-the-wheel') {
-            // Reset shop menu selection
-            await interaction.update({ components: [getShopMenuRow()] });
-            await this.purchaseSpin(interaction); // Placeholder if you plan to reimplement spins
         }
     },
 
