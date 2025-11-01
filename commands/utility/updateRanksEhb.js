@@ -87,21 +87,21 @@ module.exports = {
       const allMembers = guild.members.cache;
 
       // Map of rank names to their respective emojis
-      // const rankEmojiMap = {
-      //   'Sweat': '<:Sweat:1339598866818793505>',
-      //   'Master General': '<:MasterGeneral:1339598851304063077>',
-      //   'Touch Grass': '<:TouchGrass:1339598837110669354>',
-      //   'Wrath': '<:WR:1239257793199083580>',
-      //   'Top Dawgs': '<:TZ:1309544425298329681>',
-      //   'Mind Goblin': '<:GO:1213799278150164490>',
-      //   'Holy': '<:SA:1309547678694248488>',
-      //   'Skull': '<:S_:1239658968654282863>',
-      //   'SLAAAAAY': '<:SL:1309544667561459712>',
-      //   'Guthixian': '<:GU:1213799334773129236>',
-      //   'Black Hearts': '<:de:1341120690325028865>',
-      //   'Discord Kitten': '<:HE:1213787848088494100>',
-      //   'Brewaholic': '<:AP:1213784678419406858>',  
-      // };
+      const rankEmojiMap = {
+        'Sweat': '<:Sweat:1339598866818793505>',
+        'Master General': '<:MasterGeneral:1339598851304063077>',
+        'Touch Grass': '<:TouchGrass:1339598837110669354>',
+        'Wrath': '<:WR:1239257793199083580>',
+        'Top Dawgs': '<:TZ:1309544425298329681>',
+        'Mind Goblin': '<:GO:1213799278150164490>',
+        'Holy': '<:SA:1309547678694248488>',
+        'Skull': '<:S_:1239658968654282863>',
+        'SLAAAAAY': '<:SL:1309544667561459712>',
+        'Guthixian': '<:GU:1213799334773129236>',
+        'Black Hearts': '<:de:1341120690325028865>',
+        'Discord Kitten': '<:HE:1213787848088494100>',
+        'Brewaholic': '<:AP:1213784678419406858>',  
+      };
 
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
       let mismatchOutput = [];

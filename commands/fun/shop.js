@@ -23,7 +23,7 @@ function getShopMenuRow() {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('shop')
-        .setDescription('(Admin)'),
+        .setDescription('(Admin Only)'),
 
     async execute(interaction) {
         // Admin role check
