@@ -9,6 +9,7 @@ const {
   ChannelType,
 } = require('discord.js');
 const config = require('./config.json');
+require('dotenv').config();
 
 const client = new Client({
   intents: [
@@ -185,4 +186,4 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
-client.login(config.token);
+client.login(process.env.TOKEN);
