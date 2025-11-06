@@ -144,19 +144,42 @@ async function handleVerifySubmit(interaction) {
         // Determine rank
         const rank = determineRank(ehb);
 
-        // Handle nickname change if requirements met
+        // Handle nickname change and role updates if requirements met
         let nicknameChanged = false;
         let nicknameError = null;
+        let rolesUpdated = false;
+        let roleError = null;
+        const member = await interaction.guild.members.fetch(targetUser.id);
 
         if (meetsRequirements) {
+            // Try to update nickname (skip if bot lacks permission)
             try {
-                const member = await interaction.guild.members.fetch(targetUser.id);
                 await member.setNickname(actualRsn);
                 nicknameChanged = true;
                 console.log(`[CreateVerify] Updated nickname for ${targetUser.tag} to ${actualRsn}`);
             } catch (error) {
-                nicknameError = error.message;
-                console.error('[CreateVerify] Failed to update nickname:', error);
+                if (error.code === 50013) {
+                    nicknameError = 'Bot lacks permission (user has higher role)';
+                } else {
+                    nicknameError = error.message;
+                }
+                console.log(`[CreateVerify] Could not update nickname for ${targetUser.tag}: ${nicknameError}`);
+            }
+
+            // Add verified role and remove unverified role
+            try {
+                if (config.verifiedRoleID) {
+                    await member.roles.add(config.verifiedRoleID);
+                    console.log(`[CreateVerify] Added verified role to ${targetUser.tag}`);
+                }
+                if (config.unverifiedRoleID && member.roles.cache.has(config.unverifiedRoleID)) {
+                    await member.roles.remove(config.unverifiedRoleID);
+                    console.log(`[CreateVerify] Removed unverified role from ${targetUser.tag}`);
+                }
+                rolesUpdated = true;
+            } catch (error) {
+                roleError = error.message;
+                console.error('[CreateVerify] Failed to update roles:', error);
             }
         }
 
@@ -205,8 +228,17 @@ async function handleVerifySubmit(interaction) {
         statsEmbed.setThumbnail('https://i.imgur.com/BJJpBj2.png');
         statsEmbed.setTimestamp();
 
+        // Send the result embed
+        let replyContent = null;
+
+        // If requirements not met, ping all admin roles
+        if (!meetsRequirements) {
+            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+            replyContent = `${adminMentions} - User needs assistance with requirements`;
+        }
+
         await interaction.editReply({
-            content: null,
+            content: replyContent,
             embeds: [statsEmbed]
         });
 
