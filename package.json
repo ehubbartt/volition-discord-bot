@@ -7,11 +7,22 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "webhook": "node webhook-server.js",
+    "poll": "node polling-sync-server.js",
+    "listen": "node wom-message-listener.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.79.0",
     "axios": "^1.7.7",
     "discord.js": "^14.16.3",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0"
   }
 }

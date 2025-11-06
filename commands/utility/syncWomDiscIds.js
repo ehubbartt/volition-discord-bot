@@ -1,12 +1,13 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
 const axios = require('axios');
+const db = require('../../db/supabase');
 const config = require('../../config.json');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('sync')
-    .setDescription('(Admin Only)'),
+    .setName('syncwomids')
+    .setDescription('(Admin Only) Sync WOM IDs for all clan members'),
 
   async execute(interaction) {
     const member = interaction.member;
@@ -14,30 +15,19 @@ module.exports = {
     const hasRole = member.roles.cache.has(allowedRoleId);
     if (!hasRole) {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-    }    
+    }
 
     await interaction.deferReply({ ephemeral: false });
 
     try {
       const clanId = config.clanId;
 
-      // Fetch existing data from SheetDB (main)
-      const SHEETDB_API_URL = config.SYNC_SHEETDB_API_URL;
-      const sheetResponse = await axios.get(SHEETDB_API_URL);
-      const existingData = sheetResponse.data;
+      const existingPlayers = await db.getAllPlayers();
+      console.log("Fetched existing data:", existingPlayers);
 
-      // Fetch existing data from SheetDB (points)
-      const PUBLIC_SHEET_API_URL = config.POINTS_SHEETDB_API_URL;
-      const publicSheetResponse = await axios.get(PUBLIC_SHEET_API_URL);
-      const publicSheetData = publicSheetResponse.data;
+      const existingRSNs = new Set(existingPlayers.map(p => p.rsn?.toLowerCase()));
+      const existingWOMIds = new Map(existingPlayers.map(p => [p.wom_id?.toString(), p]));
 
-      console.log("Fetched existing data:", existingData);
-
-      // Build existing WOM IDs and RSN
-      const existingRSNs = new Set(existingData.map(row => row[config.COLUMN_RSN]?.toLowerCase()));
-      const existingWOMIds = new Map(existingData.map(row => [row[config.COLUMN_WOM_ID]?.toString(), row]));
-
-      // Fetch clan data from WOM API
       const womApiUrl = `https://api.wiseoldman.net/v2/groups/${clanId}`;
       const womResponse = await axios.get(womApiUrl);
       const clanData = womResponse.data;
@@ -50,29 +40,23 @@ module.exports = {
       const discordMembers = await interaction.guild.members.fetch();
       const humanMembers = discordMembers.filter(member => !member.user.bot);
 
-      const COLUMN_RSN = config.COLUMN_RSN;
-      const COLUMN_WOM_ID = config.COLUMN_WOM_ID;
-      const COLUMN_DISCORD_ID = config.COLUMN_DISCORD_ID;
-
       let output = '';
-      const rowsToUpdate = [];
+      const playersToCreate = [];
       const nameChanges = [];
       const leavers = [];
+      const nicknameFixAttempts = [];
       let successfulPairingsCount = 0;
       let failedPairingsCount = 0;
       let skippedPairingCount = 0;
-      const newMembersToAddToPublicSheet = [];
 
-      // Check current clan members
       for (let i = 0; i < clanMembers.length; i++) {
         const member = clanMembers[i];
         const memberName = member.player.username.toLowerCase();
         const memberId = member.player.id.toString();
 
-        // Check for duplicate WOM ID to determine namechanges
         if (existingWOMIds.has(memberId)) {
-          const existingRow = existingWOMIds.get(memberId);
-          const existingRSN = existingRow[COLUMN_RSN]?.toLowerCase();
+          const existingPlayer = existingWOMIds.get(memberId);
+          const existingRSN = existingPlayer.rsn?.toLowerCase();
           if (existingRSN !== memberName) {
             nameChanges.push({
               oldName: existingRSN,
@@ -80,28 +64,29 @@ module.exports = {
               womId: memberId,
             });
           }
+
+          // Nickname auto-fix disabled
+          // if (existingPlayer.discord_id) {
+          //   const discordMember = humanMembers.find(dm => dm.id === existingPlayer.discord_id);
+          //   if (discordMember && discordMember.displayName !== member.player.username) {
+          //     nicknameFixAttempts.push({
+          //       discordId: existingPlayer.discord_id,
+          //       currentNickname: discordMember.displayName,
+          //       correctRSN: member.player.username,
+          //       member: discordMember
+          //     });
+          //   }
+          // }
+
           skippedPairingCount++;
           continue;
         }
-        // Check for existing RSN in the spreadsheet
+
         if (existingRSNs.has(memberName)) {
           skippedPairingCount++;
           continue;
         }
 
-        // --------------------------------------------
-        // Sync new members
-        const publicSheetRSNs = new Set(publicSheetData.map(row => row.RSN?.toLowerCase()));
-
-        if (!publicSheetRSNs.has(memberName)) {
-          newMembersToAddToPublicSheet.push({
-            RSN: member.player.username,
-            Points: 0
-          });
-        }
-        // --------------------------------------------
-
-        // Find matching Discord user
         const discordMatch = humanMembers.find(discordMember => discordMember.displayName.toLowerCase() === memberName);
 
         const discordId = discordMatch ? discordMatch.id : null;
@@ -113,10 +98,10 @@ module.exports = {
           failedPairingsCount++;
         }
 
-        rowsToUpdate.push({
-          [COLUMN_RSN]: memberName,
-          [COLUMN_WOM_ID]: memberId,
-          [COLUMN_DISCORD_ID]: discordId || '1'
+        playersToCreate.push({
+          rsn: member.player.username,
+          wom_id: memberId,
+          discord_id: discordId || null
         });
 
         output += `**${member.player.username}** - WOM ID: ${memberId}, ${matchStatus}\n`;
@@ -127,13 +112,12 @@ module.exports = {
         }
       }
 
-      // Check for clan leavers
       const currentWOMIds = new Set(clanMembers.map(member => member.player.id.toString()));
-      for (const row of existingData) {
-        const womId = row[COLUMN_WOM_ID]?.toString();
-        if (!currentWOMIds.has(womId)) {
+      for (const player of existingPlayers) {
+        const womId = player.wom_id?.toString();
+        if (womId && !currentWOMIds.has(womId)) {
           leavers.push({
-            rsn: row[COLUMN_RSN],
+            rsn: player.rsn,
             womId: womId,
           });
         }
@@ -143,71 +127,65 @@ module.exports = {
         await interaction.followUp({ content: output, ephemeral: false });
       }
 
-      // Update spreadsheet for name changes specifically - ONLY update that supports both sheets currently! /!\
       for (const change of nameChanges) {
         try {
-          // Main sheet (ranks)
-          await axios.put(`${SHEETDB_API_URL}/${COLUMN_RSN}/${change.oldName}`, {
-            data: { [COLUMN_RSN]: change.newName, [COLUMN_WOM_ID]: change.memberId, [COLUMN_DISCORD_ID]: change.discordId }
-          });
+          await db.updatePlayerRsnByWomId(change.womId, change.newName);
           console.log(`Successfully updated RSN for WOM ID ${change.womId}: ${change.oldName} -> ${change.newName}`);
-
-          // Second sheet (points)
-          const publicRow = publicSheetData.find(row => row.RSN?.toLowerCase() === change.oldName.toLowerCase());
-          if (publicRow) {
-            await axios.put(`${PUBLIC_SHEET_API_URL}/RSN/${change.oldName}`, {
-              data: { RSN: change.newName }
-            });
-          }
         } catch (error) {
           console.error(`Error updating RSN for WOM ID ${change.womId}:`, error.message);
         }
       }
 
-      // Add new members (cont. L76)
-      if (newMembersToAddToPublicSheet.length > 0) {
-        await axios.post(PUBLIC_SHEET_API_URL, { data: newMembersToAddToPublicSheet });
-      }
+      // Nickname auto-fix disabled
+      // if (nicknameFixAttempts.length > 0) {
+      //   let fixOutput = '\n**🔧 Auto-fixing mismatched nicknames:**\n';
+      //   let fixedCount = 0;
+      //   let failedCount = 0;
 
-      // Remove leavers from both spreadsheets
+      //   for (const fix of nicknameFixAttempts) {
+      //     try {
+      //       await fix.member.setNickname(fix.correctRSN);
+      //       fixOutput += `✅ Updated <@${fix.discordId}> nickname: ${fix.currentNickname} → ${fix.correctRSN}\n`;
+      //       fixedCount++;
+      //       console.log(`Auto-fixed nickname for ${fix.discordId}: ${fix.currentNickname} -> ${fix.correctRSN}`);
+      //     } catch (error) {
+      //       fixOutput += `❌ Failed to update <@${fix.discordId}> nickname: ${error.message}\n`;
+      //       failedCount++;
+      //       console.error(`Failed to auto-fix nickname for ${fix.discordId}:`, error.message);
+      //     }
+      //   }
+
+      //   fixOutput += `\nFixed: ${fixedCount} | Failed: ${failedCount}\n`;
+      //   await interaction.followUp({ content: fixOutput, ephemeral: false });
+      // }
+
       if (leavers.length > 0) {
         try {
           for (const leaver of leavers) {
-            // Main spreadsheet
-            await axios.delete(`${SHEETDB_API_URL}/${COLUMN_WOM_ID}/${leaver.womId}`);
-            console.log(`Removed leaver internal ID sheet: RSN: ${leaver.rsn} - WOM ID: ${leaver.womId}`);
-
-            // Second spreadsheet (points sheet)
-            const matchingRow = publicSheetData.find(row => row.RSN?.toLowerCase() === leaver.rsn.toLowerCase());
-            if (matchingRow) {
-              try {
-                await axios.delete(`${PUBLIC_SHEET_API_URL}/RSN/${leaver.rsn}`);
-                console.log(`Removed leaver from public points sheet: RSN: ${leaver.rsn}`);
-              } catch (publicDeleteError) {
-                console.error(`Error removing RSN ${leaver.rsn} from the second spreadsheet:`, publicDeleteError.response?.data || publicDeleteError.message);
-              }
-            }
+            await db.deletePlayerByWomId(leaver.womId);
+            console.log(`Removed leaver: RSN: ${leaver.rsn} - WOM ID: ${leaver.womId}`);
           }
         } catch (deleteError) {
-          console.error('Error removing leavers from the spreadsheets:', deleteError.response?.data || deleteError.message);
-          await interaction.followUp('Failed to remove leavers from one or both spreadsheets. Check the console for debug logs.');
+          console.error('Error removing leavers:', deleteError.message);
+          await interaction.followUp('Failed to remove leavers. Check the console for debug logs.');
         }
       }
 
-      // Batch push new members/other sync data to SheetDB
-      if (rowsToUpdate.length > 0) {
+      if (playersToCreate.length > 0) {
         try {
-          const sheetDbResponse = await axios.post(SHEETDB_API_URL, { data: rowsToUpdate });
-          console.log(`SheetDB update success: ${sheetDbResponse.status} ${sheetDbResponse.statusText}`);
-        } catch (sheetError) {
-          console.error('Error updating SheetDB:', sheetError.response?.data || sheetError.message);
-          await interaction.followUp('Failed to update the spreadsheet. Check the console for debug logs.');
+          for (const playerData of playersToCreate) {
+            await db.createPlayer(playerData, 0);
+          }
+
+          console.log(`Successfully created ${playersToCreate.length} new players`);
+        } catch (createError) {
+          console.error('Error creating players:', createError.message);
+          await interaction.followUp('Failed to create new players. Check the console for debug logs.');
         }
       } else {
         await interaction.followUp('No **NEW** members to capture. All current clan members are already captured.');
       }
 
-      // Log leavers
       if (leavers.length > 0) {
         let leaversOutput = '**Detected and Updated Leavers:**\n';
         for (const leaver of leavers) {

@@ -6,8 +6,6 @@ require('dotenv').config();
 
 
 
-// https://sheetdb.io/api/v1/lyjrr6hjhh576 Old Sync Endpoint
-// https://sheetdb.io/api/v1/drgidl25d13pi Old Point Endpoint
 const commands = [];
 
 // Grab all comand folders
@@ -44,8 +42,9 @@ const rest = new REST().setToken(process.env.TOKEN);
 		);
 
 		console.log(`Successfully reloaded ${data.length} application (/) commands.`);
-		
+
 	} catch (error) {
 		console.error(error);
-	}}
-    )();
+	}
+}
+)();

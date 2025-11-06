@@ -4,7 +4,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
 const axios = require('axios');
+const db = require('../../db/supabase');
 const config = require('../../config.json');
+const { RANK_ROLES, determineRank } = require('./sync');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -36,48 +38,16 @@ module.exports = {
 
       const clanMembers = clanData.memberships;
 
-      // Define rank thresholds & role IDs
-      const ranks = [
-        { rank: 'Sweat', minEHB: 3000, roleId: '1339599170394259517', timeRequirement: null },
-        { rank: 'Master General', minEHB: 2500, roleId: '1339599293413068860', timeRequirement: null },
-        { rank: 'Touch Grass', minEHB: 2000, roleId: '1339599017813741652', timeRequirement: null },
-        { rank: 'Wrath', minEHB: 1500, roleId: '1238443298625159220', timeRequirement: null },
-        { rank: 'Top Dawgs', minEHB: 1250, roleId: '1309545563498352772', timeRequirement: null },
-        { rank: 'Mind Goblin', minEHB: 1000, roleId: '1087162684602056775', timeRequirement: null },
-        { rank: 'Holy', minEHB: 900, roleId: '1309547277966377050', timeRequirement: null },
-        { rank: 'Skull', minEHB: 800, roleId: '1087485648832843796', timeRequirement: null },
-        { rank: 'SLAAAAAY', minEHB: 650, roleId: '1309545367880208405', timeRequirement: null },
-        { rank: 'Guthixian', minEHB: 500, roleId: '1087167843998650399', timeRequirement: 2 * 365 * 24 * 60 * 60 * 1000 }, // 500 EHB **or** 2 years+
-        { rank: 'Black Hearts', minEHB: 350, roleId: '1309548746844930058', timeRequirement: 1 * 365 * 24 * 60 * 60 * 1000 }, // 350 EHB **or** 1-2 years
-        { rank: 'Discord Kitten', minEHB: 200, roleId: '1087482275307978894', timeRequirement: 6 * 30 * 24 * 60 * 60 * 1000 }, // 200 EHB **or** 6 months - 1 year
-        { rank: 'Brewaholic', minEHB: 100, roleId: '1213921453762809886', timeRequirement: 0 },
-      ];
+      // Use centralized RANK_ROLES from sync.js
+      // Get all rank role IDs for checking
+      const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
 
-      // const ranks = [
-      //   { rank: 'Wrath', minEHB: 1500, roleId: '1308188139940089856', timeRequirement: null },
-      //   { rank: 'Top Dawgs', minEHB: 1250, roleId: '1315911656471138344', timeRequirement: null },
-      //   { rank: 'Mind Goblin', minEHB: 1000, roleId: '1315911597230915586', timeRequirement: null },
-      //   { rank: 'Holy', minEHB: 900, roleId: '1308188079445639258', timeRequirement: null },
-      //   { rank: 'Skull', minEHB: 800, roleId: '1315911590561841243', timeRequirement: null },
-      //   { rank: 'SLAAAAAY', minEHB: 650, roleId: '1315911285803843594', timeRequirement: null },
-      //   { rank: 'Guthixian', minEHB: 500, roleId: '1315911507799965777', timeRequirement: 2 * 365 * 24 * 60 * 60 * 1000 },
-      //   { rank: 'Golden Shower', minEHB: 350, roleId: '1308188211796906128', timeRequirement: 1 * 365 * 24 * 60 * 60 * 1000 },
-      //   { rank: 'Discord Kitten', minEHB: 200, roleId: '1308188230679793755', timeRequirement: 6 * 30 * 24 * 60 * 60 * 1000 },
-      //   { rank: 'Brewaholic', minEHB: 100, roleId: '1315911335518670879', timeRequirement: 0 },
-      // ];
+      const existingPlayers = await db.getAllPlayers();
 
-      // Fetch Discord IDs and RSNs from Google Sheets using SheetDB
-      const SHEETDB_API_URL = config.SYNC_SHEETDB_API_URL; 
-      const sheetResponse = await axios.get(SHEETDB_API_URL);
-      const existingData = sheetResponse.data;
-
-      // Extract Discord IDs, RSNs, filtering out 0 for Discord IDs
       const discordIdToRsnMap = {};
-      existingData.forEach(row => {
-        const discordId = row["Discord ID"];
-        const rsn = row["RSN"];
-        if (discordId && discordId !== '0' && discordId !== '1' && rsn ) {
-          discordIdToRsnMap[discordId] = rsn;
+      existingPlayers.forEach(player => {
+        if (player.discord_id && player.rsn) {
+          discordIdToRsnMap[player.discord_id] = player.rsn;
         }
       });
 
@@ -111,29 +81,30 @@ module.exports = {
       for (const discordId in discordIdToRsnMap) {
         const member = allMembers.get(discordId);
         if (member) {
-          const rsn = discordIdToRsnMap[discordId]; 
-          const joinDuration = Date.now() - member.joinedTimestamp;
-          
-          const clanMember = clanMembers.find(m => m.player.username === rsn);
-          const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0; 
+          const rsn = discordIdToRsnMap[discordId];
 
-          // Determine the rank (based on ranks[])
-          const eligibleRank = ranks.find(r => 
-            ehb >= r.minEHB || (r.timeRequirement !== null && joinDuration >= r.timeRequirement)
-          );
-          const calculatedRank = eligibleRank ? eligibleRank.rank : null;
-          const calculatedRankId = eligibleRank ? eligibleRank.roleId : null;
+          const clanMember = clanMembers.find(m => m.player.username === rsn);
+          const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
+
+          // Determine the rank using centralized function
+          const calculatedRank = determineRank(ehb);
+          const calculatedRankId = RANK_ROLES[calculatedRank];
 
           const memberRoles = member.roles.cache;
-          const currentRank = ranks.find(r => memberRoles.has(r.roleId))?.rank || 'None';
+
+          // Get current rank role (if any)
+          const currentRankRole = memberRoles.find(role => allRankRoleIds.includes(role.id));
+          const currentRank = currentRankRole
+            ? Object.keys(RANK_ROLES).find(key => RANK_ROLES[key] === currentRankRole.id)
+            : 'None';
           const currentRankEmoji = rankEmojiMap[currentRank] || '';
 
           const hasCorrectRank = memberRoles.some(role => role.id === calculatedRankId);
 
           if (!hasCorrectRank) {
-            const rolesToRemove = memberRoles.filter(role => ranks.some(r => r.roleId === role.id));
-            if (rolesToRemove.size > 0) {
-              await member.roles.remove(rolesToRemove, 'Removing outdated EHB roles');
+            // Only remove the current rank role, not all roles
+            if (currentRankRole) {
+              await member.roles.remove(currentRankRole, 'Removing old rank role');
             }
 
             if (calculatedRankId) {

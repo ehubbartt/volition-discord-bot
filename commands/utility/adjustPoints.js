@@ -1,17 +1,17 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const db = require('../../db/supabase');
 const config = require('../../config.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('adjustpoints')
         .setDescription('(Admin Only)')
-        .addStringOption(option => 
+        .addStringOption(option =>
             option.setName('rsn')
                 .setDescription("The user's RSN(s), comma separated if multiple RSNs")
                 .setRequired(true)
         )
-        .addIntegerOption(option => 
+        .addIntegerOption(option =>
             option.setName('points')
                 .setDescription('Positive or negative integers only.')
                 .setRequired(true)
@@ -39,19 +39,13 @@ module.exports = {
         let results = [];
 
         try {
-            const COLUMN_POINTS = config.COLUMN_POINTS;
-            const COLUMN_RSN = config.COLUMN_RSN;
-            const SHEETDB_API_URL = config.POINTS_SHEETDB_API_URL;
-
             for (const rsn of rsnList) {
-                const searchResponse = await axios.get(`${SHEETDB_API_URL}/search?${COLUMN_RSN}=${rsn}`);
-                if (searchResponse.data.length > 0) {
-                    const existingPoints = parseInt(searchResponse.data[0][COLUMN_POINTS], 10) || 0;
+                const player = await db.getPlayerByRSN(rsn);
+                if (player && player.player_points) {
+                    const existingPoints = player.player_points.points || 0;
                     const newTotalPoints = existingPoints + pointsToAdd;
 
-                    await axios.put(`${SHEETDB_API_URL}/${COLUMN_RSN}/${rsn}`, {
-                        data: { [COLUMN_RSN]: rsn, [COLUMN_POINTS]: newTotalPoints }
-                    });
+                    await db.addPoints(rsn, pointsToAdd);
 
                     results.push(pointsToAdd < 0
                         ? `Removed **${Math.abs(pointsToAdd)}** points from **${rsn}**. New total: **${newTotalPoints}**.`
@@ -70,10 +64,9 @@ module.exports = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error('Error interacting with SheetDB API:', error.message);
-            if (error.response) console.error('Response:', error.response.data, 'Code:', error.response.status);
+            console.error('Error adjusting points:', error.message);
 
-            await interaction.editReply({ content: 'Error interacting with SheetDB API. Check console for help with debugging.' });
+            await interaction.editReply({ content: 'Error adjusting points. Check console for help with debugging.' });
         }
     },
 };

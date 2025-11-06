@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ButtonBuilder, ActionRowBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
-const axios = require('axios');
+const db = require('../../db/supabase');
 const config = require('../../config.json');
 
 module.exports = {
@@ -21,15 +21,11 @@ module.exports = {
     await interaction.deferReply({ ephemeral: false });
 
     try {
-      const SHEETDB_API_URL = config.SYNC_SHEETDB_API_URL;
       const FRIEND_OF_CLAN_ROLE_ID = '1351873965672628244';
 
-      // Fetch existing data from SheetDB
-      const sheetResponse = await axios.get(SHEETDB_API_URL);
-      const existingData = sheetResponse.data;
+      const existingPlayers = await db.getAllPlayers();
 
-      // Extract a set of all Discord IDs that are in the sync sheet
-      const syncedDiscordIDs = new Set(existingData.map(row => row[config.COLUMN_DISCORD_ID]?.toString()));
+      const syncedDiscordIDs = new Set(existingPlayers.map(p => p.discord_id?.toString()).filter(Boolean));
 
       // Fetch Discord members
       const discordMembers = await interaction.guild.members.fetch();
