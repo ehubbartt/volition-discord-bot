@@ -1,12 +1,11 @@
-// commands/fun/lootcrate.js
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 module.exports = {
-  name: 'lootcrate',
-  run: async (message) => {
-    if (message.author.bot) return;
-    if (message.content.toLowerCase().trim() !== '!lootcrate') return;
+  data: new SlashCommandBuilder()
+    .setName('lootcrate')
+    .setDescription('Open a Volition loot crate for VP and prizes'),
 
+  async execute(interaction) {
     const embed = new EmbedBuilder()
       .setTitle('Volition Loot Crate 🎁')
       .setDescription('A crate full of loot has appeared!')
@@ -23,6 +22,6 @@ module.exports = {
         .setStyle(ButtonStyle.Primary)
     );
 
-    await message.channel.send({ embeds: [embed], components: [row] });
+    await interaction.reply({ embeds: [embed], components: [row] });
   }
 };
