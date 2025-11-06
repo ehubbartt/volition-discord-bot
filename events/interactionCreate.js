@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../db/supabase');
 const config = require('../config.json');
+const features = require('../utils/features');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -10,6 +11,15 @@ module.exports = {
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
       if (!command) return console.error(`No command matching ${interaction.commandName} was found.`);
+
+      // Check if command is enabled in features.json
+      if (!features.isCommandEnabled(interaction.commandName)) {
+        return interaction.reply({
+          content: `⚠️ The \`/${interaction.commandName}\` command is currently disabled.`,
+          ephemeral: true
+        });
+      }
+
       try {
         await command.execute(interaction);
       } catch (error) {
@@ -30,8 +40,27 @@ module.exports = {
 
     // Handle ticket creation dropdown
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_create') {
+      // Check if ticket system is enabled
+      if (!features.isEnabled('ticketSystem.enabled')) {
+        return interaction.reply({
+          content: '⚠️ The ticket system is currently disabled.',
+          ephemeral: true
+        });
+      }
+
       const { PermissionFlagsBits, ChannelType } = require('discord.js');
       const ticketType = interaction.values[0];
+
+      // Check if specific ticket type is enabled
+      if (ticketType === 'join' && !features.isEnabled('ticketSystem.allowJoinTickets')) {
+        return interaction.reply({ content: '⚠️ Join tickets are currently disabled.', ephemeral: true });
+      }
+      if (ticketType === 'general' && !features.isEnabled('ticketSystem.allowGeneralTickets')) {
+        return interaction.reply({ content: '⚠️ General tickets are currently disabled.', ephemeral: true });
+      }
+      if (ticketType === 'shop' && !features.isEnabled('ticketSystem.allowShopTickets')) {
+        return interaction.reply({ content: '⚠️ Shop tickets are currently disabled.', ephemeral: true });
+      }
 
       try {
         // Determine category based on ticket type
@@ -299,6 +328,16 @@ module.exports = {
       await interaction.editReply({ embeds: [embed], components: [lootButtons()] });
     }
     if (interaction.isButton()) {
+      // Loot crate buttons - check if feature is enabled
+      if (interaction.customId === 'lootcrate_claim_free' || interaction.customId === 'lootcrate_spin_paid') {
+        if (!features.isEnabled('gamification.lootCrates')) {
+          return interaction.reply({
+            content: '⚠️ Loot crates are currently disabled.',
+            ephemeral: true
+          });
+        }
+      }
+
       if (interaction.customId === 'lootcrate_claim_free') await handleLootInteraction(interaction, true);
       if (interaction.customId === 'lootcrate_spin_paid') await handleLootInteraction(interaction, false);
 

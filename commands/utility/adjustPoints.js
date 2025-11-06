@@ -5,10 +5,10 @@ const config = require('../../config.json');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('adjustpoints')
-        .setDescription('(Admin Only)')
+        .setDescription('(Admin Only) Adjust VP points for players')
         .addStringOption(option =>
-            option.setName('rsn')
-                .setDescription("The user's RSN(s), comma separated if multiple RSNs")
+            option.setName('player')
+                .setDescription("RSN or @mention (comma separated for multiple)")
                 .setRequired(true)
         )
         .addIntegerOption(option =>
@@ -27,32 +27,57 @@ module.exports = {
 
         await interaction.deferReply({ ephemeral: false });
 
-        const rsnInput = interaction.options.getString('rsn');
+        const playerInput = interaction.options.getString('player');
         const pointsToAdd = interaction.options.getInteger('points');
 
         if (isNaN(pointsToAdd)) {
             return interaction.editReply({ content: 'Invalid points input. Please enter a valid number.' });
         }
 
-        const rsnList = rsnInput.split(',').map(rsn => rsn.trim()).filter(rsn => rsn.length > 0);
+        // Split by comma and trim
+        const playerList = playerInput.split(',').map(p => p.trim()).filter(p => p.length > 0);
 
         let results = [];
 
         try {
-            for (const rsn of rsnList) {
-                const player = await db.getPlayerByRSN(rsn);
-                if (player && player.player_points) {
-                    const existingPoints = player.player_points.points || 0;
-                    const newTotalPoints = existingPoints + pointsToAdd;
+            for (const playerEntry of playerList) {
+                let player = null;
+                let displayName = '';
 
-                    await db.addPoints(rsn, pointsToAdd);
+                // Check if it's a Discord mention
+                const mentionMatch = playerEntry.match(/^<@!?(\d+)>$/);
 
-                    results.push(pointsToAdd < 0
-                        ? `Removed **${Math.abs(pointsToAdd)}** points from **${rsn}**. New total: **${newTotalPoints}**.`
-                        : `Added **${pointsToAdd}** points to **${rsn}**. New total: **${newTotalPoints}**.`);
+                if (mentionMatch) {
+                    // It's a Discord mention
+                    const userId = mentionMatch[1];
+                    player = await db.getPlayerByDiscordId(userId);
+
+                    if (!player) {
+                        results.push(`<@${userId}>: Not found in the clan database.`);
+                        continue;
+                    }
+
+                    displayName = `<@${userId}> (${player.rsn})`;
                 } else {
-                    results.push(`**${rsn}**: Not found in the clan. No points were adjusted.`);
+                    // Treat as RSN
+                    player = await db.getPlayerByRSN(playerEntry);
+                    displayName = playerEntry;
+
+                    if (!player) {
+                        results.push(`**${playerEntry}**: Not found in the clan database.`);
+                        continue;
+                    }
                 }
+
+                // Adjust points
+                const existingPoints = player.player_points?.points || 0;
+                const newTotalPoints = existingPoints + pointsToAdd;
+
+                await db.addPoints(player.rsn, pointsToAdd);
+
+                results.push(pointsToAdd < 0
+                    ? `Removed **${Math.abs(pointsToAdd)}** points from ${displayName}. New total: **${newTotalPoints}**.`
+                    : `Added **${pointsToAdd}** points to ${displayName}. New total: **${newTotalPoints}**.`);
             }
 
             const embed = new EmbedBuilder()

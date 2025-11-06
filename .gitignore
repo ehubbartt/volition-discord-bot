@@ -1,4 +1,9 @@
 node_modules
 .env
+
+# Config files (contain sensitive Discord IDs)
 config.json
+config.production.json
+config.test.json
 configtest.json
+config.json.production

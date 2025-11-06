@@ -9,12 +9,13 @@ module.exports = {
     .setDescription('(Admin Only)'),
 
   async execute(interaction) {
-    // Command exclusivity
+    // Command exclusivity - check if user has admin role from config
     const member = interaction.member;
-    const allowedRoleIds = ['1308175000620240906', '1303488536627908679', '571390912966688768', '1239291642813354075', '1239290911117279292', '1239292257929134162']; // Update as needed
-    const hasRole = allowedRoleIds.some(roleId => member.roles.cache.has(roleId));
+    const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
+      member.roles.cache.has(roleId)
+    );
 
-    if (!hasRole) {
+    if (!isAdmin) {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
     }
 

@@ -62,11 +62,64 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         );
 
         if (!playerInClan) {
+            // Player not in clan - check if they exist in database and remove them
+            await interaction.editReply({
+                content: `⚠️ **${rsn}** is not in the WOM clan...\n\nChecking database...`
+            });
+
+            // Try to find player in database by RSN
+            const existingPlayer = await db.getPlayerByRSN(rsn);
+
+            if (existingPlayer) {
+                // Player exists in database but not in clan - remove them
+                await interaction.editReply({
+                    content: `⚠️ **${rsn}** is not in the WOM clan...\n\n` +
+                        `Found in database - removing...`
+                });
+
+                try {
+                    await db.deletePlayerByWomId(existingPlayer.wom_id);
+
+                    const removedEmbed = new EmbedBuilder()
+                        .setColor('Orange')
+                        .setTitle('🗑️ Player Removed from Database')
+                        .setDescription(
+                            `**${rsn}** was not found in the Volition clan on WOM and has been removed from the database.\n\n` +
+                            `**Removed Player:**\n` +
+                            `• RSN: ${existingPlayer.rsn}\n` +
+                            `• Discord: ${existingPlayer.discord_id ? `<@${existingPlayer.discord_id}>` : 'Not linked'}\n` +
+                            `• VP Balance: ${existingPlayer.player_points?.points || 0}\n` +
+                            `• WOM ID: ${existingPlayer.wom_id}\n\n` +
+                            `**Reason:** Player is no longer in the WOM clan\n\n` +
+                            `If this was a mistake, please:\n` +
+                            `1. Add the player back to the WOM clan\n` +
+                            `2. Run \`/syncuser\` again to re-add them`
+                        )
+                        .setTimestamp();
+
+                    return interaction.editReply({ content: null, embeds: [removedEmbed] });
+                } catch (error) {
+                    console.error('[SyncUser] Error removing player from database:', error);
+                    const errorEmbed = new EmbedBuilder()
+                        .setColor('Red')
+                        .setTitle('❌ Database Error')
+                        .setDescription(
+                            `**${rsn}** is not in the WOM clan, but there was an error removing them from the database.\n\n` +
+                            `Error: \`${error.message}\``
+                        )
+                        .setTimestamp();
+
+                    return interaction.editReply({ content: null, embeds: [errorEmbed] });
+                }
+            }
+
+            // Player not in clan and not in database
             const errorEmbed = new EmbedBuilder()
                 .setColor('Red')
                 .setTitle('❌ Not In Clan')
                 .setDescription(
                     `**${rsn}** is not found in the Volition clan on Wise Old Man.\n\n` +
+                    `The player is also not in the bot's database.\n\n` +
                     `Please make sure:\n` +
                     `1. The player has been added to the WOM clan\n` +
                     `2. The RSN is spelled correctly\n` +

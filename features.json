@@ -1,0 +1,134 @@
+{
+  "_comment": "Feature toggle configuration - Enable/disable bot features and commands",
+  "environment": {
+    "_description": "Environment settings - Switch between production and test configurations",
+    "_options": [
+      "production",
+      "test"
+    ],
+    "mode": "production"
+  },
+  "events": {
+    "_description": "Control automatic bot event handlers",
+    "autoJoinTickets": false,
+    "autoAddUnverifiedRole": false,
+    "handleGuildMemberAdd": true,
+    "womMessageListener": true,
+    "reactionRoleSystem": true
+  },
+  "verification": {
+    "_description": "Player verification system features",
+    "enabled": true,
+    "autoUpdateNicknames": true,
+    "requirementCheck": true,
+    "pingAdminOnFailure": true
+  },
+  "ticketSystem": {
+    "_description": "Support ticket features",
+    "enabled": true,
+    "allowJoinTickets": true,
+    "allowGeneralTickets": true,
+    "allowShopTickets": true,
+    "createTranscripts": true,
+    "archiveOnClose": true
+  },
+  "rankManagement": {
+    "_description": "Automatic rank syncing and role assignment",
+    "enabled": true,
+    "autoSyncRanks": true,
+    "autoUpdateRoles": true,
+    "syncFromWiseOldMan": true
+  },
+  "pointsSystem": {
+    "_description": "VP (Volition Points) tracking and rewards",
+    "enabled": true,
+    "allowPointAdjustments": true,
+    "trackPointHistory": true,
+    "showLeaderboard": true
+  },
+  "gamification": {
+    "_description": "Fun engagement features",
+    "lootCrates": true,
+    "dailyWordle": true,
+    "duels": true,
+    "weeklyTasks": true,
+    "eventRewards": true
+  },
+  "commands": {
+    "_description": "Individual command toggles - Set to false to disable specific commands",
+    "verification": {
+      "verify": true,
+      "adminverify": true,
+      "createverifymessage": true
+    },
+    "tickets": {
+      "createticketmessage": true,
+      "close": true
+    },
+    "points": {
+      "checkpoints": true,
+      "adjustpoints": true,
+      "leaderboard": true
+    },
+    "admin": {
+      "sync": true,
+      "syncuser": true,
+      "updateranks": true,
+      "syncwomdiscids": true,
+      "inactive": true,
+      "rewardevent": true
+    },
+    "fun": {
+      "lootcrate": true,
+      "weeklytask": true,
+      "dailywordle": true,
+      "duel": true
+    },
+    "debug": {
+      "_description": "Testing and debug commands - Keep disabled in production",
+      "testpreverify": false,
+      "testpostverify": false,
+      "testverifyflow": false,
+      "debugtasks": false,
+      "undonicknames": false
+    }
+  },
+  "notifications": {
+    "_description": "Bot notification settings",
+    "sendWelcomeMessages": true,
+    "sendVerificationSuccess": true,
+    "sendPointAdjustmentNotifications": true,
+    "sendRankChangeNotifications": true,
+    "sendEventReminders": true
+  },
+  "automation": {
+    "_description": "Automated bot tasks",
+    "dailyTaskReset": true,
+    "weeklyTaskReset": true,
+    "autoSyncPlayers": false,
+    "autoKickInactive": false,
+    "autoBackupDatabase": false
+  },
+  "integrations": {
+    "_description": "Third-party service integrations",
+    "wiseOldManAPI": true,
+    "supabaseDatabase": true,
+    "discordAPI": true
+  },
+  "moderation": {
+    "_description": "Moderation and security features",
+    "requireAdminForPointAdjustment": true,
+    "requireAdminForSync": true,
+    "requireAdminForTicketManagement": true,
+    "logCommandUsage": true,
+    "preventDuplicateVerification": true
+  },
+  "limits": {
+    "_description": "Rate limits and restrictions",
+    "lootCrateDailyCooldown": true,
+    "wordleDailyLimit": true,
+    "duelMinimumStake": 10,
+    "duelMaximumStake": 10000,
+    "pointAdjustmentMaxPerCommand": 10000
+  }
+}

@@ -8,85 +8,199 @@ const { RANK_ROLES, determineRank } = require('../commands/utility/sync');
 async function handleJoinMessage(description, originalMessage) {
     try {
         // Extract RSNs from description
-        // WOM format can be: "🔷 PlayerName" OR ":emoji: PlayerName" (like :feeder: iAdren)
+        // WOM format can be: "🔷 PlayerName" OR ":emoji: PlayerName" OR "<:emoji:ID> PlayerName"
+        console.log('[JOIN] =====================================');
         console.log('[JOIN] Raw description:', description);
+        console.log('[JOIN] Description length:', description.length);
+        console.log('[JOIN] =====================================');
 
-        // First try the :emoji: format (e.g., ":feeder: iAdren")
-        let rsnMatches = description.match(/:[a-z_]+:\s*([a-zA-Z0-9\s_-]+)/gi);
+        let rsns = [];
 
-        // If that doesn't work, try the Unicode emoji format
-        if (!rsnMatches || rsnMatches.length === 0) {
-            rsnMatches = description.match(/(?:🔷|▪️|•)\s*([a-zA-Z0-9\s_-]+)/g);
+        // Try different patterns:
+        // 1. Custom Discord emoji format: <:feeder:1159532437412515860> PlayerName
+        const customEmojiMatches = description.match(/<a?:[a-z_0-9]+:\d+>\s*([a-zA-Z0-9\s_-]+)/gi);
+        if (customEmojiMatches && customEmojiMatches.length > 0) {
+            console.log('[JOIN] Found custom emoji format matches:', customEmojiMatches);
+            for (const match of customEmojiMatches) {
+                // Extract username after the emoji
+                const rsn = match.replace(/<a?:[a-z_0-9]+:\d+>/gi, '').trim();
+                if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) { // Make sure it's not just numbers
+                    rsns.push(rsn);
+                    console.log('[JOIN] ✅ Extracted RSN from custom emoji:', rsn);
+                }
+            }
         }
 
-        if (!rsnMatches || rsnMatches.length === 0) {
-            console.log('[WOM MESSAGE] Could not extract RSNs from join message');
-            console.log('[WOM MESSAGE] Description was:', description);
+        // 2. Standard emoji format: :emoji: PlayerName
+        if (rsns.length === 0) {
+            const standardEmojiMatches = description.match(/:[a-z_]+:\s*([a-zA-Z0-9\s_-]+)/gi);
+            if (standardEmojiMatches && standardEmojiMatches.length > 0) {
+                console.log('[JOIN] Found standard emoji format matches:', standardEmojiMatches);
+                for (const match of standardEmojiMatches) {
+                    const rsn = match.replace(/:[a-z_]+:/gi, '').trim();
+                    if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) {
+                        rsns.push(rsn);
+                        console.log('[JOIN] ✅ Extracted RSN from standard emoji:', rsn);
+                    }
+                }
+            }
+        }
+
+        // 3. Unicode emoji format: 🔷 PlayerName
+        if (rsns.length === 0) {
+            const unicodeEmojiMatches = description.match(/(?:🔷|▪️|•)\s*([a-zA-Z0-9\s_-]+)/g);
+            if (unicodeEmojiMatches && unicodeEmojiMatches.length > 0) {
+                console.log('[JOIN] Found unicode emoji format matches:', unicodeEmojiMatches);
+                for (const match of unicodeEmojiMatches) {
+                    const rsn = match.replace(/(?:🔷|▪️|•)\s*/, '').trim();
+                    if (rsn && rsn.length > 0) {
+                        rsns.push(rsn);
+                        console.log('[JOIN] ✅ Extracted RSN from unicode emoji:', rsn);
+                    }
+                }
+            }
+        }
+
+        if (rsns.length === 0) {
+            console.log('[JOIN] ❌ Could not extract any RSNs from join message');
+            console.log('[JOIN] Description was:', description);
+
+            // Send notification to log channel
+            await sendSyncErrorNotification(originalMessage, 'Could not parse player name from WOM message', description);
             return;
         }
 
-        console.log('[JOIN] Found matches:', rsnMatches);
+        console.log('[JOIN] Final extracted RSNs:', rsns);
+        console.log('[JOIN] Total RSNs to process:', rsns.length);
 
-        for (const match of rsnMatches) {
-            // Clean up RSN (remove emoji and whitespace)
-            // Remove both :emoji: format and Unicode emojis
-            const rsn = match.replace(/:[a-z_]+:/gi, '').replace(/(?:🔷|▪️|•)\s*/, '').trim();
-
-            if (!rsn) continue;
-
-            console.log(`\n[JOIN] Processing: ${rsn}`);
+        for (const rsn of rsns) {
+            console.log(`\n[JOIN] ======================================`);
+            console.log(`[JOIN] Processing RSN: "${rsn}"`);
+            console.log(`[JOIN] RSN length: ${rsn.length} characters`);
+            console.log(`[JOIN] ======================================`);
             await processMemberJoin(rsn, originalMessage);
         }
     } catch (error) {
-        console.error('[WOM MESSAGE] Error handling join message:', error);
+        console.error('[JOIN] ❌ Error handling join message:', error);
+        await sendSyncErrorNotification(originalMessage, 'Error processing join message', error.message);
     }
 }
 
 // Parse and handle leave messages
 async function handleLeaveMessage(description, originalMessage) {
     try {
-        // Extract RSNs from description
+        console.log('[LEAVE] =====================================');
         console.log('[LEAVE] Raw description:', description);
+        console.log('[LEAVE] Description length:', description.length);
+        console.log('[LEAVE] =====================================');
 
-        // First try the :emoji: format (e.g., ":feeder: iAdren")
-        let rsnMatches = description.match(/:[a-z_]+:\s*([a-zA-Z0-9\s_-]+)/gi);
+        let rsns = [];
 
-        // If that doesn't work, try the Unicode emoji format
-        if (!rsnMatches || rsnMatches.length === 0) {
-            rsnMatches = description.match(/(?:🔷|▪️|•)\s*([a-zA-Z0-9\s_-]+)/g);
+        // Check for "left: RSN" format first (common in title)
+        // Format: "👋 Group member left: bajjy"
+        const leftColonMatch = description.match(/(?:left|member left):\s*([a-zA-Z0-9\s_-]+)/i);
+        if (leftColonMatch && leftColonMatch[1]) {
+            const rsn = leftColonMatch[1].trim();
+            if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) {
+                rsns.push(rsn);
+                console.log('[LEAVE] ✅ Extracted RSN from "left:" format:', rsn);
+            }
         }
 
-        if (!rsnMatches || rsnMatches.length === 0) {
-            console.log('[WOM MESSAGE] Could not extract RSNs from leave message');
-            console.log('[WOM MESSAGE] Description was:', description);
+        // If that didn't work, try other patterns:
+        if (rsns.length === 0) {
+            // 1. Custom Discord emoji format: <:feeder:1159532437412515860> PlayerName
+            const customEmojiMatches = description.match(/<a?:[a-z_0-9]+:\d+>\s*([a-zA-Z0-9\s_-]+)/gi);
+            if (customEmojiMatches && customEmojiMatches.length > 0) {
+                console.log('[LEAVE] Found custom emoji format matches:', customEmojiMatches);
+                for (const match of customEmojiMatches) {
+                    const rsn = match.replace(/<a?:[a-z_0-9]+:\d+>/gi, '').trim();
+                    if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) {
+                        rsns.push(rsn);
+                        console.log('[LEAVE] ✅ Extracted RSN from custom emoji:', rsn);
+                    }
+                }
+            }
+        }
+
+        // 2. Standard emoji format: :emoji: PlayerName
+        if (rsns.length === 0) {
+            const standardEmojiMatches = description.match(/:[a-z_]+:\s*([a-zA-Z0-9\s_-]+)/gi);
+            if (standardEmojiMatches && standardEmojiMatches.length > 0) {
+                console.log('[LEAVE] Found standard emoji format matches:', standardEmojiMatches);
+                for (const match of standardEmojiMatches) {
+                    const rsn = match.replace(/:[a-z_]+:/gi, '').trim();
+                    if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) {
+                        rsns.push(rsn);
+                        console.log('[LEAVE] ✅ Extracted RSN from standard emoji:', rsn);
+                    }
+                }
+            }
+        }
+
+        // 3. Unicode emoji format: 🔷 PlayerName
+        if (rsns.length === 0) {
+            const unicodeEmojiMatches = description.match(/(?:🔷|▪️|•|👋)\s*([a-zA-Z0-9\s_-]+)/g);
+            if (unicodeEmojiMatches && unicodeEmojiMatches.length > 0) {
+                console.log('[LEAVE] Found unicode emoji format matches:', unicodeEmojiMatches);
+                for (const match of unicodeEmojiMatches) {
+                    const rsn = match.replace(/(?:🔷|▪️|•|👋)\s*/, '').trim();
+                    // Filter out common words that might match
+                    if (rsn && rsn.length > 0 && !['group', 'member', 'left'].includes(rsn.toLowerCase())) {
+                        rsns.push(rsn);
+                        console.log('[LEAVE] ✅ Extracted RSN from unicode emoji:', rsn);
+                    }
+                }
+            }
+        }
+
+        if (rsns.length === 0) {
+            console.log('[LEAVE] ❌ Could not extract any RSNs from leave message');
+            console.log('[LEAVE] Description was:', description);
+            await sendSyncErrorNotification(originalMessage, 'Could not parse player name from WOM leave message', description);
             return;
         }
 
-        console.log('[LEAVE] Found matches:', rsnMatches);
+        console.log('[LEAVE] Final extracted RSNs:', rsns);
+        console.log('[LEAVE] Total RSNs to process:', rsns.length);
 
-        for (const match of rsnMatches) {
-            // Clean up RSN (remove emoji and whitespace)
-            const rsn = match.replace(/:[a-z_]+:/gi, '').replace(/(?:🔷|▪️|•)\s*/, '').trim();
-
-            if (!rsn) continue;
-
-            console.log(`\n[LEAVE] Processing: ${rsn}`);
+        for (const rsn of rsns) {
+            console.log(`\n[LEAVE] ======================================`);
+            console.log(`[LEAVE] Processing RSN: "${rsn}"`);
+            console.log(`[LEAVE] RSN length: ${rsn.length} characters`);
+            console.log(`[LEAVE] ======================================`);
             await processMemberLeave(rsn, originalMessage);
         }
     } catch (error) {
-        console.error('[WOM MESSAGE] Error handling leave message:', error);
+        console.error('[LEAVE] ❌ Error handling leave message:', error);
+        await sendSyncErrorNotification(originalMessage, 'Error processing leave message', error.message);
     }
 }
 
 // Process member join - Full sync with Discord and database
 async function processMemberJoin(rsn, originalMessage) {
-    console.log(`[JOIN] Fetching stats for ${rsn}...`);
+    console.log(`[JOIN] ======================================`);
+    console.log(`[JOIN] Starting WOM API fetch for: "${rsn}"`);
+    console.log(`[JOIN] Encoded URL parameter: ${encodeURIComponent(rsn)}`);
+    console.log(`[JOIN] Full API URL: https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`);
+    console.log(`[JOIN] ======================================`);
 
     try {
         // Fetch player stats from WOM
         const playerResponse = await axios.get(
-            `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`
+            `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`,
+            {
+                headers: {
+                    'User-Agent': 'Volition-Discord-Bot',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000 // 10 second timeout
+            }
         );
+
+        console.log(`[JOIN] ✅ WOM API Response Status: ${playerResponse.status}`);
+        console.log(`[JOIN] ✅ WOM API Response received successfully`);
+
         const playerData = playerResponse.data;
 
         const womId = playerData.id.toString();
@@ -189,9 +303,42 @@ async function processMemberJoin(rsn, originalMessage) {
         // Send custom notification with full stats
         await sendJoinNotification(rsn, totalLevel, ehb, ehp, rank, womId, originalMessage, nicknameChanged, rankAssigned, discordId);
 
+        // Send confirmation to log channel
+        const confirmDetails = `**Player:** ${rsn}\n` +
+            `**Total Level:** ${totalLevel}\n` +
+            `**EHB:** ${ehb} | **EHP:** ${ehp}\n` +
+            `**Rank:** ${rank}\n` +
+            `**Discord:** ${discordId ? `<@${discordId}>` : 'Not linked'}\n` +
+            `**Database:** ✅ Synced`;
+        await sendSyncConfirmation(originalMessage, 'Member Join Auto-Synced', confirmDetails);
+
         console.log(`[JOIN] ✅ Successfully processed ${rsn}`);
     } catch (error) {
-        console.error(`[JOIN] ❌ Error processing ${rsn}:`, error.message);
+        console.error(`[JOIN] ======================================`);
+        console.error(`[JOIN] ❌ ERROR processing RSN: "${rsn}"`);
+        console.error(`[JOIN] Error Type: ${error.constructor.name}`);
+        console.error(`[JOIN] Error Message: ${error.message}`);
+
+        if (error.response) {
+            console.error(`[JOIN] HTTP Status: ${error.response.status}`);
+            console.error(`[JOIN] HTTP Status Text: ${error.response.statusText}`);
+            console.error(`[JOIN] Response Data:`, JSON.stringify(error.response.data, null, 2));
+            console.error(`[JOIN] Request URL: ${error.config?.url}`);
+        } else if (error.request) {
+            console.error(`[JOIN] No response received from WOM API`);
+            console.error(`[JOIN] Request Details:`, error.request);
+        } else {
+            console.error(`[JOIN] Error Details:`, error);
+        }
+        console.error(`[JOIN] Full Stack Trace:`, error.stack);
+        console.error(`[JOIN] ======================================`);
+
+        // Send error notification to log channel
+        await sendSyncErrorNotification(
+            originalMessage,
+            `Failed to process member join for: ${rsn}`,
+            error.response ? `HTTP ${error.response.status}: ${error.response.statusText}` : error.message
+        );
     }
 }
 
@@ -243,6 +390,13 @@ async function processMemberLeave(rsn, originalMessage) {
 
         // Send custom leave notification
         await sendLeaveNotification(rsn, womId, existingPlayer, originalMessage);
+
+        // Send confirmation to log channel
+        const confirmDetails = `**Player:** ${rsn}\n` +
+            `**Discord:** ${existingPlayer?.discord_id ? `<@${existingPlayer.discord_id}>` : 'Not linked'}\n` +
+            `**VP Balance:** ${existingPlayer?.player_points?.points || 0}\n` +
+            `**Database:** ${existingPlayer ? '✅ Removed' : 'ℹ️ Was not in database'}`;
+        await sendSyncConfirmation(originalMessage, 'Member Leave Auto-Synced', confirmDetails);
 
         console.log(`[LEAVE] ✅ Successfully processed ${rsn}`);
     } catch (error) {
@@ -353,6 +507,74 @@ async function sendLeaveNotification(rsn, womId, playerData, originalMessage) {
     }
 }
 
+// Send error notification to log channel
+async function sendSyncErrorNotification(originalMessage, errorTitle, errorDetails) {
+    try {
+        const LOG_CHANNEL_ID = config.PAYOUT_LOG_CHANNEL_ID;
+
+        if (!LOG_CHANNEL_ID) {
+            console.error('[SYNC ERROR] No log channel configured in config.PAYOUT_LOG_CHANNEL_ID');
+            return;
+        }
+
+        const logChannel = await originalMessage.guild.channels.fetch(LOG_CHANNEL_ID);
+
+        if (!logChannel) {
+            console.error('[SYNC ERROR] Could not find log channel');
+            return;
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('❌ Auto-Sync Error')
+            .setDescription(errorTitle)
+            .addFields(
+                { name: 'Error Details', value: errorDetails.slice(0, 1024), inline: false },
+                { name: 'WOM Message Link', value: `[Jump to Message](${originalMessage.url})`, inline: false }
+            )
+            .setFooter({ text: 'Check console logs for full details' })
+            .setTimestamp();
+
+        await logChannel.send({ embeds: [embed] });
+        console.log('[SYNC ERROR] ✅ Sent error notification to log channel');
+    } catch (error) {
+        console.error('[SYNC ERROR] ❌ Failed to send error notification:', error.message);
+    }
+}
+
+// Send sync confirmation to log channel
+async function sendSyncConfirmation(originalMessage, action, details) {
+    try {
+        const LOG_CHANNEL_ID = config.PAYOUT_LOG_CHANNEL_ID;
+
+        if (!LOG_CHANNEL_ID) {
+            console.log('[SYNC CONFIRM] No log channel configured, skipping confirmation');
+            return;
+        }
+
+        const logChannel = await originalMessage.guild.channels.fetch(LOG_CHANNEL_ID);
+
+        if (!logChannel) {
+            console.error('[SYNC CONFIRM] Could not find log channel');
+            return;
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor('Green')
+            .setTitle(`✅ ${action}`)
+            .setDescription(details)
+            .addFields(
+                { name: 'WOM Message', value: `[View Original](${originalMessage.url})`, inline: false }
+            )
+            .setTimestamp();
+
+        await logChannel.send({ embeds: [embed] });
+        console.log('[SYNC CONFIRM] ✅ Sent sync confirmation to log channel');
+    } catch (error) {
+        console.error('[SYNC CONFIRM] ❌ Failed to send confirmation:', error.message);
+    }
+}
+
 module.exports = {
     name: Events.MessageCreate,
     async execute(message) {
@@ -404,7 +626,14 @@ module.exports = {
         // Detect leave messages
         else if (title.includes('left') || title.includes('member left')) {
             console.log('[WOM MESSAGE] ✅ Detected LEAVE notification - processing...');
-            await handleLeaveMessage(description, message);
+            // For leave messages, the RSN might be in the title instead of description
+            // Title format: "👋 Group member left: bajjy"
+            if (title && (title.includes('left:') || title.includes('member left:'))) {
+                console.log('[LEAVE] Extracting RSN from title instead of description');
+                await handleLeaveMessage(title, message);
+            } else {
+                await handleLeaveMessage(description, message);
+            }
         }
         else {
             console.log('[WOM MESSAGE] ⚠️ Message title does not match join/leave patterns');

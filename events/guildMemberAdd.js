@@ -1,24 +1,38 @@
 const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const config = require('../config.json');
+const features = require('../utils/features');
 
 module.exports = {
     name: Events.GuildMemberAdd,
     async execute(member) {
         console.log(`[GuildMemberAdd] ${member.user.tag} joined the server`);
 
+        // Check if guild member add handling is enabled
+        if (!features.isEventEnabled('handleGuildMemberAdd')) {
+            console.log('[GuildMemberAdd] Handler disabled in features.json');
+            return;
+        }
+
         try {
             // Add unverified role
-            const unverifiedRoleId = config.unverifiedRoleID;
-            if (unverifiedRoleId) {
-                try {
-                    await member.roles.add(unverifiedRoleId);
-                    console.log(`[GuildMemberAdd] Added unverified role to ${member.user.tag}`);
-                } catch (error) {
-                    console.error(`[GuildMemberAdd] Failed to add unverified role:`, error.message);
+            if (features.isEventEnabled('autoAddUnverifiedRole')) {
+                const unverifiedRoleId = config.unverifiedRoleID;
+                if (unverifiedRoleId) {
+                    try {
+                        await member.roles.add(unverifiedRoleId);
+                        console.log(`[GuildMemberAdd] Added unverified role to ${member.user.tag}`);
+                    } catch (error) {
+                        console.error(`[GuildMemberAdd] Failed to add unverified role:`, error.message);
+                    }
                 }
             }
 
             // Create join ticket automatically
+            if (!features.isEventEnabled('autoJoinTickets')) {
+                console.log('[GuildMemberAdd] Auto join tickets disabled in features.json');
+                return;
+            }
+
             const categoryId = config.TICKET_JOIN_CATEGORY_ID;
             if (!categoryId) {
                 console.error('[GuildMemberAdd] TICKET_JOIN_CATEGORY_ID not configured');
