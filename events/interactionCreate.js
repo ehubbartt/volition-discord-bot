@@ -280,6 +280,9 @@ module.exports = {
               components: [lootButtons()]
             });
           }
+
+          // CRITICAL: Save to database FIRST, before any Discord responses
+          // This ensures player gets reward even if Discord fails
           const newPoints = Math.max(0, currentPoints + amount);
           await db.setPoints(rsn, newPoints);
           await db.updateLastLootDate(rsn, today);
@@ -287,7 +290,15 @@ module.exports = {
           const description = amount === 0
             ? `${interaction.user} opened their daily crate and found **nothing**.`
             : `${interaction.user} opened their daily crate and found **${amount} VP**.`;
-          return await sendLootEmbed(interaction, title, description, label, chance, color, image, newPoints);
+
+          // Try to send Discord response - if this fails, player still got their reward
+          try {
+            return await sendLootEmbed(interaction, title, description, label, chance, color, image, newPoints);
+          } catch (discordError) {
+            console.error('Discord response failed, but reward was saved:', discordError.message);
+            // Reward is already in database, so this is just cosmetic
+          }
+          return;
         }
         if (currentPoints < PRICE) {
           return await interaction.editReply({
@@ -295,11 +306,17 @@ module.exports = {
             components: [lootButtons()]
           });
         }
+        // CRITICAL: Save to database FIRST, before any Discord responses
+        // This ensures player gets reward even if Discord fails
         const newTotal = Math.max(0, currentPoints - PRICE + (kind === 'vp' ? amount : 0));
         await db.setPoints(rsn, newTotal);
+
+        // Add role reward if applicable
         if (kind === 'role' && interaction.guild && interaction.member && roleId) {
           try { await interaction.member.roles.add(roleId).catch(() => {}); } catch {}
         }
+
+        // Build description for Discord response
         let description;
         if (kind === 'role') description = `${interaction.user} paid **${PRICE} VP** and received the **King Gamba** rank!`;
         else if (kind === 'item') description = `${interaction.user} paid **${PRICE} VP** and found **${itemName}**!`;
@@ -307,10 +324,18 @@ module.exports = {
           ? `${interaction.user} paid **${PRICE} VP** to open a crate and found **nothing**.`
           : `${interaction.user} paid **${PRICE} VP** to open a crate and found **${amount} VP**.`;
 
-        await sendLootEmbed(interaction, title, description, label, chance, color, image, newTotal);
+        // Try to send Discord response - if this fails, player still got their reward
+        try {
+          await sendLootEmbed(interaction, title, description, label, chance, color, image, newTotal);
+        } catch (discordError) {
+          console.error('Discord response failed, but reward was saved:', discordError.message);
+          // Reward is already in database, so this is just cosmetic
+        }
       } catch (error) {
         console.error(free ? 'Free daily claim error:' : 'Paid spin error:', error);
-        await interaction.editReply({ content: 'Something went wrong.' });
+        try {
+          await interaction.editReply({ content: 'Something went wrong.' });
+        } catch { /* Ignore if Discord response also fails */ }
       }
     }
 
