@@ -12,7 +12,7 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply({ ephemeral: true });
 
         const playerInput = interaction.options.getString('player');
         let player = null;
