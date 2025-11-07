@@ -2,6 +2,7 @@ const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = r
 const db = require('../db/supabase');
 const config = require('../config.json');
 const features = require('../utils/features');
+const analytics = require('../db/lootcrate_analytics');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -287,6 +288,15 @@ module.exports = {
           await db.setPoints(rsn, newPoints);
           await db.updateLastLootDate(rsn, today);
 
+          // Log analytics for free lootcrate
+          await analytics.logLootcrateOpen(interaction.user.id, true, {
+            kind,
+            amount,
+            chance,
+            itemName,
+            roleId
+          }).catch(err => console.error('[Analytics] Failed to log free lootcrate:', err));
+
           const description = amount === 0
             ? `${interaction.user} opened their daily crate and found **nothing**.`
             : `${interaction.user} opened their daily crate and found **${amount} VP**.`;
@@ -310,6 +320,15 @@ module.exports = {
         // This ensures player gets reward even if Discord fails
         const newTotal = Math.max(0, currentPoints - PRICE + (kind === 'vp' ? amount : 0));
         await db.setPoints(rsn, newTotal);
+
+        // Log analytics for paid lootcrate
+        await analytics.logLootcrateOpen(interaction.user.id, false, {
+          kind,
+          amount,
+          chance,
+          itemName,
+          roleId
+        }).catch(err => console.error('[Analytics] Failed to log paid lootcrate:', err));
 
         // Add role reward if applicable
         if (kind === 'role' && interaction.guild && interaction.member && roleId) {
