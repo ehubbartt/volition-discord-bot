@@ -8,14 +8,14 @@ module.exports = {
         console.log(`[GuildMemberAdd] ${member.user.tag} joined the server`);
 
         // Check if guild member add handling is enabled
-        if (!features.isEventEnabled('handleGuildMemberAdd')) {
+        if (!await features.isEventEnabled('handleGuildMemberAdd')) {
             console.log('[GuildMemberAdd] Handler disabled in features.json');
             return;
         }
 
         try {
             // Add unverified role
-            if (features.isEventEnabled('autoAddUnverifiedRole')) {
+            if (await features.isEventEnabled('autoAddUnverifiedRole')) {
                 const unverifiedRoleId = config.unverifiedRoleID;
                 if (unverifiedRoleId) {
                     try {
@@ -28,7 +28,7 @@ module.exports = {
             }
 
             // Create join ticket automatically
-            if (!features.isEventEnabled('autoJoinTickets')) {
+            if (!await features.isEventEnabled('autoJoinTickets')) {
                 console.log('[GuildMemberAdd] Auto join tickets disabled in features.json');
                 return;
             }

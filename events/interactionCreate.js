@@ -13,7 +13,7 @@ module.exports = {
       if (!command) return console.error(`No command matching ${interaction.commandName} was found.`);
 
       // Check if command is enabled in features.json
-      if (!features.isCommandEnabled(interaction.commandName)) {
+      if (!await features.isCommandEnabled(interaction.commandName)) {
         return interaction.reply({
           content: `⚠️ The \`/${interaction.commandName}\` command is currently disabled.`,
           ephemeral: true
@@ -41,7 +41,7 @@ module.exports = {
     // Handle ticket creation dropdown
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_create') {
       // Check if ticket system is enabled
-      if (!features.isEnabled('ticketSystem.enabled')) {
+      if (!await features.isEnabled('ticketSystem.enabled')) {
         return interaction.reply({
           content: '⚠️ The ticket system is currently disabled.',
           ephemeral: true
@@ -52,13 +52,13 @@ module.exports = {
       const ticketType = interaction.values[0];
 
       // Check if specific ticket type is enabled
-      if (ticketType === 'join' && !features.isEnabled('ticketSystem.allowJoinTickets')) {
+      if (ticketType === 'join' && !await features.isEnabled('ticketSystem.allowJoinTickets')) {
         return interaction.reply({ content: '⚠️ Join tickets are currently disabled.', ephemeral: true });
       }
-      if (ticketType === 'general' && !features.isEnabled('ticketSystem.allowGeneralTickets')) {
+      if (ticketType === 'general' && !await features.isEnabled('ticketSystem.allowGeneralTickets')) {
         return interaction.reply({ content: '⚠️ General tickets are currently disabled.', ephemeral: true });
       }
-      if (ticketType === 'shop' && !features.isEnabled('ticketSystem.allowShopTickets')) {
+      if (ticketType === 'shop' && !await features.isEnabled('ticketSystem.allowShopTickets')) {
         return interaction.reply({ content: '⚠️ Shop tickets are currently disabled.', ephemeral: true });
       }
 
@@ -355,7 +355,7 @@ module.exports = {
     if (interaction.isButton()) {
       // Loot crate buttons - check if feature is enabled
       if (interaction.customId === 'lootcrate_claim_free' || interaction.customId === 'lootcrate_spin_paid') {
-        if (!features.isEnabled('gamification.lootCrates')) {
+        if (!await features.isEnabled('gamification.lootCrates')) {
           return interaction.reply({
             content: '⚠️ Loot crates are currently disabled.',
             ephemeral: true
