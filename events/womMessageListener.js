@@ -513,7 +513,7 @@ async function sendSyncErrorNotification (originalMessage, errorTitle, errorDeta
         const LOG_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
         if (!LOG_CHANNEL_ID) {
-            console.error('[SYNC ERROR] No log channel configured in config.PAYOUT_LOG_CHANNEL_ID');
+            console.error('[SYNC ERROR] No log channel configured');
             return;
         }
 
