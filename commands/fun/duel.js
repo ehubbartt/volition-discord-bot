@@ -40,7 +40,7 @@ module.exports = {
 
             const opponentPlayer = await db.getPlayerByDiscordId(opponent.id);
             if (!opponentPlayer) {
-                return interaction.editReply({ content: `${opponent.username} is not registered in the system.` });
+                return interaction.editReply({ content: `<@${opponent.id}> is not registered in the system.` });
             }
 
             const challengerPoints = challengerPlayer.player_points?.points || 0;
@@ -54,7 +54,7 @@ module.exports = {
 
             if (opponentPoints < wager) {
                 return interaction.editReply({
-                    content: `${opponent.username} doesn't have enough points! They have **${opponentPoints}** VP, but need **${wager}** VP to accept this duel.`
+                    content: `<@${opponent.id}> doesn't have enough points! They have **${opponentPoints}** VP, but need **${wager}** VP to accept this duel.`
                 });
             }
 
