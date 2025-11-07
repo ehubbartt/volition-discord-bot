@@ -366,30 +366,6 @@ module.exports = {
       if (interaction.customId === 'lootcrate_claim_free') await handleLootInteraction(interaction, true);
       if (interaction.customId === 'lootcrate_spin_paid') await handleLootInteraction(interaction, false);
 
-      if (interaction.customId === 'start_verification') {
-        const verifyFlowCommand = require('../commands/utility/testVerifyFlow.js');
-        if (verifyFlowCommand?.handleVerificationButton) {
-          try { await verifyFlowCommand.handleVerificationButton(interaction); }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
-        }
-      }
-
-      if (interaction.customId === 'preverify_start') {
-        const preVerifyCommand = require('../commands/utility/testPreVerify.js');
-        if (preVerifyCommand?.handlePreVerifyButton) {
-          try { await preVerifyCommand.handlePreVerifyButton(interaction); }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
-        }
-      }
-
-      if (interaction.customId === 'postverify_start') {
-        const postVerifyCommand = require('../commands/utility/testPostVerify.js');
-        if (postVerifyCommand?.handlePostVerifyButton) {
-          try { await postVerifyCommand.handlePostVerifyButton(interaction); }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
-        }
-      }
-
       if (interaction.customId === 'verify_start') {
         const verifyCommand = require('../commands/utility/verify.js');
         if (verifyCommand?.handleVerifyButton) {
@@ -491,30 +467,6 @@ module.exports = {
     }
 
     if (interaction.isModalSubmit()) {
-      if (interaction.customId === 'verification_modal') {
-        const verifyFlowCommand = require('../commands/utility/testVerifyFlow.js');
-        if (verifyFlowCommand?.handleVerificationSubmit) {
-          try { await verifyFlowCommand.handleVerificationSubmit(interaction); }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
-        }
-      }
-
-      if (interaction.customId === 'preverify_modal') {
-        const preVerifyCommand = require('../commands/utility/testPreVerify.js');
-        if (preVerifyCommand?.handlePreVerifySubmit) {
-          try { await preVerifyCommand.handlePreVerifySubmit(interaction); }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
-        }
-      }
-
-      if (interaction.customId === 'postverify_modal') {
-        const postVerifyCommand = require('../commands/utility/testPostVerify.js');
-        if (postVerifyCommand?.handlePostVerifySubmit) {
-          try { await postVerifyCommand.handlePostVerifySubmit(interaction); }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
-        }
-      }
-
       if (interaction.customId === 'verify_modal') {
         const verifyCommand = require('../commands/utility/verify.js');
         if (verifyCommand?.handleVerifySubmit) {
