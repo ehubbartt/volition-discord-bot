@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../../db/supabase');
 const config = require('../../utils/config');
+const analytics = require('../../db/gamification_analytics');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -147,6 +148,17 @@ module.exports = {
 
                     const winnerNewPoints = (winnerPlayer.player_points?.points || 0) + wager;
                     const loserNewPoints = (loserPlayer.player_points?.points || 0) - wager;
+
+                    // Log duel analytics
+                    await analytics.logDuel(
+                        challenger.id,
+                        opponent.id,
+                        wager,
+                        winner.id,
+                        loser.id,
+                        winner.username,
+                        loser.username
+                    ).catch(err => console.error('[Analytics] Failed to log duel:', err));
 
                     // Payout logs disabled for duels (player vs player transactions)
 
