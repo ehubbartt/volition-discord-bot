@@ -81,7 +81,11 @@ module.exports = {
                 .setThumbnail('https://i.imgur.com/BJJpBj2.png')
                 .setTimestamp();
 
-            const response = await interaction.editReply({ embeds: [challengeEmbed], components: [row] });
+            const response = await interaction.editReply({
+                content: `<@${opponent.id}>`,
+                embeds: [challengeEmbed],
+                components: [row]
+            });
 
             const collector = response.createMessageComponentCollector({ time: 60000 });
 

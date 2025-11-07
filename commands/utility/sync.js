@@ -302,31 +302,68 @@ async function fullClanSync (interaction, clanId) {
     }
 }
 
-function determineRank (ehb, memberJoinedTimestamp = null) {
+function determineRank (ehb, memberJoinedTimestamp = null, guild = null) {
     // Calculate time in clan (in milliseconds)
     const timeInClan = memberJoinedTimestamp ? Date.now() - memberJoinedTimestamp : 0;
     const daysInClan = timeInClan / (1000 * 60 * 60 * 24);
     const monthsInClan = daysInClan / 30;
     const yearsInClan = daysInClan / 365;
 
+    let rankName = '';
+    let emojiName = '';
+
     // Check pure EHB ranks first (no time requirement)
-    if (ehb >= 3000) return ':Sweat: Sweat';
-    if (ehb >= 2500) return ':MasterGeneral: Master General';
-    if (ehb >= 2000) return ':TouchGrass: Touch Grass';
-    if (ehb >= 1500) return ':WR: Wrath';
-    if (ehb >= 1250) return ':TZ: Top Dawgs';
-    if (ehb >= 1000) return ':GO: Mind Goblin';
-    if (ehb >= 900) return ':SA: Holy';
-    if (ehb >= 800) return ':S_~1: Skull';
-    if (ehb >= 650) return ':SL: SLAAAAAY';
+    if (ehb >= 3000) {
+        emojiName = 'Sweat';
+        rankName = 'Sweat';
+    } else if (ehb >= 2500) {
+        emojiName = 'MasterGeneral';
+        rankName = 'Master General';
+    } else if (ehb >= 2000) {
+        emojiName = 'TouchGrass';
+        rankName = 'Touch Grass';
+    } else if (ehb >= 1500) {
+        emojiName = 'WR';
+        rankName = 'Wrath';
+    } else if (ehb >= 1250) {
+        emojiName = 'TZ';
+        rankName = 'Top Dawgs';
+    } else if (ehb >= 1000) {
+        emojiName = 'GO';
+        rankName = 'Mind Goblin';
+    } else if (ehb >= 900) {
+        emojiName = 'SA';
+        rankName = 'Holy';
+    } else if (ehb >= 800) {
+        emojiName = 'S_~1';
+        rankName = 'Skull';
+    } else if (ehb >= 650) {
+        emojiName = 'SL';
+        rankName = 'SLAAAAAY';
+    } else if (ehb >= 500 || yearsInClan >= 2) {
+        emojiName = 'GU';
+        rankName = 'Guthixian';
+    } else if (ehb >= 350 || yearsInClan >= 1) {
+        emojiName = 'de';
+        rankName = 'Black Hearts';
+    } else if (ehb >= 200 || monthsInClan >= 6) {
+        emojiName = 'HE';
+        rankName = 'Discord Kitten';
+    } else {
+        emojiName = 'AP';
+        rankName = 'Brewaholic';
+    }
 
-    // Time-based ranks (EHB OR time requirement)
-    // Note: Check from highest to lowest, return the BEST rank they qualify for
-    if (ehb >= 500 || yearsInClan >= 2) return ':GU: Guthixian';
-    if (ehb >= 350 || yearsInClan >= 1) return ':de: Black Hearts';
-    if (ehb >= 200 || monthsInClan >= 6) return ':HE: Discord Kitten';
+    // If guild is provided, try to find and use the actual emoji
+    if (guild) {
+        const emoji = guild.emojis.cache.find(e => e.name === emojiName);
+        if (emoji) {
+            return `${emoji} ${rankName}`;
+        }
+    }
 
-    return ':AP: Brewaholic';
+    // Fallback to text format if guild not provided or emoji not found
+    return `:${emojiName}: ${rankName}`;
 }
 
 function getRankRole (member) {
