@@ -150,7 +150,7 @@ module.exports = {
                     const loserNewPoints = (loserPlayer.player_points?.points || 0) - wager;
 
                     // Log duel analytics
-                    await analytics.logDuel(
+                    analytics.logDuel(
                         challenger.id,
                         opponent.id,
                         wager,

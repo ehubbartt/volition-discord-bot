@@ -3,10 +3,10 @@ require('dotenv').config();
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
-    process.env.SUPABASE_KEY
+    process.env.SUPABASE_ANON_KEY
 );
 
-async function viewAnalytics() {
+async function viewAnalytics () {
     console.log('📊 Lootcrate Analytics Dashboard\n');
     console.log('='.repeat(60));
 
