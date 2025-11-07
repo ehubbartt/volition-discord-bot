@@ -170,20 +170,12 @@ async function cacheOldMessages() {
 // });
 
 // ----------------------------------------------------------------------------
-// Message create event (duels & lootcrate)
+// Message create event (legacy message commands removed - all commands now use slash commands)
+// Kept for future message-based features if needed
 
-// const duel = require('./commands/duel.js');
-const lootCrate = require('./commands/fun/lootCrate.js');
-
-client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot) return;
-
-  try {
-    // await duel.run(message);
-    await lootCrate.run(message);
-  } catch (err) {
-    console.error('messageCreate dispatch error:', err);
-  }
-});
+// client.on(Events.MessageCreate, async (message) => {
+//   if (message.author.bot) return;
+//   // Legacy message commands removed - use slash commands instead
+// });
 
 client.login(process.env.TOKEN);

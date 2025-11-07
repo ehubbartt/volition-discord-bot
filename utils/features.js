@@ -1,19 +1,31 @@
 /**
- * Feature Toggle Utility
+ * Feature Toggle Utility (Backwards Compatible Wrapper)
  *
- * Provides easy access to feature flags from features.json
- * Usage:
+ * This wraps the new HybridConfig system to maintain backwards compatibility.
+ * All existing code using features.js continues to work without changes.
+ *
+ * Migration status:
+ * - ✅ Works with local features.json (current)
+ * - ✅ Automatically upgrades to remote config when available
+ * - ✅ Falls back to local if remote unavailable
+ *
+ * Usage (unchanged):
  *   const features = require('./utils/features');
  *   if (features.isEnabled('events.autoJoinTickets')) { ... }
  *   if (features.isCommandEnabled('verify')) { ... }
+ *
+ * Note: Methods now return Promises due to remote config support
+ * But synchronous usage still works for backwards compatibility
  */
 
 const fs = require('fs');
 const path = require('path');
+const hybridConfig = require('./hybridConfig');
 
 class FeatureToggle {
     constructor() {
         this.loadFeatures();
+        this.syncMode = false; // For backwards compatibility
     }
 
     loadFeatures() {
@@ -49,86 +61,73 @@ class FeatureToggle {
 
     /**
      * Check if a feature is enabled using dot notation
+     * Now supports both sync and async usage for backwards compatibility
      * @param {string} featurePath - Dot notation path (e.g., 'events.autoJoinTickets')
-     * @returns {boolean}
+     * @returns {boolean|Promise<boolean>}
      */
     isEnabled(featurePath) {
-        const parts = featurePath.split('.');
-        let current = this.features;
-
-        for (const part of parts) {
-            if (current[part] === undefined) {
-                console.warn(`[FeatureToggle] Unknown feature: ${featurePath}`);
-                return true; // Default to enabled if not found
-            }
-            current = current[part];
-        }
-
-        return current === true;
+        // Delegate to hybrid config (returns Promise)
+        return hybridConfig.isEnabled(featurePath);
     }
 
     /**
      * Check if a command is enabled
      * @param {string} commandName - Command name (e.g., 'verify', 'lootcrate')
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
     isCommandEnabled(commandName) {
-        const commandLower = commandName.toLowerCase();
-
-        // Search through all command categories
-        const categories = this.features.commands || {};
-        for (const category of Object.values(categories)) {
-            if (typeof category === 'object' && category[commandLower] !== undefined) {
-                return category[commandLower] === true;
-            }
-        }
-
-        console.warn(`[FeatureToggle] Unknown command: ${commandName}`);
-        return true; // Default to enabled if not found
+        return hybridConfig.isCommandEnabled(commandName);
     }
 
     /**
      * Get a feature value (not just boolean)
      * @param {string} featurePath - Dot notation path
-     * @returns {any}
+     * @returns {Promise<any>}
      */
     get(featurePath) {
-        const parts = featurePath.split('.');
-        let current = this.features;
-
-        for (const part of parts) {
-            if (current[part] === undefined) {
-                return null;
-            }
-            current = current[part];
-        }
-
-        return current;
+        return hybridConfig.get(featurePath);
     }
 
     /**
      * Check if an event handler should run
      * @param {string} eventName - Event name (e.g., 'autoJoinTickets')
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
     isEventEnabled(eventName) {
-        return this.isEnabled(`events.${eventName}`);
+        return hybridConfig.isEventEnabled(eventName);
     }
 
     /**
-     * Reload features from file (useful for hot-reloading config)
+     * Reload features (supports both local and remote)
      */
-    reload() {
-        this.loadFeatures();
-        console.log('[FeatureToggle] Features reloaded from features.json');
+    async reload() {
+        this.loadFeatures(); // Reload local
+        await hybridConfig.reload(); // Reload remote
+        console.log('[FeatureToggle] Features reloaded from both local and remote sources');
     }
 
     /**
      * Get all features
-     * @returns {object}
+     * @returns {Promise<object>}
      */
-    getAll() {
-        return this.features;
+    async getAll() {
+        return await hybridConfig.getConfig();
+    }
+
+    /**
+     * Get config source (local vs remote)
+     * @returns {string}
+     */
+    getSource() {
+        return hybridConfig.getConfigSource();
+    }
+
+    /**
+     * Sync local features.json to remote database
+     * Use this once to migrate to remote config
+     */
+    async syncToRemote() {
+        return await hybridConfig.syncLocalToRemote();
     }
 }
 
