@@ -5,7 +5,7 @@ const config = require('../config.json');
 const { RANK_ROLES, determineRank } = require('../commands/utility/sync');
 
 // Parse and handle join messages
-async function handleJoinMessage(description, originalMessage) {
+async function handleJoinMessage (description, originalMessage) {
     try {
         // Extract RSNs from description
         // WOM format can be: "🔷 PlayerName" OR ":emoji: PlayerName" OR "<:emoji:ID> PlayerName"
@@ -87,7 +87,7 @@ async function handleJoinMessage(description, originalMessage) {
 }
 
 // Parse and handle leave messages
-async function handleLeaveMessage(description, originalMessage) {
+async function handleLeaveMessage (description, originalMessage) {
     try {
         console.log('[LEAVE] =====================================');
         console.log('[LEAVE] Raw description:', description);
@@ -178,7 +178,7 @@ async function handleLeaveMessage(description, originalMessage) {
 }
 
 // Process member join - Full sync with Discord and database
-async function processMemberJoin(rsn, originalMessage) {
+async function processMemberJoin (rsn, originalMessage) {
     console.log(`[JOIN] ======================================`);
     console.log(`[JOIN] Starting WOM API fetch for: "${rsn}"`);
     console.log(`[JOIN] Encoded URL parameter: ${encodeURIComponent(rsn)}`);
@@ -343,7 +343,7 @@ async function processMemberJoin(rsn, originalMessage) {
 }
 
 // Process member leave
-async function processMemberLeave(rsn, originalMessage) {
+async function processMemberLeave (rsn, originalMessage) {
     console.log(`[LEAVE] Looking up ${rsn} in database...`);
 
     try {
@@ -405,7 +405,7 @@ async function processMemberLeave(rsn, originalMessage) {
 }
 
 // Send custom join notification (thread reply to WOM message)
-async function sendJoinNotification(rsn, totalLevel, ehb, ehp, rank, womId, originalMessage, nicknameChanged, rankAssigned, discordId) {
+async function sendJoinNotification (rsn, totalLevel, ehb, ehp, rank, womId, originalMessage, nicknameChanged, rankAssigned, discordId) {
     try {
         const hasDiscordLink = !!discordId;
 
@@ -450,7 +450,7 @@ async function sendJoinNotification(rsn, totalLevel, ehb, ehp, rank, womId, orig
 }
 
 // Send admin notification for players not meeting requirements
-async function sendAdminNotification(rsn, totalLevel, ehb, originalMessage) {
+async function sendAdminNotification (rsn, totalLevel, ehb, originalMessage) {
     try {
         const embed = new EmbedBuilder()
             .setColor('Orange')
@@ -473,7 +473,7 @@ async function sendAdminNotification(rsn, totalLevel, ehb, originalMessage) {
 }
 
 // Send custom leave notification
-async function sendLeaveNotification(rsn, womId, playerData, originalMessage) {
+async function sendLeaveNotification (rsn, womId, playerData, originalMessage) {
     try {
         const embed = new EmbedBuilder()
             .setColor('Red')
@@ -508,9 +508,9 @@ async function sendLeaveNotification(rsn, womId, playerData, originalMessage) {
 }
 
 // Send error notification to log channel
-async function sendSyncErrorNotification(originalMessage, errorTitle, errorDetails) {
+async function sendSyncErrorNotification (originalMessage, errorTitle, errorDetails) {
     try {
-        const LOG_CHANNEL_ID = config.PAYOUT_LOG_CHANNEL_ID;
+        const LOG_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
         if (!LOG_CHANNEL_ID) {
             console.error('[SYNC ERROR] No log channel configured in config.PAYOUT_LOG_CHANNEL_ID');
@@ -543,9 +543,9 @@ async function sendSyncErrorNotification(originalMessage, errorTitle, errorDetai
 }
 
 // Send sync confirmation to log channel
-async function sendSyncConfirmation(originalMessage, action, details) {
+async function sendSyncConfirmation (originalMessage, action, details) {
     try {
-        const LOG_CHANNEL_ID = config.PAYOUT_LOG_CHANNEL_ID;
+        const LOG_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
         if (!LOG_CHANNEL_ID) {
             console.log('[SYNC CONFIRM] No log channel configured, skipping confirmation');
@@ -577,7 +577,7 @@ async function sendSyncConfirmation(originalMessage, action, details) {
 
 module.exports = {
     name: Events.MessageCreate,
-    async execute(message) {
+    async execute (message) {
         // Get WOM Bot ID from environment or config
         const WOM_BOT_ID = process.env.WOM_BOT_ID || config.WISE_OLD_MAN_BOT_ID;
         const WOM_NOTIFICATION_CHANNEL_ID = process.env.WOM_NOTIFICATION_CHANNEL_ID || config.WISE_OLD_MAN_CHANNEL_ID;
