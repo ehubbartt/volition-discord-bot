@@ -1,12 +1,18 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const db = require('../db/supabase');
 const config = require('../config.json');
+const features = require('../utils/features');
 
 module.exports = {
     name: Events.MessageReactionAdd,
-    
+
     async execute(reaction, user) {
         if (user.bot) return;
+
+        // Check if reaction award points system is enabled
+        if (!await features.isEventEnabled('reactionAwardPoints')) {
+            return;
+        }
 
         try {
             if (reaction.partial) await reaction.fetch();
