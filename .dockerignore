@@ -1,0 +1,12 @@
+node_modules
+.env
+
+# Config files - auto-generated locally
+config.json
+
+# Test config - keep private
+config.test.json
+configtest.json
+config.json.production
+
+# Production config is committed for deployment

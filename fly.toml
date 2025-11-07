@@ -1,25 +1,21 @@
-# fly.toml - fly.io Configuration for Discord Bot
-# Reference: https://fly.io/docs/reference/configuration/
+# fly.toml app configuration file generated for voli-disc-bot on 2025-11-06T20:25:08-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "voli-disc-bot" # Change this to your app name
-primary_region = "ord" # Change to closest region: https://fly.io/docs/reference/regions/
+app = 'voli-disc-bot'
+primary_region = 'ord'
 
 [build]
 
 [env]
-  NODE_ENV = "production"
+  NODE_ENV = 'production'
 
-# Discord bots don't need HTTP servers, but fly.io requires port config
-# We'll use a minimal internal port that won't be exposed externally
 [http_service]
-  internal_port = 8080
-  force_https = false
-  auto_stop_machines = false
+  internal_port = 3000
+  auto_stop_machines = 'off'
   auto_start_machines = false
   min_machines_running = 1
 
-# VM Resources (Free tier: 256MB RAM, shared CPU)
 [[vm]]
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 256
+  size = 'shared-cpu-1x'
