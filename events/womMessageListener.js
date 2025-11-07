@@ -244,7 +244,7 @@ async function processMemberJoin(rsn, originalMessage) {
                 console.log(`[JOIN] Found linked Discord user: ${member.user.tag}`);
 
                 // Determine rank with time-based consideration
-                rank = determineRank(ehb, member.joinedTimestamp);
+                rank = determineRank(ehb, member.joinedTimestamp, originalMessage.guild);
                 console.log(`[JOIN] Assigned rank: ${rank}`);
 
                 // Nickname changes disabled
@@ -280,7 +280,7 @@ async function processMemberJoin(rsn, originalMessage) {
         } else {
             console.log(`[JOIN] No Discord ID linked for this player`);
             // For non-linked players, determine rank without time consideration
-            rank = determineRank(ehb);
+            rank = determineRank(ehb, null, originalMessage.guild);
         }
 
         // Update or create player in database
@@ -434,7 +434,7 @@ async function sendJoinNotification(rsn, totalLevel, ehb, ehp, rank, womId, orig
                 { name: 'Assigned Rank', value: rank, inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )
-            .setThumbnail('https://i.imgur.com/BJJpBj2.png')
+            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
             .setTimestamp();
 
         if (!hasDiscordLink || !rankAssigned) {

@@ -34,7 +34,7 @@ module.exports = {
                 '**General Support** - For general questions and assistance\n' +
                 '**Shop Payout** - For VP shop payout requests'
             )
-            .setThumbnail('https://i.imgur.com/BJJpBj2.png')
+            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
             .setFooter({ text: 'Volition Clan Support' })
             .setTimestamp();
 

@@ -197,7 +197,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         const member = await interaction.guild.members.fetch(targetUser.id);
 
         // Determine and assign rank (with time-based consideration)
-        const rank = determineRank(ehb, member.joinedTimestamp);
+        const rank = determineRank(ehb, member.joinedTimestamp, interaction.guild);
         let rankAssigned = false;
         let rankError = null;
 
@@ -284,7 +284,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         }
 
         successEmbed.addFields({ name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false });
-        successEmbed.setThumbnail('https://i.imgur.com/BJJpBj2.png');
+        successEmbed.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
         successEmbed.setTimestamp();
 
         await interaction.editReply({

@@ -16,7 +16,7 @@ module.exports = {
                 .setRequired(true)
                 .setMinValue(1)),
 
-    async execute(interaction) {
+    async execute (interaction) {
         await interaction.deferReply({ ephemeral: false });
 
         const challenger = interaction.user;
@@ -78,7 +78,7 @@ module.exports = {
                     `**Type:** 50/50 chance\n\n` +
                     `<@${opponent.id}>, do you accept?`
                 )
-                .setThumbnail('https://i.imgur.com/BJJpBj2.png')
+                .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .setTimestamp();
 
             const response = await interaction.editReply({
@@ -148,36 +148,7 @@ module.exports = {
                     const winnerNewPoints = (winnerPlayer.player_points?.points || 0) + wager;
                     const loserNewPoints = (loserPlayer.player_points?.points || 0) - wager;
 
-                    // Log winner to payout channel
-                    const logChannel = interaction.guild.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
-                    if (logChannel) {
-                        const winnerLogEmbed = new EmbedBuilder()
-                            .setColor('Green')
-                            .setTitle('Duel Victory - Points Won')
-                            .setDescription(
-                                `**Player:** <@${winner.id}> (${winnerPlayer.rsn})\n` +
-                                `**Change:** +${wager} VP\n` +
-                                `**New Total:** ${winnerNewPoints} VP\n` +
-                                `**Reason:** Won duel against <@${loser.id}>`
-                            )
-                            .setTimestamp();
-
-                        await logChannel.send({ embeds: [winnerLogEmbed] });
-
-                        // Log loser to payout channel
-                        const loserLogEmbed = new EmbedBuilder()
-                            .setColor('Red')
-                            .setTitle('Duel Loss - Points Lost')
-                            .setDescription(
-                                `**Player:** <@${loser.id}> (${loserPlayer.rsn})\n` +
-                                `**Change:** -${wager} VP\n` +
-                                `**New Total:** ${loserNewPoints} VP\n` +
-                                `**Reason:** Lost duel against <@${winner.id}>`
-                            )
-                            .setTimestamp();
-
-                        await logChannel.send({ embeds: [loserLogEmbed] });
-                    }
+                    // Payout logs disabled for duels (player vs player transactions)
 
                     const resultEmbed = new EmbedBuilder()
                         .setColor(winner.id === challenger.id ? 'Green' : 'Red')
@@ -190,7 +161,7 @@ module.exports = {
                             `<@${winner.id}>: **${winnerNewPoints}** VP\n` +
                             `<@${loser.id}>: **${loserNewPoints}** VP`
                         )
-                        .setThumbnail('https://i.imgur.com/BJJpBj2.png')
+                        .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                         .setTimestamp();
 
                     await interaction.editReply({ embeds: [resultEmbed], components: [] });

@@ -33,7 +33,7 @@ module.exports = {
                 '• 1750+ Total Level OR 50+ EHB\n\n' +
                 'Your stats will be checked via Wise Old Man.'
             )
-            .setThumbnail('https://i.imgur.com/BJJpBj2.png')
+            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
             .setFooter({ text: 'Volition Clan Verification' })
             .setTimestamp();
 
@@ -222,7 +222,7 @@ async function handleVerifySubmit(interaction) {
         }
 
         statsEmbed.addFields({ name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false });
-        statsEmbed.setThumbnail('https://i.imgur.com/BJJpBj2.png');
+        statsEmbed.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
         statsEmbed.setTimestamp();
 
         // Send the result embed

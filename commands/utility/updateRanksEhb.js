@@ -84,7 +84,7 @@ module.exports = {
           const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
           // Determine the rank using centralized function
-          const calculatedRank = determineRank(ehb);
+          const calculatedRank = determineRank(ehb, member.joinedTimestamp, interaction.guild);
           const calculatedRankId = RANK_ROLES[calculatedRank];
 
           const memberRoles = member.roles.cache;

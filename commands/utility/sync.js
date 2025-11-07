@@ -235,7 +235,7 @@ async function fullClanSync (interaction, clanId) {
                 { name: 'Failed Updates', value: rankUpdatesFailed.toString(), inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }
             )
-            .setThumbnail('https://i.imgur.com/BJJpBj2.png')
+            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
             .setTimestamp();
 
         // Add new members details if any

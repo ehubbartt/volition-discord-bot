@@ -78,7 +78,7 @@ module.exports = {
                 .setColor('White')
                 .setTitle('Volition Points Awarded')
                 .setDescription(`Volition Points successfully awarded to the top 3 participants of competition: **${competitionTitle}** with ID: ${competitionId}.`)
-                .setThumbnail('https://i.imgur.com/BJJpBj2.png');
+                .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
 
             for (let i = 0; i < topParticipants.length; i++) {
                 const participant = topParticipants[i];
