@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const config = require('../../config.json');
 const hybridConfig = require('../../utils/hybridConfig');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,11 +21,7 @@ module.exports = {
 
     async execute(interaction) {
         // Check admin permissions
-        const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-            interaction.member.roles.cache.has(roleId)
-        );
-
-        if (!isAdmin) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({
                 content: '❌ Admin only command.',
                 ephemeral: true

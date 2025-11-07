@@ -7,6 +7,7 @@ const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
 const { RANK_ROLES, determineRank } = require('./sync');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -14,11 +15,7 @@ module.exports = {
     .setDescription('(Admin Only)'),
 
   async execute(interaction) {
-    const member = interaction.member;
-    const allowedRoleId = config.ADMIN_ROLE_IDS[0];
-    const hasRole = member.roles.cache.has(allowedRoleId);
-
-    if (!hasRole) {
+    if (!isAdmin(interaction.member)) {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
     }
     

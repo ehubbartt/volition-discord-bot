@@ -1,7 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db/supabase');
-const config = require('../../config.json');
+const config = require('../../utils/config');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -25,12 +26,9 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-
-        const member = interaction.member;
-        const allowedRoleId = config.ADMIN_ROLE_IDS[0];
         const allowedChannelId = '1307790021545431163';
 
-        if (!member.roles.cache.has(allowedRoleId)) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have permission to use this command.',
                 ephemeral: true
@@ -97,6 +95,25 @@ module.exports = {
                 } else {
                     newTotalPoints = points;
                     await db.createPlayer({ rsn }, points);
+                }
+
+                // Log to payout channel
+                const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+                if (logChannel) {
+                    const logEmbed = new EmbedBuilder()
+                        .setColor('Green')
+                        .setTitle('Competition Points Awarded')
+                        .setDescription(
+                            `**Player:** ${rsn}\n` +
+                            `**Change:** +${points} VP\n` +
+                            `**New Total:** ${newTotalPoints} VP\n` +
+                            `**Competition:** ${competitionTitle}\n` +
+                            `**Rank:** ${i + 1}\n` +
+                            `**Awarded by:** <@${interaction.user.id}>`
+                        )
+                        .setTimestamp();
+
+                    await logChannel.send({ embeds: [logEmbed] });
                 }
 
                 embed.addFields({

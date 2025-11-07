@@ -2,6 +2,7 @@ const { SlashCommandBuilder, ButtonBuilder, ActionRowBuilder } = require('@disco
 const { ButtonStyle } = require('discord.js');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,12 +11,7 @@ module.exports = {
 
   async execute(interaction) {
     // Command exclusivity - check if user has admin role from config
-    const member = interaction.member;
-    const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-      member.roles.cache.has(roleId)
-    );
-
-    if (!isAdmin) {
+    if (!isAdmin(interaction.member)) {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
     }
 

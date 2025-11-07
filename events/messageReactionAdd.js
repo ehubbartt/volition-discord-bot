@@ -2,6 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const db = require('../db/supabase');
 const config = require('../config.json');
 const features = require('../utils/features');
+const { isAdmin } = require('../utils/permissions');
 
 module.exports = {
     name: Events.MessageReactionAdd,
@@ -54,7 +55,9 @@ module.exports = {
             console.log(`Found RSN: ${rsn} for Discord ID: ${discordId}`);
 
             const guild = reaction.message.guild;
-            if (user.id !== config.ADMIN_ROLE_IDS[0]) {
+            const member = await guild.members.fetch(user.id);
+
+            if (!isAdmin(member)) {
                 console.log(`${user.tag} is not allowed to award points.`);
                 return;
             }

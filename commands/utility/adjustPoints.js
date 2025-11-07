@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../../db/supabase');
-const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
+const config = require('../../utils/config');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,10 +19,7 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        const member = interaction.member;
-        const allowedRoleId = config.ADMIN_ROLE_IDS[0];
-
-        if (!member.roles.cache.has(allowedRoleId)) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
         }
 
@@ -74,6 +72,23 @@ module.exports = {
                 const newTotalPoints = existingPoints + pointsToAdd;
 
                 await db.addPoints(player.rsn, pointsToAdd);
+
+                // Log to payout channel
+                const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+                if (logChannel) {
+                    const logEmbed = new EmbedBuilder()
+                        .setColor(pointsToAdd < 0 ? 'Red' : 'Green')
+                        .setTitle(pointsToAdd < 0 ? 'Points Removed' : 'Points Added')
+                        .setDescription(
+                            `**Player:** ${displayName}\n` +
+                            `**Change:** ${pointsToAdd > 0 ? '+' : ''}${pointsToAdd} VP\n` +
+                            `**New Total:** ${newTotalPoints} VP\n` +
+                            `**Adjusted by:** <@${interaction.user.id}>`
+                        )
+                        .setTimestamp();
+
+                    await logChannel.send({ embeds: [logEmbed] });
+                }
 
                 results.push(pointsToAdd < 0
                     ? `Removed **${Math.abs(pointsToAdd)}** points from ${displayName}. New total: **${newTotalPoints}**.`

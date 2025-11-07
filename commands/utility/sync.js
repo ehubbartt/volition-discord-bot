@@ -5,6 +5,7 @@ const {
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 // Role name to role ID mapping
 const RANK_ROLES = {
@@ -30,11 +31,7 @@ module.exports = {
         .setDescription('(Admin Only) Full clan sync - syncs all WOM clan members to database and Discord'),
 
     async execute (interaction) {
-        const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-            interaction.member.roles.cache.has(roleId)
-        );
-
-        if (!isAdmin) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'Admin only command.', ephemeral: true });
         }
 

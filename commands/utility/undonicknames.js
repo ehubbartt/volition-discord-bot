@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 // Parse the log output to extract the nickname changes
 const NICKNAME_CHANGES = `
@@ -153,11 +153,7 @@ module.exports = {
         .setDescription('(Admin Only) Undo the nickname changes from /syncwomids'),
 
     async execute(interaction) {
-        const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-            interaction.member.roles.cache.has(roleId)
-        );
-
-        if (!isAdmin) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'Admin only command.', ephemeral: true });
         }
 

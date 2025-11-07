@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../../db/supabase');
+const config = require('../../utils/config');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -142,6 +143,37 @@ module.exports = {
 
                     const winnerNewPoints = (winnerPlayer.player_points?.points || 0) + wager;
                     const loserNewPoints = (loserPlayer.player_points?.points || 0) - wager;
+
+                    // Log winner to payout channel
+                    const logChannel = interaction.guild.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+                    if (logChannel) {
+                        const winnerLogEmbed = new EmbedBuilder()
+                            .setColor('Green')
+                            .setTitle('Duel Victory - Points Won')
+                            .setDescription(
+                                `**Player:** <@${winner.id}> (${winnerPlayer.rsn})\n` +
+                                `**Change:** +${wager} VP\n` +
+                                `**New Total:** ${winnerNewPoints} VP\n` +
+                                `**Reason:** Won duel against <@${loser.id}>`
+                            )
+                            .setTimestamp();
+
+                        await logChannel.send({ embeds: [winnerLogEmbed] });
+
+                        // Log loser to payout channel
+                        const loserLogEmbed = new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('Duel Loss - Points Lost')
+                            .setDescription(
+                                `**Player:** <@${loser.id}> (${loserPlayer.rsn})\n` +
+                                `**Change:** -${wager} VP\n` +
+                                `**New Total:** ${loserNewPoints} VP\n` +
+                                `**Reason:** Lost duel against <@${winner.id}>`
+                            )
+                            .setTimestamp();
+
+                        await logChannel.send({ embeds: [loserLogEmbed] });
+                    }
 
                     const resultEmbed = new EmbedBuilder()
                         .setColor(winner.id === challenger.id ? 'Green' : 'Red')

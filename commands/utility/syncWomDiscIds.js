@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db/supabase');
-const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,10 +10,7 @@ module.exports = {
     .setDescription('(Admin Only) Sync WOM IDs for all clan members'),
 
   async execute(interaction) {
-    const member = interaction.member;
-    const allowedRoleId = config.ADMIN_ROLE_IDS[0];
-    const hasRole = member.roles.cache.has(allowedRoleId);
-    if (!hasRole) {
+    if (!isAdmin(interaction.member)) {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
     }
 

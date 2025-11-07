@@ -6,6 +6,7 @@ const {
     StringSelectMenuOptionBuilder
 } = require('discord.js');
 const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,11 +18,7 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-            interaction.member.roles.cache.has(roleId)
-        );
-
-        if (!isAdmin) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'Admin only command.', ephemeral: true });
         }
 

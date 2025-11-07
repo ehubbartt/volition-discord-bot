@@ -11,6 +11,7 @@ const {
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,9 +19,7 @@ module.exports = {
         .setDescription('(Admin Only) Test the full verification welcome flow'),
 
     async execute (interaction) {
-        const isAdmin = interaction.member.roles.cache.has(config.ADMIN_ROLE_IDS[0]);
-
-        if (!isAdmin) {
+        if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'Admin only command.', ephemeral: true });
         }
 

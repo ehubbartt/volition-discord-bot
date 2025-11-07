@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../../config.json');
+const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -24,14 +25,12 @@ module.exports = {
         }
 
         // Check if user is admin or the ticket owner
-        const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-            interaction.member.roles.cache.has(roleId)
-        );
+        const userIsAdmin = isAdmin(interaction.member);
 
         // Check if user has permission to view this channel (ticket owner)
         const canView = channel.permissionsFor(interaction.user).has('ViewChannel');
 
-        if (!isAdmin && !canView) {
+        if (!userIsAdmin && !canView) {
             return interaction.reply({
                 content: '❌ You do not have permission to close this ticket.',
                 ephemeral: true
