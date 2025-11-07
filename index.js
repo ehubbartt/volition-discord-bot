@@ -83,6 +83,9 @@ const { getDailyWordleAndMove } = require('./commands/fun/dailyWordle.js');
 const weeklyTaskRoleID = config.weeklyTaskRoleID; // used for push notifications
 const taskSubmissionChannelID = config.WEEKLY_CHALLENGE_SUBMISSION_CHANNEL_ID;
 const wordleSubmissionChannelID = config.DAILY_CHALLENGE_SUBMISSION_CHANNEL_ID;
+const WEEKLY_CHANNEL_ID = config.WEEKLY_CHALLENGE_SUBMISSION_CHANNEL_ID;
+const DAILY_CHANNEL_ID = config.DAILY_CHALLENGE_SUBMISSION_CHANNEL_ID;
+const TEST_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
 let lastTaskSentDate = null;
 let lastWordleSentDate = null;
@@ -119,7 +122,10 @@ client.once(Events.ClientReady, async () => {
 // Weekly task
 async function sendWeeklyTask() {
   const channel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  if (!channel) return;
+  if (!channel) {
+    console.log('[Weekly Task] Channel not found');
+    return;
+  }
 
   const task = await getWeeklyTaskAndMove();
   const deadline = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
@@ -127,12 +133,21 @@ async function sendWeeklyTask() {
   await channel.send(`<@&${weeklyTaskRoleID}>\n**Task:** ${task}`);
   await channel.send(`**Duration:** Starting now until <t:${deadline}:F>.`);
   await channel.send(`Please post your evidence in **one message** in <#${taskSubmissionChannelID}>.`);
+
+  // Log to test channel
+  const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
+  if (testChannel) {
+    await testChannel.send(`✅ **[Auto-Run]** Weekly task posted at ${new Date().toLocaleString()}\nTask: ${task}`);
+  }
 }
 
 // Daily Wordle
 async function sendDailyWordle() {
   const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
-  if (!channel) return;
+  if (!channel) {
+    console.log('[Daily Wordle] Channel not found');
+    return;
+  }
 
   const wordleUrl = await getDailyWordleAndMove();
   if (!wordleUrl) {
@@ -142,6 +157,12 @@ async function sendDailyWordle() {
 
   await channel.send(`**Daily Wordle:**\n${wordleUrl}`);
   await channel.send(`Share your result in <#${wordleSubmissionChannelID}>.`);
+
+  // Log to test channel
+  const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
+  if (testChannel) {
+    await testChannel.send(`✅ **[Auto-Run]** Daily Wordle posted at ${new Date().toLocaleString()}\nURL: ${wordleUrl}`);
+  }
 }
 
 // ----------------------------------------------------------------------------
