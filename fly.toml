@@ -2,7 +2,7 @@
 # Reference: https://fly.io/docs/reference/configuration/
 
 app = "voli-disc-bot" # Change this to your app name
-primary_region = "sea" # Change to closest region: https://fly.io/docs/reference/regions/
+primary_region = "ord" # Change to closest region: https://fly.io/docs/reference/regions/
 
 [build]
 
