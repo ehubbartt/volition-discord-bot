@@ -12,9 +12,9 @@
     "_description": "Control automatic bot event handlers",
     "autoJoinTickets": false,
     "autoAddUnverifiedRole": false,
-    "handleGuildMemberAdd": true,
+    "handleGuildMemberAdd": false,
     "womMessageListener": true,
-    "reactionRoleSystem": true
+    "reactionAwardPoints": true
   },
   "verification": {
     "_description": "Player verification system features",
@@ -95,7 +95,7 @@
   },
   "notifications": {
     "_description": "Bot notification settings",
-    "sendWelcomeMessages": true,
+    "sendWelcomeMessages": false,
     "sendVerificationSuccess": true,
     "sendPointAdjustmentNotifications": true,
     "sendRankChangeNotifications": true,
@@ -105,7 +105,7 @@
     "_description": "Automated bot tasks",
     "dailyTaskReset": true,
     "weeklyTaskReset": true,
-    "autoSyncPlayers": false,
+    "autoSyncPlayers": true,
     "autoKickInactive": false,
     "autoBackupDatabase": false
   },
