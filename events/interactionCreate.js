@@ -2,7 +2,8 @@ const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = r
 const db = require('../db/supabase');
 const config = require('../config.json');
 const features = require('../utils/features');
-const analytics = require('../db/lootcrate_analytics');
+const lootcrateAnalytics = require('../db/lootcrate_analytics');
+const gamificationAnalytics = require('../db/gamification_analytics');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -23,6 +24,10 @@ module.exports = {
 
       try {
         await command.execute(interaction);
+
+        // Track command usage (non-blocking)
+        gamificationAnalytics.trackCommandUsage(interaction.commandName)
+          .catch(err => console.error('[Analytics] Failed to track command:', err));
       } catch (error) {
         console.error(error);
         const msg = { content: 'There was an error: events/interactionCreate.js', ephemeral: true };
@@ -289,7 +294,7 @@ module.exports = {
           await db.updateLastLootDate(rsn, today);
 
           // Log analytics for free lootcrate
-          await analytics.logLootcrateOpen(interaction.user.id, true, {
+          await lootcrateAnalytics.logLootcrateOpen(interaction.user.id, true, {
             kind,
             amount,
             chance,
@@ -322,7 +327,7 @@ module.exports = {
         await db.setPoints(rsn, newTotal);
 
         // Log analytics for paid lootcrate
-        await analytics.logLootcrateOpen(interaction.user.id, false, {
+        await lootcrateAnalytics.logLootcrateOpen(interaction.user.id, false, {
           kind,
           amount,
           chance,

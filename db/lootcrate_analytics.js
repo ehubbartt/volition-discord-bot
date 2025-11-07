@@ -1,4 +1,4 @@
-const supabase = require('./supabase');
+const { supabase } = require('./supabase');
 
 /**
  * Lootcrate Analytics Module
@@ -49,7 +49,7 @@ async function updateDailyMetrics(date, isFree, vpAmount, dropType) {
     const vpSpent = isFree ? 0 : 5; // 5 VP cost for paid opens
     const isNothing = dropType === 'vp' && vpAmount === 0;
 
-    const { data, error } = await supabase.client
+    const { data, error } = await supabase
         .rpc('increment_lootcrate_metrics', {
             p_date: date,
             p_total_opens: 1,
@@ -67,7 +67,7 @@ async function updateDailyMetrics(date, isFree, vpAmount, dropType) {
  * Track unique user for the day (used to calculate unique_users count)
  */
 async function trackDailyUser(date, userId) {
-    const { error } = await supabase.client
+    const { error } = await supabase
         .from('lootcrate_daily_users')
         .upsert({
             date,
@@ -92,7 +92,7 @@ async function logRareDrop(userId, isFree, result) {
     // Get username from cache if available (optional)
     const username = null; // Could fetch from interaction.user.username
 
-    const { error } = await supabase.client
+    const { error } = await supabase
         .from('lootcrate_rare_drops')
         .insert({
             user_id: userId,
@@ -137,7 +137,7 @@ function isRareDrop(result) {
  * Get daily metrics for a date range
  */
 async function getDailyMetrics(startDate, endDate) {
-    const { data, error } = await supabase.client
+    const { data, error } = await supabase
         .from('lootcrate_daily_metrics')
         .select('*')
         .gte('date', startDate)
@@ -152,7 +152,7 @@ async function getDailyMetrics(startDate, endDate) {
  * Get recent rare drops
  */
 async function getRecentRareDrops(limit = 50) {
-    const { data, error } = await supabase.client
+    const { data, error } = await supabase
         .from('lootcrate_rare_drops')
         .select('*')
         .order('timestamp', { ascending: false })
@@ -166,7 +166,7 @@ async function getRecentRareDrops(limit = 50) {
  * Calculate unique users for a specific date (from daily_users table)
  */
 async function updateUniqueUsersCount(date) {
-    const { count, error } = await supabase.client
+    const { count, error } = await supabase
         .from('lootcrate_daily_users')
         .select('user_id', { count: 'exact', head: true })
         .eq('date', date);
@@ -174,7 +174,7 @@ async function updateUniqueUsersCount(date) {
     if (error) throw error;
 
     // Update the daily metrics with unique user count
-    const { error: updateError } = await supabase.client
+    const { error: updateError } = await supabase
         .from('lootcrate_daily_metrics')
         .update({ unique_users: count })
         .eq('date', date);
