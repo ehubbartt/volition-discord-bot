@@ -2,7 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../db/supabase');
 const config = require('../config.json');
-const { RANK_ROLES, determineRank } = require('../commands/utility/sync');
+const { RANK_ROLES, determineRank, formatRankWithEmoji } = require('../commands/utility/sync');
 
 // Parse and handle join messages
 async function handleJoinMessage (description, originalMessage) {
@@ -534,7 +534,7 @@ async function sendJoinNotification (rsn, totalLevel, ehb, ehp, rank, womId, ori
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Assigned Rank', value: rank, inline: false },
+                { name: 'Assigned Rank', value: formatRankWithEmoji(rank), inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )
             .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')

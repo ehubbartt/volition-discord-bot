@@ -9,7 +9,7 @@ const {
     TextInputStyle
 } = require('discord.js');
 const axios = require('axios');
-const { determineRank } = require('./sync');
+const { determineRank, formatRankWithEmoji } = require('./sync');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -143,7 +143,7 @@ async function handleVerifySubmit(interaction) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Expected Rank', value: rank, inline: false },
+                { name: 'Expected Rank', value: formatRankWithEmoji(rank), inline: false },
                 { name: 'Discord Nickname', value: nicknameChanged ? `✅ Updated to ${actualRsn}` : `⚠️ ${nicknameError || 'Could not update'}`, inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )

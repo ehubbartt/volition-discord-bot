@@ -8,7 +8,7 @@ const {
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
-const { RANK_ROLES, determineRank } = require('./sync');
+const { RANK_ROLES, determineRank, formatRankWithEmoji } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
@@ -259,13 +259,13 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             .setTitle('✅ Sync Complete!')
             .setDescription(
                 `<@${targetUser.id}> has been successfully synced!\n\n` +
-                `**Assigned Rank:** ${rank}\n\n` +
+                `**Assigned Rank:** ${formatRankWithEmoji(rank)}\n\n` +
                 `**Completed:**\n` +
                 `• ${rankAssigned ? '✅' : '⚠️'} Discord rank ${rankAssigned ? 'assigned' : 'failed'}\n` +
                 `• ✅ Database synced\n\n` +
                 `**Next Steps:**\n` +
                 `• ${rankAssigned ? '✅ Discord rank assigned' : '⚠️ Manually assign Discord rank'}\n` +
-                `• Verify in-game rank matches (${rank})`
+                `• Verify in-game rank matches (${formatRankWithEmoji(rank)})`
             )
             .addFields(
                 { name: 'Discord User', value: `<@${targetUser.id}>`, inline: true },

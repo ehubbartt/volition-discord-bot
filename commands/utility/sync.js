@@ -25,6 +25,44 @@ const RANK_ROLES = {
     ':OP: Unverified': null // Not provided
 };
 
+// Emoji name to emoji ID mapping (for displaying emojis in embeds)
+const RANK_EMOJIS = {
+    'Sweat': '1339599170394259517',
+    'MasterGeneral': '1339599293413068860',
+    'TouchGrass': '1339599017813741652',
+    'WR': '1238443298625159220',
+    'TZ': '1309545563498352772',
+    'GO': '1087162684602056775',
+    'SA': '1309547277966377050',
+    'S_~1': '1087485648832843796',
+    'SL': '1309545367880208405',
+    'GU': '1087167843998650399',
+    'de': '1309548746844930058',
+    'HE': '1087482275307978894',
+    'AP': '1213921453762809886',
+    'OP': null
+};
+
+/**
+ * Convert a rank name with emoji shortcodes to Discord emoji format
+ * @param {string} rankName - Rank name like ":TZ: Top Dawgs"
+ * @returns {string} - Formatted rank like "<:TZ:1309545563498352772> Top Dawgs"
+ */
+function formatRankWithEmoji(rankName) {
+    if (!rankName) return 'None';
+
+    // Match pattern :EmojiName: RankName
+    const match = rankName.match(/^:([^:]+):\s*(.+)$/);
+    if (!match) return rankName;
+
+    const [, emojiName, displayName] = match;
+    const emojiId = RANK_EMOJIS[emojiName];
+
+    if (!emojiId) return rankName; // If no emoji ID, return original
+
+    return `<:${emojiName}:${emojiId}> ${displayName}`;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('sync')
@@ -267,7 +305,7 @@ async function fullClanSync (interaction, clanId) {
         // Add rank mismatch alerts if any
         if (rankMismatches.length > 0) {
             let mismatchText = rankMismatches.slice(0, 10).map(m =>
-                `• **${m.rsn}**: ${m.currentRank} -> ${m.expectedRank} (${m.ehb} EHB, ${m.daysInClan} days)`
+                `• **${m.rsn}**: ${formatRankWithEmoji(m.currentRank)} -> ${formatRankWithEmoji(m.expectedRank)} (${m.ehb} EHB, ${m.daysInClan} days)`
             ).join('\n');
 
             if (rankMismatches.length > 10) {
@@ -385,3 +423,4 @@ function getRankRole (member) {
 module.exports.fullClanSync = fullClanSync;
 module.exports.determineRank = determineRank;
 module.exports.RANK_ROLES = RANK_ROLES;
+module.exports.formatRankWithEmoji = formatRankWithEmoji;
