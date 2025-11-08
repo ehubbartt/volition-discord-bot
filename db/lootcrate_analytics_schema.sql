@@ -33,10 +33,25 @@ CREATE TABLE IF NOT EXISTS lootcrate_daily_users (
     PRIMARY KEY (date, user_id)
 );
 
+-- Per-User Lootcrate Stats (1 row per user, updated continuously)
+CREATE TABLE IF NOT EXISTS lootcrate_user_stats (
+    user_id TEXT PRIMARY KEY,
+    username TEXT,
+    total_opens INTEGER DEFAULT 0,
+    free_opens INTEGER DEFAULT 0,
+    paid_opens INTEGER DEFAULT 0,
+    total_vp_won INTEGER DEFAULT 0,
+    total_vp_spent INTEGER DEFAULT 0,
+    biggest_win INTEGER DEFAULT 0,
+    last_open_date DATE,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_rare_drops_timestamp ON lootcrate_rare_drops(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_rare_drops_user ON lootcrate_rare_drops(user_id);
 CREATE INDEX IF NOT EXISTS idx_daily_users_date ON lootcrate_daily_users(date DESC);
+CREATE INDEX IF NOT EXISTS idx_lootcrate_user_stats_opens ON lootcrate_user_stats(total_opens DESC);
 
 -- Auto-update timestamp function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -49,5 +64,10 @@ $$ language 'plpgsql';
 
 CREATE TRIGGER update_lootcrate_daily_metrics_updated_at
     BEFORE UPDATE ON lootcrate_daily_metrics
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_lootcrate_user_stats_updated_at
+    BEFORE UPDATE ON lootcrate_user_stats
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

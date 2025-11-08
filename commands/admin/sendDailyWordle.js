@@ -16,9 +16,9 @@ module.exports = {
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            const channel = interaction.client.channels.cache.get(config.DAILY_CHALLENGE_SUBMISSION_CHANNEL_ID);
+            const channel = interaction.client.channels.cache.get(config.DAILY_WORDLE_ANNOUNCEMENT_CHANNEL_ID);
             if (!channel) {
-                return interaction.editReply({ content: '❌ Daily challenge channel not found!' });
+                return interaction.editReply({ content: '❌ Daily Wordle announcement channel not found!' });
             }
 
             const wordleUrl = await getDailyWordleAndMove();
