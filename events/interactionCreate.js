@@ -299,7 +299,8 @@ module.exports = {
             amount,
             chance,
             itemName,
-            roleId
+            roleId,
+            username: interaction.user.username
           }).catch(err => console.error('[Analytics] Failed to log free lootcrate:', err));
 
           const description = amount === 0
@@ -332,7 +333,8 @@ module.exports = {
           amount,
           chance,
           itemName,
-          roleId
+          roleId,
+          username: interaction.user.username
         }).catch(err => console.error('[Analytics] Failed to log paid lootcrate:', err));
 
         // Add role reward if applicable

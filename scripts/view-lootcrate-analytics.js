@@ -65,17 +65,34 @@ async function viewAnalytics () {
         });
     }
 
-    // Get summary stats
-    const { data: totalStats, error: statsError } = await supabase
-        .rpc('get_total_stats');
+    // Get user leaderboard
+    const { data: userStats, error: userError } = await supabase
+        .from('lootcrate_user_stats')
+        .select('*')
+        .order('total_opens', { ascending: false })
+        .limit(10);
 
-    if (!statsError && totalStats && totalStats.length > 0) {
-        const stats = totalStats[0];
-        console.log('\n\n📈 All-Time Summary:\n');
-        console.log(`Total Opens:        ${stats.total_opens || 0}`);
-        console.log(`Total VP Won:       ${stats.total_vp_won || 0}`);
-        console.log(`Total VP Spent:     ${stats.total_vp_spent || 0}`);
-        console.log(`Net VP Change:      ${(stats.total_vp_won || 0) - (stats.total_vp_spent || 0)}`);
+    if (userError) {
+        console.error('\n❌ Error fetching user stats:', userError);
+    } else if (userStats && userStats.length > 0) {
+        console.log('\n\n🏆 Top 10 Lootcrate Openers:\n');
+        console.log('#'.padEnd(4), 'User ID'.padEnd(20), 'Total'.padEnd(8), 'Free'.padEnd(8), 'Paid'.padEnd(8), 'VP Won'.padEnd(10), 'VP Spent'.padEnd(10), 'Net VP'.padEnd(10), 'Biggest Win');
+        console.log('-'.repeat(120));
+
+        userStats.forEach((user, idx) => {
+            const netVP = user.total_vp_won - user.total_vp_spent;
+            console.log(
+                String(idx + 1).padEnd(4),
+                (user.username || user.user_id.slice(0, 18)).padEnd(20),
+                String(user.total_opens).padEnd(8),
+                String(user.free_opens).padEnd(8),
+                String(user.paid_opens).padEnd(8),
+                String(user.total_vp_won).padEnd(10),
+                String(user.total_vp_spent).padEnd(10),
+                (netVP >= 0 ? `+${netVP}` : String(netVP)).padEnd(10),
+                String(user.biggest_win)
+            );
+        });
     }
 
     console.log('\n' + '='.repeat(60));

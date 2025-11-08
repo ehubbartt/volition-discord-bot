@@ -16,11 +16,11 @@ const RARE_THRESHOLDS = {
  * Log a lootcrate opening (updates daily aggregates)
  * @param {string} userId - Discord user ID
  * @param {boolean} isFree - Whether it was a free daily claim
- * @param {object} result - Loot roll result {kind, amount, chance, itemName}
+ * @param {object} result - Loot roll result {kind, amount, chance, itemName, username}
  */
 async function logLootcrateOpen(userId, isFree, result) {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const { kind, amount = 0, chance = 0, itemName = null } = result;
+    const { kind, amount = 0, chance = 0, itemName = null, username = null } = result;
 
     try {
         // 1. Update daily aggregate metrics
@@ -29,7 +29,11 @@ async function logLootcrateOpen(userId, isFree, result) {
         // 2. Track unique user for this day
         await trackDailyUser(today, userId);
 
-        // 3. Log rare drops individually
+        // 3. Update per-user stats
+        const vpWon = kind === 'vp' ? amount : 0;
+        await updateUserStats(userId, username, isFree, vpWon, today);
+
+        // 4. Log rare drops individually
         if (isRareDrop(result)) {
             await logRareDrop(userId, isFree, result);
         }
@@ -81,6 +85,22 @@ async function trackDailyUser(date, userId) {
     if (error && error.code !== '23505') { // Ignore duplicate key errors
         throw error;
     }
+}
+
+/**
+ * Update per-user lootcrate stats
+ */
+async function updateUserStats(userId, username, isFree, vpWon, date) {
+    const { error } = await supabase
+        .rpc('update_lootcrate_user_stats', {
+            p_user_id: userId,
+            p_username: username,
+            p_is_free: isFree,
+            p_vp_won: vpWon,
+            p_date: date
+        });
+
+    if (error) throw error;
 }
 
 /**
@@ -184,10 +204,45 @@ async function updateUniqueUsersCount(date) {
     return count;
 }
 
+/**
+ * Get lootcrate user stats leaderboard
+ * @param {number} limit - Number of results
+ * @param {string} orderBy - Field to order by (total_opens, total_vp_won, biggest_win)
+ */
+async function getUserLeaderboard(limit = 10, orderBy = 'total_opens') {
+    const { data, error } = await supabase
+        .from('lootcrate_user_stats')
+        .select('*')
+        .order(orderBy, { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data;
+}
+
+/**
+ * Get a specific user's lootcrate stats
+ */
+async function getUserStats(userId) {
+    const { data, error } = await supabase
+        .from('lootcrate_user_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+    }
+    return data;
+}
+
 module.exports = {
     logLootcrateOpen,
     getDailyMetrics,
     getRecentRareDrops,
     updateUniqueUsersCount,
+    getUserLeaderboard,
+    getUserStats,
     RARE_THRESHOLDS
 };
