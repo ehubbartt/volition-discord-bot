@@ -86,6 +86,37 @@ async function handleJoinMessage (description, originalMessage) {
     }
 }
 
+// Parse and handle name change messages
+async function handleNameChangeMessage (description, title, originalMessage) {
+    try {
+        console.log('[NAME CHANGE] =====================================');
+        console.log('[NAME CHANGE] Raw title:', title);
+        console.log('[NAME CHANGE] Raw description:', description);
+        console.log('[NAME CHANGE] =====================================');
+
+        // Format: "Member Name Changed"
+        // Description: "Nutistic → nut bot"
+        const nameChangeMatch = description.match(/([a-zA-Z0-9\s_-]+)\s*→\s*([a-zA-Z0-9\s_-]+)/i);
+
+        if (!nameChangeMatch) {
+            console.log('[NAME CHANGE] ❌ Could not extract old and new name from message');
+            await sendSyncErrorNotification(originalMessage, 'Could not parse name change', description);
+            return;
+        }
+
+        const oldRsn = nameChangeMatch[1].trim();
+        const newRsn = nameChangeMatch[2].trim();
+
+        console.log(`[NAME CHANGE] Old RSN: "${oldRsn}"`);
+        console.log(`[NAME CHANGE] New RSN: "${newRsn}"`);
+
+        await processNameChange(oldRsn, newRsn, originalMessage);
+    } catch (error) {
+        console.error('[NAME CHANGE] ❌ Error handling name change message:', error);
+        await sendSyncErrorNotification(originalMessage, 'Error processing name change', error.message);
+    }
+}
+
 // Parse and handle leave messages
 async function handleLeaveMessage (description, originalMessage) {
     try {
@@ -342,6 +373,78 @@ async function processMemberJoin (rsn, originalMessage) {
     }
 }
 
+// Process name change - Update RSN in database
+async function processNameChange (oldRsn, newRsn, originalMessage) {
+    console.log(`[NAME CHANGE] ======================================`);
+    console.log(`[NAME CHANGE] Processing name change: "${oldRsn}" → "${newRsn}"`);
+    console.log(`[NAME CHANGE] ======================================`);
+
+    try {
+        // Try to find player by old RSN in database
+        const allPlayers = await db.getAllPlayers();
+        const existingPlayer = allPlayers.find(p => p.rsn?.toLowerCase() === oldRsn.toLowerCase());
+
+        if (!existingPlayer) {
+            console.log(`[NAME CHANGE] ⚠️ Player not found in database with old RSN: ${oldRsn}`);
+
+            // Try to fetch from WOM API using new RSN to get WOM ID
+            try {
+                const playerResponse = await axios.get(
+                    `https://api.wiseoldman.net/v2/players/${encodeURIComponent(newRsn)}`
+                );
+                const womId = playerResponse.data.id.toString();
+
+                // Check if we have this player by WOM ID
+                const playerByWomId = await db.getPlayerByWomId(womId);
+                if (playerByWomId) {
+                    // Update the RSN
+                    await db.updatePlayer(playerByWomId.id, { rsn: newRsn });
+                    console.log(`[NAME CHANGE] ✅ Updated RSN via WOM ID lookup`);
+                    await sendNameChangeNotification(oldRsn, newRsn, playerByWomId.discord_id, originalMessage);
+                    await sendSyncConfirmation(originalMessage, 'Name Change Auto-Synced',
+                        `**Old RSN:** ${oldRsn}\n**New RSN:** ${newRsn}\n**Database:** ✅ Updated via WOM ID`);
+                    return;
+                } else {
+                    console.log(`[NAME CHANGE] ⚠️ Player not in database`);
+                    await sendNameChangeNotification(oldRsn, newRsn, null, originalMessage);
+                    return;
+                }
+            } catch (error) {
+                console.log(`[NAME CHANGE] ❌ Could not fetch from WOM API:`, error.message);
+                await sendSyncErrorNotification(originalMessage, 'Name change detected but player not found',
+                    `Old: ${oldRsn}, New: ${newRsn}`);
+                return;
+            }
+        }
+
+        console.log(`[NAME CHANGE] ✅ Found player in database:`);
+        console.log(`  - Old RSN: ${existingPlayer.rsn}`);
+        console.log(`  - Discord ID: ${existingPlayer.discord_id || 'Not linked'}`);
+        console.log(`  - WOM ID: ${existingPlayer.wom_id}`);
+
+        // Update RSN in database
+        await db.updatePlayer(existingPlayer.id, { rsn: newRsn });
+        console.log(`[NAME CHANGE] ✅ Updated RSN in database: ${oldRsn} → ${newRsn}`);
+
+        // Send notification
+        await sendNameChangeNotification(oldRsn, newRsn, existingPlayer.discord_id, originalMessage);
+
+        // Send confirmation to log channel
+        const confirmDetails = `**Old RSN:** ${oldRsn}\n` +
+            `**New RSN:** ${newRsn}\n` +
+            `**Discord:** ${existingPlayer.discord_id ? `<@${existingPlayer.discord_id}>` : 'Not linked'}\n` +
+            `**Database:** ✅ Updated`;
+        await sendSyncConfirmation(originalMessage, 'Name Change Auto-Synced', confirmDetails);
+
+        console.log(`[NAME CHANGE] ✅ Successfully processed name change`);
+    } catch (error) {
+        console.error(`[NAME CHANGE] ❌ Error processing name change:`, error.message);
+        await sendSyncErrorNotification(originalMessage,
+            `Failed to process name change: ${oldRsn} → ${newRsn}`,
+            error.message);
+    }
+}
+
 // Process member leave
 async function processMemberLeave (rsn, originalMessage) {
     console.log(`[LEAVE] Looking up ${rsn} in database...`);
@@ -469,6 +572,28 @@ async function sendAdminNotification (rsn, totalLevel, ehb, originalMessage) {
         console.log(`[JOIN] ✅ Sent admin notification`);
     } catch (error) {
         console.error('[JOIN] ❌ Error sending admin notification:', error);
+    }
+}
+
+// Send custom name change notification
+async function sendNameChangeNotification (oldRsn, newRsn, discordId, originalMessage) {
+    try {
+        const embed = new EmbedBuilder()
+            .setColor('Blue')
+            .setTitle('✏️ Member Name Changed and Auto-Synced')
+            .setDescription(`**${oldRsn}** changed their name to **${newRsn}**`)
+            .addFields(
+                { name: 'Old RSN', value: oldRsn, inline: true },
+                { name: 'New RSN', value: newRsn, inline: true },
+                { name: 'Discord Account', value: discordId ? `<@${discordId}>` : 'Not linked', inline: false },
+                { name: 'Database Status', value: '✅ RSN updated in database', inline: false }
+            )
+            .setTimestamp();
+
+        await originalMessage.reply({ embeds: [embed] });
+        console.log(`[NAME CHANGE] ✅ Sent custom notification`);
+    } catch (error) {
+        console.error('[NAME CHANGE] ❌ Error sending notification:', error);
     }
 }
 
@@ -635,8 +760,13 @@ module.exports = {
                 await handleLeaveMessage(description, message);
             }
         }
+        // Detect name change messages
+        else if (title.includes('name changed') || title.includes('member name changed')) {
+            console.log('[WOM MESSAGE] ✅ Detected NAME CHANGE notification - processing...');
+            await handleNameChangeMessage(description, embed.title, message);
+        }
         else {
-            console.log('[WOM MESSAGE] ⚠️ Message title does not match join/leave patterns');
+            console.log('[WOM MESSAGE] ⚠️ Message title does not match join/leave/name change patterns');
             console.log('[WOM MESSAGE] ⚠️ This message will NOT be processed');
             console.log('[WOM MESSAGE] ⚠️ Please check the title format above to update the detection logic');
         }

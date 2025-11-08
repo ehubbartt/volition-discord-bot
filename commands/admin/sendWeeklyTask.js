@@ -16,9 +16,9 @@ module.exports = {
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            const channel = interaction.client.channels.cache.get(config.WEEKLY_CHALLENGE_SUBMISSION_CHANNEL_ID);
+            const channel = interaction.client.channels.cache.get(config.WEEKLY_TASK_ANNOUNCEMENT_CHANNEL_ID);
             if (!channel) {
-                return interaction.editReply({ content: '❌ Weekly challenge channel not found!' });
+                return interaction.editReply({ content: '❌ Weekly task announcement channel not found!' });
             }
 
             const task = await getWeeklyTaskAndMove();

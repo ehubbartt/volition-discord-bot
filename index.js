@@ -83,8 +83,8 @@ const { getDailyWordleAndMove } = require('./commands/fun/dailyWordle.js');
 const weeklyTaskRoleID = config.weeklyTaskRoleID; // used for push notifications
 const taskSubmissionChannelID = config.WEEKLY_CHALLENGE_SUBMISSION_CHANNEL_ID;
 const wordleSubmissionChannelID = config.DAILY_CHALLENGE_SUBMISSION_CHANNEL_ID;
-const WEEKLY_CHANNEL_ID = config.WEEKLY_CHALLENGE_SUBMISSION_CHANNEL_ID;
-const DAILY_CHANNEL_ID = config.DAILY_CHALLENGE_SUBMISSION_CHANNEL_ID;
+const WEEKLY_CHANNEL_ID = config.WEEKLY_TASK_ANNOUNCEMENT_CHANNEL_ID;
+const DAILY_CHANNEL_ID = config.DAILY_WORDLE_ANNOUNCEMENT_CHANNEL_ID;
 const TEST_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
 let lastTaskSentDate = null;
