@@ -16,7 +16,21 @@ async function handleJoinMessage (description, originalMessage) {
 
         let rsns = [];
 
-        // Try different patterns:
+        // Check for multi-member format: "🎉 2 Members have joined the group\nPlayer1, Player2"
+        // This format has a newline followed by comma-separated names
+        const multiMemberMatch = description.match(/(?:\d+\s+)?members?\s+(?:have\s+)?joined(?:\s+the\s+group)?\s*\n\s*(.+)/i);
+        if (multiMemberMatch && multiMemberMatch[1]) {
+            // Split by comma and process each name
+            const names = multiMemberMatch[1].split(',').map(n => n.trim());
+            for (const name of names) {
+                if (name && name.length > 0 && !name.match(/^\d+$/)) {
+                    rsns.push(name);
+                    console.log('[JOIN] ✅ Extracted RSN from multi-member format:', name);
+                }
+            }
+        }
+
+        // Try different patterns if multi-member didn't match:
         // 1. Custom Discord emoji format: <:feeder:1159532437412515860> PlayerName
         const customEmojiMatches = description.match(/<a?:[a-z_0-9]+:\d+>\s*([a-zA-Z0-9\s_-]+)/gi);
         if (customEmojiMatches && customEmojiMatches.length > 0) {
@@ -127,14 +141,30 @@ async function handleLeaveMessage (description, originalMessage) {
 
         let rsns = [];
 
-        // Check for "left: RSN" format first (common in title)
+        // Check for multi-member format: "👋 2 Members have left the group\npipedownlads, Pickle AJ"
+        // This format has a newline followed by comma-separated names
+        const multiMemberMatch = description.match(/(?:\d+\s+)?members?\s+(?:have\s+)?left(?:\s+the\s+group)?\s*\n\s*(.+)/i);
+        if (multiMemberMatch && multiMemberMatch[1]) {
+            // Split by comma and process each name
+            const names = multiMemberMatch[1].split(',').map(n => n.trim());
+            for (const name of names) {
+                if (name && name.length > 0 && !name.match(/^\d+$/)) {
+                    rsns.push(name);
+                    console.log('[LEAVE] ✅ Extracted RSN from multi-member format:', name);
+                }
+            }
+        }
+
+        // Check for "left: RSN" format (common in title)
         // Format: "👋 Group member left: bajjy"
-        const leftColonMatch = description.match(/(?:left|member left):\s*([a-zA-Z0-9\s_-]+)/i);
-        if (leftColonMatch && leftColonMatch[1]) {
-            const rsn = leftColonMatch[1].trim();
-            if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) {
-                rsns.push(rsn);
-                console.log('[LEAVE] ✅ Extracted RSN from "left:" format:', rsn);
+        if (rsns.length === 0) {
+            const leftColonMatch = description.match(/(?:left|member left):\s*([a-zA-Z0-9\s_-]+)/i);
+            if (leftColonMatch && leftColonMatch[1]) {
+                const rsn = leftColonMatch[1].trim();
+                if (rsn && rsn.length > 0 && !rsn.match(/^\d+$/)) {
+                    rsns.push(rsn);
+                    console.log('[LEAVE] ✅ Extracted RSN from "left:" format:', rsn);
+                }
             }
         }
 

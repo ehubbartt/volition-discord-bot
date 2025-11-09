@@ -360,7 +360,7 @@ module.exports = {
       } catch (error) {
         console.error(free ? 'Free daily claim error:' : 'Paid spin error:', error);
         try {
-          await interaction.editReply({ content: 'Something went wrong.' });
+          await interaction.editReply({ content: `<@${interaction.user.id}> Something went wrong with your lootcrate. Please contact an admin.` });
         } catch { /* Ignore if Discord response also fails */ }
       }
     }
