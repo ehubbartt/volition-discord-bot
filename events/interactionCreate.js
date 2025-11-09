@@ -271,7 +271,7 @@ module.exports = {
       try {
         const player = await db.getPlayerByDiscordId(interaction.user.id);
         if (!player) {
-          return await interaction.editReply({ content: `We do not have valid RSN for you in the clan database, please contact an admin.` });
+          return await interaction.editReply({ content: `<@${interaction.user.id}> We do not have valid RSN for you in the clan database, please contact an admin.` });
         }
 
         const rsn = player.rsn;
