@@ -8,7 +8,7 @@ const {
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
-const { RANK_ROLES, determineRank, formatRankWithEmoji } = require('./sync');
+const { RANK_ROLES, determineRank, formatRankWithEmoji, isRankUpgrade } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
@@ -204,23 +204,41 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         try {
             // Get current rank role (if any)
             const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
-            const currentRankRole = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
+            const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
-            // Only remove the current rank role, not all roles
-            if (currentRankRole) {
-                await member.roles.remove(currentRankRole);
-                console.log(`[SyncUser] Removed old rank role: ${currentRankRole.name}`);
+            // Get current rank name
+            let currentRankName = null;
+            if (currentRankRoleObj) {
+                for (const [rankName, roleId] of Object.entries(RANK_ROLES)) {
+                    if (roleId === currentRankRoleObj.id) {
+                        currentRankName = rankName;
+                        break;
+                    }
+                }
             }
 
-            // Add new rank role if it exists
-            const newRoleId = RANK_ROLES[rank];
-            if (newRoleId) {
-                await member.roles.add(newRoleId);
-                rankAssigned = true;
-                console.log(`[SyncUser] Assigned rank ${rank} to ${targetUser.tag}`);
+            // Only upgrade ranks, never downgrade
+            if (!currentRankName || isRankUpgrade(currentRankName, rank)) {
+                // Only remove the current rank role if we're upgrading
+                if (currentRankRoleObj) {
+                    await member.roles.remove(currentRankRoleObj);
+                    console.log(`[SyncUser] Removed old rank role: ${currentRankRoleObj.name}`);
+                }
+
+                // Add new rank role if it exists
+                const newRoleId = RANK_ROLES[rank];
+                if (newRoleId) {
+                    await member.roles.add(newRoleId);
+                    rankAssigned = true;
+                    console.log(`[SyncUser] ⬆️ Upgraded rank for ${targetUser.tag}: ${currentRankName || 'None'} -> ${rank}`);
+                } else {
+                    rankError = 'Role ID not configured in bot';
+                    console.warn(`[SyncUser] Role ID not configured for rank: ${rank}`);
+                }
             } else {
-                rankError = 'Role ID not configured in bot';
-                console.warn(`[SyncUser] Role ID not configured for rank: ${rank}`);
+                // Rank would be a downgrade - skip it
+                rankAssigned = true; // Set to true so we don't show error
+                console.log(`[SyncUser] ⏭️ Skipped downgrade for ${targetUser.tag}: keeping ${currentRankName} (earned rank: ${rank})`);
             }
         } catch (error) {
             rankError = error.message;

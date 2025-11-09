@@ -2,7 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../db/supabase');
 const config = require('../config.json');
-const { RANK_ROLES, determineRank, formatRankWithEmoji } = require('../commands/utility/sync');
+const { RANK_ROLES, determineRank, formatRankWithEmoji, isRankUpgrade } = require('../commands/utility/sync');
 
 // Parse and handle join messages
 async function handleJoinMessage (description, originalMessage) {
@@ -315,22 +315,40 @@ async function processMemberJoin (rsn, originalMessage) {
                 try {
                     // Get current rank role (if any)
                     const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
-                    const currentRankRole = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
+                    const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
-                    // Only remove the current rank role, not all roles
-                    if (currentRankRole) {
-                        await member.roles.remove(currentRankRole);
-                        console.log(`[JOIN] Removed old rank role: ${currentRankRole.name}`);
+                    // Get current rank name
+                    let currentRankName = null;
+                    if (currentRankRoleObj) {
+                        for (const [rankName, roleId] of Object.entries(RANK_ROLES)) {
+                            if (roleId === currentRankRoleObj.id) {
+                                currentRankName = rankName;
+                                break;
+                            }
+                        }
                     }
 
-                    // Add new rank role if it exists
-                    const newRoleId = RANK_ROLES[rank];
-                    if (newRoleId) {
-                        await member.roles.add(newRoleId);
-                        rankAssigned = true;
-                        console.log(`[JOIN] ✅ Assigned rank ${rank}`);
+                    // Only upgrade ranks, never downgrade
+                    if (!currentRankName || isRankUpgrade(currentRankName, rank)) {
+                        // Only remove the current rank role if we're upgrading
+                        if (currentRankRoleObj) {
+                            await member.roles.remove(currentRankRoleObj);
+                            console.log(`[JOIN] Removed old rank role: ${currentRankRoleObj.name}`);
+                        }
+
+                        // Add new rank role if it exists
+                        const newRoleId = RANK_ROLES[rank];
+                        if (newRoleId) {
+                            await member.roles.add(newRoleId);
+                            rankAssigned = true;
+                            console.log(`[JOIN] ✅ Upgraded rank: ${currentRankName || 'None'} -> ${rank}`);
+                        } else {
+                            console.warn(`[JOIN] ⚠️ Role ID not configured for rank: ${rank}`);
+                        }
                     } else {
-                        console.warn(`[JOIN] ⚠️ Role ID not configured for rank: ${rank}`);
+                        // Rank would be a downgrade - skip it
+                        rankAssigned = true;
+                        console.log(`[JOIN] ⏭️ Skipped downgrade: keeping ${currentRankName} (earned rank: ${rank})`);
                     }
                 } catch (error) {
                     console.error(`[JOIN] ⚠️ Failed to assign rank:`, error.message);

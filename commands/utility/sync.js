@@ -167,8 +167,9 @@ async function fullClanSync (interaction, clanId) {
                         // Pass the member's join timestamp for time-based ranks
                         const expectedRank = determineRank(ehb, discordMember.joinedTimestamp);
 
-                        if (currentRankRole !== expectedRank) {
-                            // ACTIVE MODE - Actually change ranks
+                        // Only update if it's an upgrade or they have no rank
+                        if (currentRankRole !== expectedRank && isRankUpgrade(currentRankRole, expectedRank)) {
+                            // ACTIVE MODE - Only upgrade ranks, never downgrade
                             const timeInClan = Date.now() - discordMember.joinedTimestamp;
                             const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
 
@@ -188,7 +189,7 @@ async function fullClanSync (interaction, clanId) {
                                 if (newRoleId) {
                                     await discordMember.roles.add(newRoleId);
                                     ranksUpdated++;
-                                    console.log(`[FullSync] Updated rank for ${rsn}: ${currentRankRole || 'None'} -> ${expectedRank} (${ehb} EHB, ${daysInClan} days)`);
+                                    console.log(`[FullSync] ⬆️ Upgraded rank for ${rsn}: ${currentRankRole || 'None'} -> ${expectedRank} (${ehb} EHB, ${daysInClan} days)`);
 
                                     rankMismatches.push({
                                         rsn,
@@ -196,7 +197,7 @@ async function fullClanSync (interaction, clanId) {
                                         expectedRank,
                                         ehb,
                                         daysInClan,
-                                        issue: `Updated: ${currentRankRole || 'None'} -> ${expectedRank}`
+                                        issue: `Upgraded: ${currentRankRole || 'None'} -> ${expectedRank}`
                                     });
                                 } else {
                                     console.warn(`[FullSync] Role ID not configured for rank: ${expectedRank}`);
@@ -206,6 +207,11 @@ async function fullClanSync (interaction, clanId) {
                                 rankMismatches.push({ rsn, currentRank: currentRankRole || 'None', expectedRank, ehb, daysInClan, issue: `Failed: ${roleError.message}` });
                                 console.error(`[FullSync] Failed to update rank for ${rsn}:`, roleError.message);
                             }
+                        } else if (currentRankRole !== expectedRank) {
+                            // Rank would be a downgrade - skip it
+                            const timeInClan = Date.now() - discordMember.joinedTimestamp;
+                            const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
+                            console.log(`[FullSync] ⏭️ Skipped downgrade for ${rsn}: keeping ${currentRankRole} (earned rank: ${expectedRank}, ${ehb} EHB, ${daysInClan} days)`);
                         }
                     } catch (error) {
                         // Check if error is "Unknown Member" (Discord user no longer in server)
@@ -340,6 +346,43 @@ async function fullClanSync (interaction, clanId) {
     }
 }
 
+// Rank hierarchy - higher index = higher rank
+const RANK_HIERARCHY = [
+    ':AP: Brewaholic',       // 0 - Lowest
+    ':HE: Discord Kitten',   // 1
+    ':de: Black Hearts',     // 2
+    ':GU: Guthixian',        // 3
+    ':SL: SLAAAAAY',         // 4
+    ':S_~1: Skull',          // 5
+    ':SA: Holy',             // 6
+    ':GO: Mind Goblin',      // 7
+    ':TZ: Top Dawgs',        // 8
+    ':WR: Wrath',            // 9
+    ':TouchGrass: Touch Grass', // 10
+    ':MasterGeneral: Master General', // 11
+    ':Sweat: Sweat'          // 12 - Highest
+];
+
+/**
+ * Compare two ranks to determine if newRank is higher than currentRank
+ * @param {string} currentRank - Current rank like ":TZ: Top Dawgs"
+ * @param {string} newRank - New rank to compare
+ * @returns {boolean} - True if newRank is higher than currentRank
+ */
+function isRankUpgrade(currentRank, newRank) {
+    if (!currentRank) return true; // No current rank, any rank is an upgrade
+    if (!newRank) return false; // Can't upgrade to nothing
+
+    const currentIndex = RANK_HIERARCHY.indexOf(currentRank);
+    const newIndex = RANK_HIERARCHY.indexOf(newRank);
+
+    // If rank not found in hierarchy, treat as upgrade to be safe
+    if (currentIndex === -1) return true;
+    if (newIndex === -1) return false;
+
+    return newIndex > currentIndex;
+}
+
 function determineRank (ehb, memberJoinedTimestamp = null, guild = null) {
     // Calculate time in clan (in milliseconds)
     const timeInClan = memberJoinedTimestamp ? Date.now() - memberJoinedTimestamp : 0;
@@ -424,3 +467,5 @@ module.exports.fullClanSync = fullClanSync;
 module.exports.determineRank = determineRank;
 module.exports.RANK_ROLES = RANK_ROLES;
 module.exports.formatRankWithEmoji = formatRankWithEmoji;
+module.exports.isRankUpgrade = isRankUpgrade;
+module.exports.RANK_HIERARCHY = RANK_HIERARCHY;
