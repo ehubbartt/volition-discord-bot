@@ -54,11 +54,11 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         }
 
         // Check if player is in clan
-        const playerInClan = clanData.memberships.find(
+        const membershipData = clanData.memberships.find(
             member => member.player.username.toLowerCase() === rsn.toLowerCase()
         );
 
-        if (!playerInClan) {
+        if (!membershipData) {
             // Player not in clan - check if they exist in database and remove them
             await interaction.editReply({
                 content: `⚠️ **${rsn}** is not in the WOM clan...\n\nChecking database...`
@@ -127,9 +127,10 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             return interaction.editReply({ content: null, embeds: [errorEmbed] });
         }
 
-        const womId = playerInClan.player.id;
-        const actualRsn = playerInClan.player.username;
-        const ehb = Math.round(playerInClan.player.ehb || 0);
+        const womId = membershipData.player.id;
+        const actualRsn = membershipData.player.username;
+        const ehb = Math.round(membershipData.player.ehb || 0);
+        const clanJoinedAt = membershipData.createdAt; // WOM clan join timestamp
 
         await interaction.editReply({
             content: `🔄 Syncing **${rsn}** for <@${targetUser.id}>...\n\n` +
@@ -193,11 +194,12 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 `Step 4/5: Assigning Discord rank...`
         });
 
-        // Fetch member to get join timestamp for time-based ranks
+        // Fetch member for role assignment
         const member = await interaction.guild.members.fetch(targetUser.id);
 
-        // Determine and assign rank (with time-based consideration)
-        const rank = determineRank(ehb, member.joinedTimestamp);
+        // Determine and assign rank using clan join timestamp from WOM
+        const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
+        const rank = determineRank(ehb, clanJoinTimestamp);
         let rankAssigned = false;
         let rankError = null;
 
@@ -259,14 +261,16 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             await db.updatePlayer(existingPlayer.id, {
                 discord_id: targetUser.id,
                 rsn: actualRsn,
-                wom_id: womId.toString()
+                wom_id: womId.toString(),
+                clan_joined_at: clanJoinedAt
             });
             console.log(`[SyncUser] Updated existing player in database`);
         } else {
             await db.createPlayer({
                 rsn: actualRsn,
                 discord_id: targetUser.id,
-                wom_id: womId.toString()
+                wom_id: womId.toString(),
+                clan_joined_at: clanJoinedAt
             }, 0);
             console.log(`[SyncUser] Created new player in database`);
         }

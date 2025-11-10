@@ -268,6 +268,20 @@ async function processMemberJoin (rsn, originalMessage) {
         const ehb = Math.round(playerData.ehb || 0);
         const ehp = Math.round(playerData.ehp || 0);
 
+        // Fetch clan membership data to get the clan join timestamp
+        const clanId = config.clanId;
+        let clanJoinedAt = null;
+        try {
+            const clanResponse = await axios.get(`https://api.wiseoldman.net/v2/groups/${clanId}`);
+            const membershipData = clanResponse.data.memberships?.find(m => m.player.id.toString() === womId);
+            if (membershipData) {
+                clanJoinedAt = membershipData.createdAt;
+                console.log(`[JOIN] Found clan join date: ${clanJoinedAt}`);
+            }
+        } catch (error) {
+            console.log(`[JOIN] ⚠️ Could not fetch clan join date:`, error.message);
+        }
+
         // Get total level
         let totalLevel = 0;
         if (playerData.latestSnapshot?.data?.skills?.overall) {
@@ -304,8 +318,9 @@ async function processMemberJoin (rsn, originalMessage) {
                 member = await originalMessage.guild.members.fetch(discordId);
                 console.log(`[JOIN] Found linked Discord user: ${member.user.tag}`);
 
-                // Determine rank with time-based consideration
-                rank = determineRank(ehb, member.joinedTimestamp);
+                // Determine rank using clan join timestamp from WOM
+                const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
+                rank = determineRank(ehb, clanJoinTimestamp);
                 console.log(`[JOIN] Assigned rank: ${rank}`);
 
                 // Nickname changes disabled
@@ -367,14 +382,16 @@ async function processMemberJoin (rsn, originalMessage) {
             await db.updatePlayer(existingPlayer.id, {
                 rsn: rsn,
                 wom_id: womId,
-                discord_id: discordId // Preserve existing discord_id
+                discord_id: discordId, // Preserve existing discord_id
+                clan_joined_at: clanJoinedAt
             });
             console.log(`[JOIN] ✅ Updated existing player in database`);
         } else {
             await db.createPlayer({
                 rsn: rsn,
                 wom_id: womId,
-                discord_id: null
+                discord_id: null,
+                clan_joined_at: clanJoinedAt
             }, 0);
             console.log(`[JOIN] ✅ Created new player in database`);
         }

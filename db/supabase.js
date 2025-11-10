@@ -95,6 +95,7 @@ async function createPlayer(playerData, initialPoints = 0) {
       rsn: playerData.rsn,
       discord_id: playerData.discord_id || null,
       wom_id: playerData.wom_id || null,
+      clan_joined_at: playerData.clan_joined_at || null,
     })
     .select()
     .single();

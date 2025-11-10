@@ -129,6 +129,7 @@ async function fullClanSync (interaction, clanId) {
             const womId = member.player.id.toString();
             const rsn = member.player.username;
             const ehb = Math.round(member.player.ehb || 0);
+            const clanJoinedAt = member.createdAt; // WOM clan join timestamp
 
             const existingPlayer = existingWomIds.get(womId);
 
@@ -138,23 +139,33 @@ async function fullClanSync (interaction, clanId) {
                     await db.createPlayer({
                         rsn: rsn,
                         discord_id: null,
-                        wom_id: womId
+                        wom_id: womId,
+                        clan_joined_at: clanJoinedAt
                     }, 0);
                     newMembersAdded++;
-                    const expectedRank = determineRank(ehb); // No join time for new members
+                    const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
+                    const expectedRank = determineRank(ehb, clanJoinTimestamp);
                     newMembers.push({ rsn, womId, ehb, rank: expectedRank });
                     console.log(`[FullSync] Added new member: ${rsn} (${womId})`);
                 } catch (error) {
                     console.error(`[FullSync] Failed to add ${rsn}:`, error.message);
                 }
             } else {
-                // Existing member - update RSN if it changed
+                // Existing member - update RSN and clan join date if changed
+                const updates = {};
                 if (existingPlayer.rsn !== rsn) {
+                    updates.rsn = rsn;
+                }
+                if (clanJoinedAt && existingPlayer.clan_joined_at !== clanJoinedAt) {
+                    updates.clan_joined_at = clanJoinedAt;
+                }
+
+                if (Object.keys(updates).length > 0) {
                     try {
-                        await db.updatePlayer(existingPlayer.id, { rsn: rsn });
-                        console.log(`[FullSync] Updated RSN: ${existingPlayer.rsn} -> ${rsn} (WOM ID: ${womId})`);
+                        await db.updatePlayer(existingPlayer.id, updates);
+                        console.log(`[FullSync] Updated player ${rsn} (WOM ID: ${womId}):`, updates);
                     } catch (error) {
-                        console.error(`[FullSync] Failed to update RSN for ${womId}:`, error.message);
+                        console.error(`[FullSync] Failed to update ${womId}:`, error.message);
                     }
                 }
 
@@ -164,13 +175,14 @@ async function fullClanSync (interaction, clanId) {
                         const discordMember = await interaction.guild.members.fetch(existingPlayer.discord_id);
                         const currentRankRole = getRankRole(discordMember);
 
-                        // Pass the member's join timestamp for time-based ranks
-                        const expectedRank = determineRank(ehb, discordMember.joinedTimestamp);
+                        // Use clan join timestamp for time-based ranks
+                        const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
+                        const expectedRank = determineRank(ehb, clanJoinTimestamp);
 
                         // Only update if it's an upgrade or they have no rank
                         if (currentRankRole !== expectedRank && isRankUpgrade(currentRankRole, expectedRank)) {
                             // ACTIVE MODE - Only upgrade ranks, never downgrade
-                            const timeInClan = Date.now() - discordMember.joinedTimestamp;
+                            const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
                             const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
 
                             try {
@@ -209,7 +221,7 @@ async function fullClanSync (interaction, clanId) {
                             }
                         } else if (currentRankRole !== expectedRank) {
                             // Rank would be a downgrade - skip it
-                            const timeInClan = Date.now() - discordMember.joinedTimestamp;
+                            const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
                             const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
                             console.log(`[FullSync] ⏭️ Skipped downgrade for ${rsn}: keeping ${currentRankRole} (earned rank: ${expectedRank}, ${ehb} EHB, ${daysInClan} days)`);
                         }
