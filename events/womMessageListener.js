@@ -305,7 +305,7 @@ async function processMemberJoin (rsn, originalMessage) {
                 console.log(`[JOIN] Found linked Discord user: ${member.user.tag}`);
 
                 // Determine rank with time-based consideration
-                rank = determineRank(ehb, member.joinedTimestamp, originalMessage.guild);
+                rank = determineRank(ehb, member.joinedTimestamp);
                 console.log(`[JOIN] Assigned rank: ${rank}`);
 
                 // Nickname changes disabled
@@ -359,7 +359,7 @@ async function processMemberJoin (rsn, originalMessage) {
         } else {
             console.log(`[JOIN] No Discord ID linked for this player`);
             // For non-linked players, determine rank without time consideration
-            rank = determineRank(ehb, null, originalMessage.guild);
+            rank = determineRank(ehb, null);
         }
 
         // Update or create player in database

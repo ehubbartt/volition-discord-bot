@@ -435,15 +435,8 @@ function determineRank (ehb, memberJoinedTimestamp = null, guild = null) {
         rankName = 'Brewaholic';
     }
 
-    // If guild is provided, try to find and use the actual emoji
-    if (guild) {
-        const emoji = guild.emojis.cache.find(e => e.name === emojiName);
-        if (emoji) {
-            return `${emoji} ${rankName}`;
-        }
-    }
-
-    // Fallback to text format if guild not provided or emoji not found
+    // Always return the text format that matches RANK_ROLES keys
+    // The guild parameter is ignored to ensure consistent format
     return `:${emojiName}: ${rankName}`;
 }
 

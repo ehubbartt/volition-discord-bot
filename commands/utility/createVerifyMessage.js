@@ -139,7 +139,7 @@ async function handleVerifySubmit(interaction) {
         const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL || ehb >= MIN_EHB;
 
         // Determine rank
-        const rank = determineRank(ehb, null, interaction.guild);
+        const rank = determineRank(ehb, null);
 
         // Handle nickname change and role updates if requirements met
         let nicknameChanged = false;

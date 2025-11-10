@@ -197,7 +197,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         const member = await interaction.guild.members.fetch(targetUser.id);
 
         // Determine and assign rank (with time-based consideration)
-        const rank = determineRank(ehb, member.joinedTimestamp, interaction.guild);
+        const rank = determineRank(ehb, member.joinedTimestamp);
         let rankAssigned = false;
         let rankError = null;
 
