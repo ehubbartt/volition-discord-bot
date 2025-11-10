@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config.json');
-const { determineRank } = require('./sync');
+const { determineRank, formatRankWithEmoji } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
@@ -212,7 +212,7 @@ async function handleVerifySubmit(interaction) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Expected Rank', value: rank, inline: false }
+                { name: 'Expected Rank', value: formatRankWithEmoji(rank), inline: false }
             );
 
         if (nicknameChanged) {

@@ -296,7 +296,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Rank', value: rank, inline: true },
+                { name: 'Rank', value: formatRankWithEmoji(rank), inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }
             );
