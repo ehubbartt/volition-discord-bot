@@ -281,13 +281,13 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             .setTitle('✅ Sync Complete!')
             .setDescription(
                 `<@${targetUser.id}> has been successfully synced!\n\n` +
-                `**Assigned Rank:** ${formatRankWithEmoji(rank)}\n\n` +
+                `**Assigned Rank:** ${formatRankWithEmoji(rank, interaction.guild)}\n\n` +
                 `**Completed:**\n` +
                 `• ${rankAssigned ? '✅' : '⚠️'} Discord rank ${rankAssigned ? 'assigned' : 'failed'}\n` +
                 `• ✅ Database synced\n\n` +
                 `**Next Steps:**\n` +
                 `• ${rankAssigned ? '✅ Discord rank assigned' : '⚠️ Manually assign Discord rank'}\n` +
-                `• Verify in-game rank matches (${formatRankWithEmoji(rank)})`
+                `• Verify in-game rank matches (${formatRankWithEmoji(rank, interaction.guild)})`
             )
             .addFields(
                 { name: 'Discord User', value: `<@${targetUser.id}>`, inline: true },
@@ -296,7 +296,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Rank', value: formatRankWithEmoji(rank), inline: true },
+                { name: 'Rank', value: formatRankWithEmoji(rank, interaction.guild), inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }
             );

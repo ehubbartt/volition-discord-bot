@@ -212,7 +212,7 @@ async function handleVerifySubmit(interaction) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Expected Rank', value: formatRankWithEmoji(rank), inline: false }
+                { name: 'Expected Rank', value: formatRankWithEmoji(rank, interaction.guild), inline: false }
             );
 
         if (nicknameChanged) {

@@ -46,9 +46,10 @@ const RANK_EMOJIS = {
 /**
  * Convert a rank name with emoji shortcodes to Discord emoji format
  * @param {string} rankName - Rank name like ":TZ: Top Dawgs"
+ * @param {Guild} guild - Optional guild to lookup emoji from
  * @returns {string} - Formatted rank like "<:TZ:1309545563498352772> Top Dawgs"
  */
-function formatRankWithEmoji(rankName) {
+function formatRankWithEmoji(rankName, guild = null) {
     if (!rankName) return 'None';
 
     // Match pattern :EmojiName: RankName
@@ -56,8 +57,17 @@ function formatRankWithEmoji(rankName) {
     if (!match) return rankName;
 
     const [, emojiName, displayName] = match;
-    const emojiId = RANK_EMOJIS[emojiName];
 
+    // Try to find emoji in guild first (dynamic lookup)
+    if (guild) {
+        const emoji = guild.emojis.cache.find(e => e.name === emojiName);
+        if (emoji) {
+            return `${emoji} ${displayName}`;
+        }
+    }
+
+    // Fallback to static mapping
+    const emojiId = RANK_EMOJIS[emojiName];
     if (!emojiId) return rankName; // If no emoji ID, return original
 
     return `<:${emojiName}:${emojiId}> ${displayName}`;
@@ -323,7 +333,7 @@ async function fullClanSync (interaction, clanId) {
         // Add rank mismatch alerts if any
         if (rankMismatches.length > 0) {
             let mismatchText = rankMismatches.slice(0, 10).map(m =>
-                `• **${m.rsn}**: ${formatRankWithEmoji(m.currentRank)} -> ${formatRankWithEmoji(m.expectedRank)} (${m.ehb} EHB, ${m.daysInClan} days)`
+                `• **${m.rsn}**: ${formatRankWithEmoji(m.currentRank, interaction.guild)} -> ${formatRankWithEmoji(m.expectedRank, interaction.guild)} (${m.ehb} EHB, ${m.daysInClan} days)`
             ).join('\n');
 
             if (rankMismatches.length > 10) {

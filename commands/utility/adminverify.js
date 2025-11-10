@@ -113,7 +113,7 @@ module.exports = {
                     { name: 'Total Level', value: totalLevel.toString(), inline: true },
                     { name: 'EHB', value: ehb.toString(), inline: true },
                     { name: 'EHP', value: ehp.toString(), inline: true },
-                    { name: 'Expected Rank', value: formatRankWithEmoji(rank), inline: true },
+                    { name: 'Expected Rank', value: formatRankWithEmoji(rank, interaction.guild), inline: true },
                     { name: '\u200B', value: '\u200B', inline: true },
                     { name: '\u200B', value: '\u200B', inline: true },
                     { name: 'Discord Nickname', value: nicknameChanged ? `✅ Updated to ${actualRsn}` : `⚠️ ${nicknameError || 'Could not update'}`, inline: false },
