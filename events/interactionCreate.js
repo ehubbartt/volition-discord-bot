@@ -90,18 +90,6 @@ module.exports = {
           return interaction.reply({ content: '❌ Ticket category not configured', ephemeral: true });
         }
 
-        // Check if user already has a ticket in this category
-        const existingTicket = interaction.guild.channels.cache.find(
-          ch => ch.parentId === categoryId && ch.permissionsFor(interaction.user).has(PermissionFlagsBits.ViewChannel)
-        );
-
-        if (existingTicket) {
-          return interaction.reply({
-            content: `❌ You already have a ${ticketType} ticket open: ${existingTicket}`,
-            ephemeral: true
-          });
-        }
-
         await interaction.deferReply({ ephemeral: true });
 
         // Create the ticket channel
