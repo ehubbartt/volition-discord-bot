@@ -45,16 +45,6 @@ module.exports = {
         });
 
         if (wasReset) {
-            // Send notification that timer was reset
-            const resetMessage = await message.channel.send({
-                content: `⏰ **Timer Reset:** Soft-close timer has been reset to 24 hours due to activity.`
-            });
-
-            // Delete the notification after 10 seconds
-            setTimeout(() => {
-                resetMessage.delete().catch(() => {});
-            }, 10000);
-
             console.log(`[TicketSoftClose] Timer reset for ${message.channel.name} due to message from ${message.author.tag}`);
         }
     },
