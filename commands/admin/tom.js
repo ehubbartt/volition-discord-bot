@@ -5,13 +5,13 @@ module.exports = {
         .setName('tom')
         .setDescription('For Tom Only')
         .addUserOption(option =>
-            option.setname('user')
+            option.setName('user')
             .setDescription('The User To Fuck off')
-            .setrequired(true))
+            .setRequired(true))
         .addUserOption(option =>
-            option.setname('user2')
+            option.setName('user2')
             .setDescription('The User To Fuck off')
-            .setrequired(false)),
+            .setRequired(false)),
 
     async execute (interaction) {
         
@@ -22,16 +22,16 @@ module.exports = {
             });
         }
 
-        const preMessage =''
-        const person = interaction.options.getuser('user')
-        const person2 = interaction.options.getuser('user2')
-        if (person2){
-            premessage=`<@${person}> and <@${person2}>`
+        let preMessage = '';
+        const person = interaction.options.getUser('user');
+        const person2 = interaction.options.getUser('user2');
+        if (person2) {
+            preMessage = `<@${person.id}> and <@${person2.id}>`;
         } else {
-            premessage =`<@${person}`
+            preMessage = `<@${person.id}>`;
         }
         const gifUrl = 'https://media.giphy.com/media/44Eq3Ab5LPYn6/giphy.gif';
-        const message = `${premessage} politely FUCK OFF\n${gifUrl}`;
+        const message = `${preMessage} politely FUCK OFF\n${gifUrl}`;
 
         await interaction.reply({ content: message });
     }
