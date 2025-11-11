@@ -17,7 +17,7 @@ module.exports = {
                 .setDescription('Channel to post the ticket panel in')
                 .setRequired(false)),
 
-    async execute(interaction) {
+    async execute (interaction) {
         if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'Admin only command.', ephemeral: true });
         }
@@ -53,7 +53,7 @@ module.exports = {
 
         const shopButton = new ButtonBuilder()
             .setCustomId('ticket_create_shop')
-            .setLabel('Shop Payout')
+            .setLabel('Payout Ticket')
             .setStyle(ButtonStyle.Success)
             .setEmoji('💰');
 
