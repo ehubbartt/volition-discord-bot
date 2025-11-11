@@ -577,10 +577,13 @@ async function handleIntroSubmit(interaction) {
 
         console.log(`[Intro] Attempting to send message to intro channel...`);
 
-        // Handle different channel types
+        // Handle different channel types and get the message/thread URL
+        let introUrl = null;
+
         if (introChannel.isThread()) {
             // It's a thread - use send directly
-            await introChannel.send(introMessage);
+            const sentMessage = await introChannel.send(introMessage);
+            introUrl = sentMessage.url;
         } else if (introChannel.type === 15) {
             // It's a forum channel (type 15) - create a new thread/post
             const thread = await introChannel.threads.create({
@@ -588,17 +591,32 @@ async function handleIntroSubmit(interaction) {
                 message: { content: introMessage }
             });
             console.log(`[Intro] Created forum post: ${thread.name}`);
+            introUrl = `https://discord.com/channels/${config.guildId}/${thread.id}`;
         } else {
             // Regular text channel
-            await introChannel.send(introMessage);
+            const sentMessage = await introChannel.send(introMessage);
+            introUrl = sentMessage.url;
         }
 
         console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
 
-        // Confirm to user
+        // Confirm to user (ephemeral in the ticket)
         await interaction.editReply({
             content: '✅ Your introduction has been posted! An admin will help you join the clan in-game shortly.'
         });
+
+        // Send link to the introduction in the ticket channel (if in a ticket)
+        const ticketCategories = [
+            config.TICKET_JOIN_CATEGORY_ID,
+            config.TICKET_GENERAL_CATEGORY_ID,
+            config.TICKET_SHOP_CATEGORY_ID
+        ];
+
+        if (interaction.channel && ticketCategories.includes(interaction.channel.parentId)) {
+            await interaction.channel.send({
+                content: `📝 **Introduction Posted!** ${interaction.user}'s introduction has been submitted: ${introUrl}`
+            });
+        }
 
     } catch (error) {
         console.error('[Intro] Error posting introduction:', error);

@@ -8,7 +8,7 @@ const gamificationAnalytics = require('../db/gamification_analytics');
 module.exports = {
   name: Events.InteractionCreate,
 
-  async execute(interaction) {
+  async execute (interaction) {
 
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
@@ -74,15 +74,15 @@ module.exports = {
 
         if (ticketType === 'join') {
           categoryId = config.TICKET_JOIN_CATEGORY_ID;
-          ticketName = `${config.UNVERIFIED_EMOJI}join-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `${config.UNVERIFIED_EMOJI}・join-${interaction.user.id}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your join ticket! Click **Verify My Account** below to get started.';
         } else if (ticketType === 'general') {
           categoryId = config.TICKET_GENERAL_CATEGORY_ID;
-          ticketName = `general-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `general-${interaction.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your general support ticket! An admin will be with you shortly.';
         } else if (ticketType === 'shop') {
           categoryId = config.TICKET_SHOP_CATEGORY_ID;
-          ticketName = `shop-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `shop-${interaction.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your shop payout ticket! Please describe what you need and an admin will assist you.';
         }
 
@@ -206,24 +206,24 @@ module.exports = {
     if (interaction.isUserSelectMenu() && interaction.customId === 'mute_user_select') {
       const shopCommand = interaction.client.commands.get('shop');
       if (shopCommand?.handleUserSelection) {
-        try { await shopCommand.handleUserSelection(interaction); } 
+        try { await shopCommand.handleUserSelection(interaction); }
         catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
       }
     }
 
-    function rollLoot(allowItems = true, allowRole = true) {
+    function rollLoot (allowItems = true, allowRole = true) {
       const KING_GAMBA_ROLE_ID = '1423714480369434675';
 
       const entries = [
-        { p: 29.7, kind: 'vp', label: 'Junk', min: 0, max: 0, color: 0x808080, title: 'Loot Crate Result',                                          image: 'https://i.imgur.com/jABzYyd.png' },
-        { p: 0.1, kind: 'role', label: 'King Gamba role', roleId: KING_GAMBA_ROLE_ID, color: 0x800080, title: 'A King of Gamba has been crowned!',  image: 'https://i.imgur.com/zeSTA3O.png' },
+        { p: 29.7, kind: 'vp', label: 'Junk', min: 0, max: 0, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/jABzYyd.png' },
+        { p: 0.1, kind: 'role', label: 'King Gamba role', roleId: KING_GAMBA_ROLE_ID, color: 0x800080, title: 'A King of Gamba has been crowned!', image: 'https://i.imgur.com/zeSTA3O.png' },
 
-        { p: 50.0, kind: 'vp', label: 'Common (1–3 VP)', min: 1, max: 3, color: 0x808080, title: 'Loot Crate Result',                               image: 'https://i.imgur.com/EF6qFMM.png' },
-        { p: 10.0, kind: 'vp', label: 'Uncommon (4–10 VP)', min: 4, max: 10, color: 0x808080, title: 'Loot Crate Result',                           image: 'https://i.imgur.com/FyOzqw2.png' },
-        { p: 5.55, kind: 'vp', label: 'Rare (11–25 VP)', min: 11, max: 25, color: 0x00FF00, title: 'Loot Crate Result',                              image: 'https://i.imgur.com/SWDduXl.png' },
-        { p: 2.2, kind: 'vp', label: 'Unique (25–50 VP)', min: 26, max: 50, color: 0x00FF00, title: 'Not bad!',                                     image: 'https://i.imgur.com/FIaGFsf.png' },
-        { p: 0.4, kind: 'vp', label: 'Legendary (100 VP)', min: 100, max: 100, color: 0x00FF00, title: `Hooo boy, it's a big one!`,                 image: 'https://i.imgur.com/nYUY964.png' },
-        { p: 0.05, kind: 'vp', label: 'Megarare (200–400 VP)', min: 200, max: 400, color: 0x800080, title: 'VP JACKPOT! 🔥',                         image: 'https://i.imgur.com/uweE4rx.png' },
+        { p: 50.0, kind: 'vp', label: 'Common (1–3 VP)', min: 1, max: 3, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/EF6qFMM.png' },
+        { p: 10.0, kind: 'vp', label: 'Uncommon (4–10 VP)', min: 4, max: 10, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/FyOzqw2.png' },
+        { p: 5.55, kind: 'vp', label: 'Rare (11–25 VP)', min: 11, max: 25, color: 0x00FF00, title: 'Loot Crate Result', image: 'https://i.imgur.com/SWDduXl.png' },
+        { p: 2.2, kind: 'vp', label: 'Unique (25–50 VP)', min: 26, max: 50, color: 0x00FF00, title: 'Not bad!', image: 'https://i.imgur.com/FIaGFsf.png' },
+        { p: 0.4, kind: 'vp', label: 'Legendary (100 VP)', min: 100, max: 100, color: 0x00FF00, title: `Hooo boy, it's a big one!`, image: 'https://i.imgur.com/nYUY964.png' },
+        { p: 0.05, kind: 'vp', label: 'Megarare (200–400 VP)', min: 200, max: 400, color: 0x800080, title: 'VP JACKPOT! 🔥', image: 'https://i.imgur.com/uweE4rx.png' },
         { p: 2.0, kind: 'item', label: 'Item Drop', color: 0x2b2d31, title: 'Rare Item Drop!' }
       ];
 
@@ -237,35 +237,37 @@ module.exports = {
       // ---
       if (chosen.kind === 'vp') {
         const amount = chosen.min === chosen.max ? chosen.min : Math.floor(Math.random() * (chosen.max - chosen.min + 1)) + chosen.min;
-        return { 
-          kind: 'vp', amount, 
-          label: chosen.label, 
-          color: chosen.color, 
-          title: chosen.title, 
-          image: chosen.image, 
-          chance: chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1) };
+        return {
+          kind: 'vp', amount,
+          label: chosen.label,
+          color: chosen.color,
+          title: chosen.title,
+          image: chosen.image,
+          chance: chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1)
+        };
       }
 
       // ---
       if (chosen.kind === 'role') {
-        return { 
-          kind: 'role', 
-          roleId: chosen.roleId, 
-          amount: 0, label: 
-          chosen.label, color: 
-          chosen.color, title: 
-          chosen.title, image: 
-          chosen.image, chance: 
-          chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1) };
+        return {
+          kind: 'role',
+          roleId: chosen.roleId,
+          amount: 0, label:
+            chosen.label, color:
+            chosen.color, title:
+            chosen.title, image:
+            chosen.image, chance:
+            chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1)
+        };
       }
       const itemTable = [
-        { p: 80, name: 'Abyssal Whip', color: 0x00FF00,                 image: 'https://i.imgur.com/tMM7G91.png' },
-        { p: 16.55, name: `Elidinis' Ward`, color: 0x00FF00,            image: 'https://i.imgur.com/ZrL4y9r.png' },
-        { p: 2.82, name: 'Bond', color: 0x00FF00,                       image: 'https://i.imgur.com/K9rLNtO.png' },
-        { p: 0.4, name: '25M GP', color: 0x800080,                      image: 'https://i.imgur.com/bEkl6mC.png' },
-        { p: 0.1, name: 'Dragon Claws', color: 0x800080,                image: 'https://i.imgur.com/Szu9nxV.png' },
-        { p: 0.08, name: '100M GP', color: 0x800080,                    image: 'https://i.imgur.com/CPxoJ4k.png' },
-        { p: 0.05, name: 'Twisted Bow', color: 0x800080,                image: 'https://i.imgur.com/RzONkPT.png' }
+        { p: 80, name: 'Abyssal Whip', color: 0x00FF00, image: 'https://i.imgur.com/tMM7G91.png' },
+        { p: 16.55, name: `Elidinis' Ward`, color: 0x00FF00, image: 'https://i.imgur.com/ZrL4y9r.png' },
+        { p: 2.82, name: 'Bond', color: 0x00FF00, image: 'https://i.imgur.com/K9rLNtO.png' },
+        { p: 0.4, name: '25M GP', color: 0x800080, image: 'https://i.imgur.com/bEkl6mC.png' },
+        { p: 0.1, name: 'Dragon Claws', color: 0x800080, image: 'https://i.imgur.com/Szu9nxV.png' },
+        { p: 0.08, name: '100M GP', color: 0x800080, image: 'https://i.imgur.com/CPxoJ4k.png' },
+        { p: 0.05, name: 'Twisted Bow', color: 0x800080, image: 'https://i.imgur.com/RzONkPT.png' }
       ];
 
       const rr = Math.random() * 100;
@@ -273,25 +275,26 @@ module.exports = {
       for (const i of itemTable) { acc += i.p; if (rr < acc) { it = i; break; } }
 
       const effective = 2.0 * it.p / 100;
-      return { 
-        kind: 'item', 
-        amount: 0, 
-        itemName: it.name, 
-        label: chosen.label, 
-        color: it.color, 
-        title: chosen.title, 
-        image: it.image, 
-        chance: effective };
+      return {
+        kind: 'item',
+        amount: 0,
+        itemName: it.name,
+        label: chosen.label,
+        color: it.color,
+        title: chosen.title,
+        image: it.image,
+        chance: effective
+      };
     }
 
-    function lootButtons() {
+    function lootButtons () {
       return new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('lootcrate_claim_free').setLabel('Free Daily Claim').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('lootcrate_spin_paid').setLabel('Open for 5 VP').setStyle(ButtonStyle.Primary)
       );
     }
 
-    async function handleLootInteraction(interaction, free = false) {
+    async function handleLootInteraction (interaction, free = false) {
       const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(!free, !free);
       const today = new Date().toISOString().slice(0, 10);
       const PRICE = 5;
@@ -371,7 +374,7 @@ module.exports = {
 
         // Add role reward if applicable
         if (kind === 'role' && interaction.guild && interaction.member && roleId) {
-          try { await interaction.member.roles.add(roleId).catch(() => {}); } catch {}
+          try { await interaction.member.roles.add(roleId).catch(() => { }); } catch { }
         }
 
         // Build description for Discord response
@@ -397,7 +400,7 @@ module.exports = {
       }
     }
 
-    async function sendLootEmbed(interaction, title, description, label, chance, color, image, newTotal) {
+    async function sendLootEmbed (interaction, title, description, label, chance, color, image, newTotal) {
       const embed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(description)
@@ -799,7 +802,7 @@ module.exports = {
     }
   },
 };
-function getNextDailyReset() {
+function getNextDailyReset () {
   const now = new Date();
   const reset = new Date(now);
   reset.setHours(3, 0, 0, 0);
