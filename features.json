@@ -10,9 +10,9 @@
   },
   "events": {
     "_description": "Control automatic bot event handlers",
-    "autoJoinTickets": true,
-    "autoAddUnverifiedRole": true,
-    "handleGuildMemberAdd": true,
+    "autoJoinTickets": false,
+    "autoAddUnverifiedRole": false,
+    "handleGuildMemberAdd": false,
     "womMessageListener": true,
     "reactionAwardPoints": true
   },
