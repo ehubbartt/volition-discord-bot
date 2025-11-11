@@ -261,17 +261,7 @@ async function handleVerifySubmit(interaction) {
                 ticketManager.markVerified(interaction.channel.id);
 
                 // Update channel name - replace unverified emoji with verified emoji
-                const verifiedEmoji = interaction.guild.emojis.cache.find(e => e.name === config.VERIFIED_EMOJI_NAME);
-                const unverifiedEmoji = interaction.guild.emojis.cache.find(e => e.name === config.UNVERIFIED_EMOJI_NAME);
-
-                let newName = interaction.channel.name;
-
-                if (unverifiedEmoji && verifiedEmoji) {
-                    newName = newName.replace(unverifiedEmoji.toString(), verifiedEmoji.toString());
-                } else {
-                    // Fallback to text replacement if emojis not found
-                    newName = newName.replace(':unverified:', ':verified:');
-                }
+                const newName = interaction.channel.name.replace(config.UNVERIFIED_EMOJI, config.VERIFIED_EMOJI);
 
                 try {
                     await interaction.channel.setName(newName);
@@ -562,19 +552,19 @@ async function handleIntroSubmit(interaction) {
 
     try {
         console.log(`[Intro] Processing introduction for ${interaction.user.tag}`);
-        console.log(`[Intro] Attempting to fetch intro thread: ${config.INTRO_THREAD_ID}`);
+        console.log(`[Intro] Attempting to fetch intro channel: ${config.INTRO_THREAD_ID}`);
 
-        // Post to intro thread
-        const introThread = await interaction.client.channels.fetch(config.INTRO_THREAD_ID);
+        // Fetch the intro channel (could be forum, text channel, or thread)
+        const introChannel = await interaction.client.channels.fetch(config.INTRO_THREAD_ID);
 
-        if (!introThread) {
-            console.error('[Intro] Intro thread not found!');
+        if (!introChannel) {
+            console.error('[Intro] Intro channel not found!');
             return interaction.editReply({
-                content: '❌ Could not find the introduction thread. Please contact an admin.'
+                content: '❌ Could not find the introduction channel. Please contact an admin.'
             });
         }
 
-        console.log(`[Intro] Found intro thread: ${introThread.name}`);
+        console.log(`[Intro] Found intro channel: ${introChannel.name} (Type: ${introChannel.type})`);
 
         // Format the intro message - simplified, more natural format
         const introMessage =
@@ -585,10 +575,23 @@ async function handleIntroSubmit(interaction) {
             `**Favorites & Goals:** ${goalsInterests}\n` +
             `**What I'm Looking For:** ${additionalInfo}`;
 
-        console.log(`[Intro] Attempting to send message to intro thread...`);
+        console.log(`[Intro] Attempting to send message to intro channel...`);
 
-        // Post the intro
-        await introThread.send(introMessage);
+        // Handle different channel types
+        if (introChannel.isThread()) {
+            // It's a thread - use send directly
+            await introChannel.send(introMessage);
+        } else if (introChannel.type === 15) {
+            // It's a forum channel (type 15) - create a new thread/post
+            const thread = await introChannel.threads.create({
+                name: `${interaction.user.username}'s Introduction`,
+                message: { content: introMessage }
+            });
+            console.log(`[Intro] Created forum post: ${thread.name}`);
+        } else {
+            // Regular text channel
+            await introChannel.send(introMessage);
+        }
 
         console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
 

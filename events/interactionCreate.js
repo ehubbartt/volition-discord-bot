@@ -72,13 +72,9 @@ module.exports = {
         // Determine category based on ticket type
         let categoryId, ticketName, description;
 
-        // Get emoji for ticket status
-        const unverifiedEmoji = interaction.guild.emojis.cache.find(e => e.name === config.UNVERIFIED_EMOJI_NAME);
-        const emojiPrefix = (ticketType === 'join' && unverifiedEmoji) ? `${unverifiedEmoji}` : '';
-
         if (ticketType === 'join') {
           categoryId = config.TICKET_JOIN_CATEGORY_ID;
-          ticketName = `${emojiPrefix}join-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `${config.UNVERIFIED_EMOJI}join-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your join ticket! Click **Verify My Account** below to get started.';
         } else if (ticketType === 'general') {
           categoryId = config.TICKET_GENERAL_CATEGORY_ID;
