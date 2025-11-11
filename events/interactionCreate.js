@@ -408,6 +408,14 @@ module.exports = {
         }
       }
 
+      if (interaction.customId === 'guest_join_start') {
+        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
+        if (createVerifyCommand?.handleGuestJoinButton) {
+          try { await createVerifyCommand.handleGuestJoinButton(interaction); }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
       // Handle ticket delete button
       if (interaction.customId === 'ticket_delete') {
         const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
@@ -505,6 +513,14 @@ module.exports = {
         const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
         if (createVerifyCommand?.handleVerifySubmit) {
           try { await createVerifyCommand.handleVerifySubmit(interaction); }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
+      if (interaction.customId === 'guest_join_modal') {
+        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
+        if (createVerifyCommand?.handleGuestJoinSubmit) {
+          try { await createVerifyCommand.handleGuestJoinSubmit(interaction); }
           catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
         }
       }

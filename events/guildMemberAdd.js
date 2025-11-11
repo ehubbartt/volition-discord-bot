@@ -88,6 +88,8 @@ module.exports = {
                     `4. If approved, join our clan in-game!\n\n` +
                     `**Requirements:**\n` +
                     `• 1750+ Total Level OR 50+ EHB\n\n` +
+                    `**Joining as Guest?**\n` +
+                    `If you have a friend or main account in the clan, click **Join as Guest** instead!\n\n` +
                     `An admin will be with you shortly if you have any questions!`
                 )
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
@@ -101,7 +103,14 @@ module.exports = {
                 .setStyle(ButtonStyle.Success)
                 .setEmoji('✅');
 
-            const row = new ActionRowBuilder().addComponents(verifyButton);
+            // Create guest join button
+            const guestButton = new ButtonBuilder()
+                .setCustomId('guest_join_start')
+                .setLabel('Join as Guest')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('👋');
+
+            const row = new ActionRowBuilder().addComponents(verifyButton, guestButton);
 
             await ticketChannel.send({
                 content: `${member}`,

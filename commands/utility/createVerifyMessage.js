@@ -44,7 +44,14 @@ module.exports = {
             .setStyle(ButtonStyle.Success)
             .setEmoji('✅');
 
-        const row = new ActionRowBuilder().addComponents(verifyButton);
+        // Create guest join button
+        const guestButton = new ButtonBuilder()
+            .setCustomId('guest_join_start')
+            .setLabel('Join as Guest')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('👋');
+
+        const row = new ActionRowBuilder().addComponents(verifyButton, guestButton);
 
         // Send the message
         await interaction.channel.send({
@@ -255,5 +262,154 @@ async function handleVerifySubmit(interaction) {
     }
 }
 
+async function handleGuestJoinButton(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('guest_join_modal')
+        .setTitle('Join as Guest');
+
+    const rsnInput = new TextInputBuilder()
+        .setCustomId('friend_rsn_input')
+        .setLabel("Enter your friend/main's RSN:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Enter the RSN of a clan member')
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(12);
+
+    const firstRow = new ActionRowBuilder().addComponents(rsnInput);
+    modal.addComponents(firstRow);
+
+    await interaction.showModal(modal);
+}
+
+async function handleGuestJoinSubmit(interaction) {
+    const friendRsn = interaction.fields.getTextInputValue('friend_rsn_input');
+    const guestUser = interaction.user;
+
+    await interaction.deferReply({ ephemeral: false }); // PUBLIC response
+
+    try {
+        await interaction.editReply({
+            content: `🔍 Checking if **${friendRsn}** is in the Volition clan...`
+        });
+
+        // Fetch clan data from WOM
+        const clanId = config.clanId;
+        const clanResponse = await axios.get(`https://api.wiseoldman.net/v2/groups/${clanId}`);
+        const clanData = clanResponse.data;
+
+        if (!clanData || !clanData.memberships) {
+            throw new Error('Could not fetch clan data from Wise Old Man');
+        }
+
+        // Check if the friend's RSN is in the clan
+        const friendInClan = clanData.memberships.find(
+            member => member.player.username.toLowerCase() === friendRsn.toLowerCase()
+        );
+
+        if (!friendInClan) {
+            // Friend NOT in clan - error and ping admins
+            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+
+            const errorEmbed = new EmbedBuilder()
+                .setColor('Red')
+                .setTitle('❌ Player Not Found in Clan')
+                .setDescription(
+                    `**${friendRsn}** is not currently in the Volition clan.\n\n` +
+                    `**Guest:** ${guestUser}\n` +
+                    `**Claimed Friend/Main:** ${friendRsn}\n\n` +
+                    `🚨 An admin will review your request shortly.`
+                )
+                .addFields(
+                    { name: 'Next Steps', value: 'Please wait for an admin to assist you. They may need to verify your connection to the clan.', inline: false }
+                )
+                .setTimestamp();
+
+            await interaction.editReply({
+                content: `${adminMentions} - Guest verification needed`,
+                embeds: [errorEmbed]
+            });
+            return;
+        }
+
+        // Friend IS in clan - give verified role and welcome
+        const actualRsn = friendInClan.player.username;
+        const member = await interaction.guild.members.fetch(guestUser.id);
+
+        // Add verified role
+        let roleAdded = false;
+        let roleError = null;
+        try {
+            if (config.verifiedRoleID) {
+                await member.roles.add(config.verifiedRoleID);
+                roleAdded = true;
+                console.log(`[GuestJoin] Added verified role to ${guestUser.tag}`);
+            }
+            if (config.unverifiedRoleID && member.roles.cache.has(config.unverifiedRoleID)) {
+                await member.roles.remove(config.unverifiedRoleID);
+                console.log(`[GuestJoin] Removed unverified role from ${guestUser.tag}`);
+            }
+        } catch (error) {
+            roleError = error.message;
+            console.error('[GuestJoin] Failed to update roles:', error);
+        }
+
+        // Send admin notification and welcome message
+        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+
+        const welcomeEmbed = new EmbedBuilder()
+            .setColor('Green')
+            .setTitle('👋 Welcome to Volition!')
+            .setDescription(
+                `Hey ${guestUser}, welcome to the **Volition** Discord! 🎉\n\n` +
+                `We've verified that **${actualRsn}** is a member of our clan. ` +
+                `You're joining us as a **guest**, so feel free to browse around, hang out in chat, and get to know the community! 💬✨\n\n` +
+                `**Please Note:**\n` +
+                `• As a guest, you won't earn Volition Points (VP)\n` +
+                `• You won't be synced to our member database\n` +
+                `• If you'd like full member access, consider joining the clan in-game! 🎮\n\n` +
+                `Enjoy your stay and don't be a stranger! 🍻`
+            )
+            .addFields(
+                { name: '🎮 Guest User', value: `${guestUser}`, inline: true },
+                { name: '⚔️ Clan Connection', value: actualRsn, inline: true },
+                { name: '✅ Verified Role', value: roleAdded ? 'Added' : `⚠️ ${roleError || 'Failed'}`, inline: true }
+            )
+            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setFooter({ text: 'Welcome to the Volition family!' })
+            .setTimestamp();
+
+        await interaction.editReply({
+            content: `${adminMentions} - New guest verified`,
+            embeds: [welcomeEmbed]
+        });
+
+        console.log(`[GuestJoin] ${guestUser.tag} joined as guest (connected to ${actualRsn})`);
+
+    } catch (error) {
+        console.error('[GuestJoin] Error during guest join:', error);
+
+        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+
+        const errorEmbed = new EmbedBuilder()
+            .setColor('Red')
+            .setTitle('⚠️ Guest Join Error')
+            .setDescription(
+                `An error occurred while processing the guest join request.\n\n` +
+                `**Guest:** ${guestUser}\n` +
+                `**Error:** \`${error.message}\`\n\n` +
+                `An admin will assist you shortly.`
+            )
+            .setTimestamp();
+
+        await interaction.editReply({
+            content: `${adminMentions} - Guest join error`,
+            embeds: [errorEmbed]
+        });
+    }
+}
+
 module.exports.handleVerifyButton = handleVerifyButton;
 module.exports.handleVerifySubmit = handleVerifySubmit;
+module.exports.handleGuestJoinButton = handleGuestJoinButton;
+module.exports.handleGuestJoinSubmit = handleGuestJoinSubmit;
