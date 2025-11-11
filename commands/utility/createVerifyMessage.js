@@ -583,11 +583,13 @@ async function handleIntroSubmit(interaction) {
 
         // Handle different channel types and get the message/thread URL
         let introUrl = null;
+        let targetChannel = null; // Channel where we'll send the "How to join" embed
 
         if (introChannel.isThread()) {
             // It's a thread - use send directly
             const sentMessage = await introChannel.send(introMessage);
             introUrl = sentMessage.url;
+            targetChannel = introChannel;
         } else if (introChannel.type === 15) {
             // It's a forum channel (type 15) - create a new thread/post
             const thread = await introChannel.threads.create({
@@ -596,15 +598,17 @@ async function handleIntroSubmit(interaction) {
             });
             console.log(`[Intro] Created forum post: ${thread.name}`);
             introUrl = `https://discord.com/channels/${config.guildId}/${thread.id}`;
+            targetChannel = thread; // Send follow-up messages to the thread, not the forum
         } else {
             // Regular text channel
             const sentMessage = await introChannel.send(introMessage);
             introUrl = sentMessage.url;
+            targetChannel = introChannel;
         }
 
         console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
 
-        // Send "How to join" embed and ping admins in the intro channel
+        // Send "How to join" embed and ping admins in the intro channel/thread
         const b1Emoji = `<:B1:${config.B1_EMOJI_ID}>`;
         const checkEmoji = `<:CHECK:${config.CHECK_EMOJI_ID}>`;
 
@@ -622,12 +626,12 @@ async function handleIntroSubmit(interaction) {
             .setImage('https://media.discordapp.net/attachments/1085149045456126064/1197653854859313284/Join_Volition_3.png?ex=6913aa92&is=69125912&hm=72f1a38dbc6f80e27af7667560ddb2e865056f0e585cc40c377b2945bf49176d&format=webp&quality=lossless&width=1242&height=936')
             .setTimestamp();
 
-        // Send the "How to join" embed in the intro channel
-        await introChannel.send({ embeds: [howToJoinEmbed] });
+        // Send the "How to join" embed in the target channel (thread for forums, channel for others)
+        await targetChannel.send({ embeds: [howToJoinEmbed] });
 
-        // Ping admins in the intro channel
+        // Ping admins in the target channel
         const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
-        await introChannel.send({
+        await targetChannel.send({
             content: `${adminMentions} - New member introduction posted!`,
             allowedMentions: { roles: config.ADMIN_ROLE_IDS }
         });
