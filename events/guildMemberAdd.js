@@ -39,8 +39,10 @@ module.exports = {
                 return;
             }
 
-            // Create channel name
-            const channelName = `join-ticket-${member.user.username}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+            // Create channel name with unverified emoji and unclaimed emoji
+            const unverifiedEmoji = member.guild.emojis.cache.find(e => e.name === config.UNVERIFIED_EMOJI_NAME);
+            const emojiPrefix = unverifiedEmoji ? `${unverifiedEmoji}` : '❌';
+            const channelName = `${emojiPrefix}join-${member.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
 
             // Create the ticket channel
             const ticketChannel = await member.guild.channels.create({
@@ -112,6 +114,33 @@ module.exports = {
 
             const row = new ActionRowBuilder().addComponents(verifyButton, guestButton);
 
+            // Send admin control panel first
+            const claimButton = new ButtonBuilder()
+                .setCustomId('ticket_claim')
+                .setLabel('Claim Ticket')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('👤');
+
+            const closeButton = new ButtonBuilder()
+                .setCustomId('ticket_close')
+                .setLabel('Close Ticket')
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('🔒');
+
+            const softCloseButton = new ButtonBuilder()
+                .setCustomId('ticket_soft_close')
+                .setLabel('Soft Close')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('⏰');
+
+            const adminRow = new ActionRowBuilder().addComponents(claimButton, closeButton, softCloseButton);
+
+            await ticketChannel.send({
+                content: '**Admin Controls** (Admin only)',
+                components: [adminRow]
+            });
+
+            // Send welcome message to user
             await ticketChannel.send({
                 content: `${member}`,
                 embeds: [welcomeEmbed],

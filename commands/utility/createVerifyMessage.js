@@ -247,6 +247,41 @@ async function handleVerifySubmit(interaction) {
             embeds: [statsEmbed]
         });
 
+        // Update ticket name if in a ticket channel (change unverified -> verified emoji)
+        const ticketManager = require('../../utils/ticketManager');
+        if (interaction.channel.parentId) {
+            const ticketCategories = [
+                config.TICKET_JOIN_CATEGORY_ID,
+                config.TICKET_GENERAL_CATEGORY_ID,
+                config.TICKET_SHOP_CATEGORY_ID
+            ];
+
+            if (ticketCategories.includes(interaction.channel.parentId)) {
+                // Mark as verified in ticket state
+                ticketManager.markVerified(interaction.channel.id);
+
+                // Update channel name - replace unverified emoji with verified emoji
+                const verifiedEmoji = interaction.guild.emojis.cache.find(e => e.name === config.VERIFIED_EMOJI_NAME);
+                const unverifiedEmoji = interaction.guild.emojis.cache.find(e => e.name === config.UNVERIFIED_EMOJI_NAME);
+
+                let newName = interaction.channel.name;
+
+                if (unverifiedEmoji && verifiedEmoji) {
+                    newName = newName.replace(unverifiedEmoji.toString(), verifiedEmoji.toString());
+                } else {
+                    // Fallback to text replacement if emojis not found
+                    newName = newName.replace(':unverified:', ':verified:');
+                }
+
+                try {
+                    await interaction.channel.setName(newName);
+                    console.log(`[Verify] Updated ticket channel name to: ${newName}`);
+                } catch (error) {
+                    console.error('[Verify] Failed to update channel name:', error);
+                }
+            }
+        }
+
         // If requirements met, send welcome message with intro button
         if (meetsRequirements) {
             const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;

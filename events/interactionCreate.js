@@ -72,17 +72,21 @@ module.exports = {
         // Determine category based on ticket type
         let categoryId, ticketName, description;
 
+        // Get emoji for ticket status
+        const unverifiedEmoji = interaction.guild.emojis.cache.find(e => e.name === config.UNVERIFIED_EMOJI_NAME);
+        const emojiPrefix = (ticketType === 'join' && unverifiedEmoji) ? `${unverifiedEmoji}` : '';
+
         if (ticketType === 'join') {
           categoryId = config.TICKET_JOIN_CATEGORY_ID;
-          ticketName = `join-ticket-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+          ticketName = `${emojiPrefix}join-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
           description = 'Welcome to your join ticket! Click **Verify My Account** below to get started.';
         } else if (ticketType === 'general') {
           categoryId = config.TICKET_GENERAL_CATEGORY_ID;
-          ticketName = `general-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+          ticketName = `general-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
           description = 'Welcome to your general support ticket! An admin will be with you shortly.';
         } else if (ticketType === 'shop') {
           categoryId = config.TICKET_SHOP_CATEGORY_ID;
-          ticketName = `shop-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+          ticketName = `shop-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
           description = 'Welcome to your shop payout ticket! Please describe what you need and an admin will assist you.';
         }
 
@@ -133,6 +137,32 @@ module.exports = {
           ],
         });
 
+        // Send admin control panel first
+        const claimButton = new ButtonBuilder()
+          .setCustomId('ticket_claim')
+          .setLabel('Claim Ticket')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('👤');
+
+        const closeButton = new ButtonBuilder()
+          .setCustomId('ticket_close')
+          .setLabel('Close Ticket')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('🔒');
+
+        const softCloseButton = new ButtonBuilder()
+          .setCustomId('ticket_soft_close')
+          .setLabel('Soft Close')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('⏰');
+
+        const adminRow = new ActionRowBuilder().addComponents(claimButton, closeButton, softCloseButton);
+
+        await ticketChannel.send({
+          content: '**Admin Controls** (Admin only)',
+          components: [adminRow]
+        });
+
         // Create welcome embed
         const ticketEmbed = new EmbedBuilder()
           .setColor('Blue')
@@ -149,7 +179,13 @@ module.exports = {
             .setStyle(ButtonStyle.Success)
             .setEmoji('✅');
 
-          const row = new ActionRowBuilder().addComponents(verifyButton);
+          const guestButton = new ButtonBuilder()
+            .setCustomId('guest_join_start')
+            .setLabel('Join as Guest')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('👋');
+
+          const row = new ActionRowBuilder().addComponents(verifyButton, guestButton);
 
           await ticketChannel.send({
             embeds: [ticketEmbed],
@@ -424,6 +460,25 @@ module.exports = {
         }
       }
 
+      // Handle new ticket system buttons
+      if (interaction.customId === 'ticket_claim') {
+        const ticketHandlers = require('../utils/ticketHandlers');
+        try { await ticketHandlers.handleTicketClaim(interaction); }
+        catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+      }
+
+      if (interaction.customId === 'ticket_close') {
+        const ticketHandlers = require('../utils/ticketHandlers');
+        try { await ticketHandlers.handleTicketClose(interaction); }
+        catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+      }
+
+      if (interaction.customId === 'ticket_soft_close') {
+        const ticketHandlers = require('../utils/ticketHandlers');
+        try { await ticketHandlers.handleTicketSoftClose(interaction); }
+        catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+      }
+
       // Handle ticket delete button
       if (interaction.customId === 'ticket_delete') {
         const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
@@ -539,6 +594,19 @@ module.exports = {
           try { await createVerifyCommand.handleIntroSubmit(interaction); }
           catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
         }
+      }
+
+      // Handle new ticket system modals
+      if (interaction.customId === 'ticket_close_modal') {
+        const ticketHandlers = require('../utils/ticketHandlers');
+        try { await ticketHandlers.handleTicketCloseSubmit(interaction); }
+        catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+      }
+
+      if (interaction.customId === 'ticket_soft_close_modal') {
+        const ticketHandlers = require('../utils/ticketHandlers');
+        try { await ticketHandlers.handleTicketSoftCloseSubmit(interaction); }
+        catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
       }
 
       // Handle transcript modal submission
