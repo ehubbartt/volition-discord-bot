@@ -18,17 +18,27 @@ module.exports = {
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Create "How to join" embed with proper emojis
-            const b1Emoji = `<:B1:${config.B1_EMOJI_ID}>`;
-            const checkEmoji = `<:CHECK:${config.CHECK_EMOJI_ID}>`;
+            // Fetch emojis from the guild to get the correct format
+            let b1Emoji = '▪️'; // Fallback
+            let checkEmoji = '✅'; // Fallback
+
+            try {
+                const guild = message.guild;
+                const b1EmojiObj = guild.emojis.cache.get(config.B1_EMOJI_ID);
+                const checkEmojiObj = guild.emojis.cache.get(config.CHECK_EMOJI_ID);
+
+                if (b1EmojiObj) b1Emoji = `<:${b1EmojiObj.name}:${b1EmojiObj.id}>`;
+                if (checkEmojiObj) checkEmoji = `<:${checkEmojiObj.name}:${checkEmojiObj.id}>`;
+            } catch (error) {
+                console.error('[IntroThread] Error fetching emojis:', error);
+            }
 
             const howToJoinEmbed = new EmbedBuilder()
                 .setColor('Blue')
                 .setTitle('How to join.')
                 .setDescription(
-                    `**YOU MUST VERIFY YOUR DISCORD BEFORE YOU CAN JOIN/SEE THIS DISCORD.**\n\n` +
                     `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
-                    `${b1Emoji} After verifying head over to <#1240268854169440347> & open up a ticket.\n\n` +
-                    `**After reqs have been checked:**\n\n` +
+                    `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n` +
                     `${b1Emoji} Jump in the clan chat in game.\n` +
                     `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
                 )
@@ -40,14 +50,7 @@ module.exports = {
                 embeds: [howToJoinEmbed]
             });
 
-            // Ping admins
-            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
-            await message.channel.send({
-                content: `${adminMentions} - New member introduction posted!`,
-                allowedMentions: { roles: config.ADMIN_ROLE_IDS }
-            });
-
-            console.log(`[IntroThread] Sent "How to join" embed and pinged admins`);
+            console.log(`[IntroThread] Sent "How to join" embed`);
 
         } catch (error) {
             console.error('[IntroThread] Error sending how to join embed:', error);

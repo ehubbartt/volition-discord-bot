@@ -612,13 +612,6 @@ async function handleIntroSubmit(interaction) {
 
         console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
 
-        // Ping admins in the intro channel/thread
-        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
-        await targetChannel.send({
-            content: `${adminMentions} - New member introduction posted!`,
-            allowedMentions: { roles: config.ADMIN_ROLE_IDS }
-        });
-
         // Confirm to user (ephemeral in the ticket)
         await interaction.editReply({
             content: '✅ Your introduction has been posted! An admin will help you join the clan in-game shortly.'
@@ -632,23 +625,35 @@ async function handleIntroSubmit(interaction) {
         ];
 
         if (interaction.channel && ticketCategories.includes(interaction.channel.parentId)) {
-            // Send link to the introduction
+            // Ping admins in the join ticket
+            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
             await interaction.channel.send({
-                content: `📝 **Introduction Posted!** ${interaction.user}'s introduction has been submitted: ${introUrl}`
+                content: `${adminMentions} - New member introduction posted!\n📝 **Introduction Posted!** ${interaction.user}'s introduction has been submitted: ${introUrl}`,
+                allowedMentions: { roles: config.ADMIN_ROLE_IDS }
             });
 
             // Send "How to join" embed in the ticket
-            const b1Emoji = `<:B1:${config.B1_EMOJI_ID}>`;
-            const checkEmoji = `<:CHECK:${config.CHECK_EMOJI_ID}>`;
+            // Fetch emojis from the guild to get the correct format
+            let b1Emoji = '▪️'; // Fallback
+            let checkEmoji = '✅'; // Fallback
+
+            try {
+                const guild = interaction.guild;
+                const b1EmojiObj = guild.emojis.cache.get(config.B1_EMOJI_ID);
+                const checkEmojiObj = guild.emojis.cache.get(config.CHECK_EMOJI_ID);
+
+                if (b1EmojiObj) b1Emoji = `<:${b1EmojiObj.name}:${b1EmojiObj.id}>`;
+                if (checkEmojiObj) checkEmoji = `<:${checkEmojiObj.name}:${checkEmojiObj.id}>`;
+            } catch (error) {
+                console.error('[Intro] Error fetching emojis:', error);
+            }
 
             const howToJoinEmbed = new EmbedBuilder()
                 .setColor('Blue')
                 .setTitle('How to join.')
                 .setDescription(
-                    `**YOU MUST VERIFY YOUR DISCORD BEFORE YOU CAN JOIN/SEE THIS DISCORD.**\n\n` +
                     `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
-                    `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n\n` +
-                    `**After reqs have been checked:**\n\n` +
+                    `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n` +
                     `${b1Emoji} Jump in the clan chat in game.\n` +
                     `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
                 )
