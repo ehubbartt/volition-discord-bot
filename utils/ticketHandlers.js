@@ -139,24 +139,38 @@ async function handleTicketCloseSubmit(interaction) {
 
         console.log(`[TicketClose] Archive channel ID: ${archiveChannelId}. Fetching messages...`);
 
-        // Fetch all messages from the ticket channel
+        // Fetch all messages from the ticket channel with timeout protection
         const messages = [];
         let lastId;
+        let fetchCount = 0;
+        const maxFetches = 50; // Prevent infinite loops (50 * 100 = 5000 messages max)
 
-        while (true) {
+        while (fetchCount < maxFetches) {
             const options = { limit: 100 };
             if (lastId) options.before = lastId;
 
-            const fetchedMessages = await channel.messages.fetch(options);
-            if (fetchedMessages.size === 0) break;
+            try {
+                console.log(`[TicketClose] Fetching batch ${fetchCount + 1}...`);
+                const fetchedMessages = await channel.messages.fetch(options);
 
-            messages.push(...fetchedMessages.values());
-            lastId = fetchedMessages.last().id;
+                if (fetchedMessages.size === 0) break;
 
-            if (fetchedMessages.size < 100) break;
+                messages.push(...fetchedMessages.values());
+                lastId = fetchedMessages.last().id;
+                fetchCount++;
+
+                if (fetchedMessages.size < 100) break;
+
+                // Small delay to avoid rate limits
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (error) {
+                console.error(`[TicketClose] Error fetching messages batch ${fetchCount + 1}:`, error);
+                // Continue with what we have if fetch fails
+                break;
+            }
         }
 
-        console.log(`[TicketClose] Fetched ${messages.length} messages. Processing transcript...`);
+        console.log(`[TicketClose] Fetched ${messages.length} messages in ${fetchCount} batches. Processing transcript...`);
 
         // Sort messages chronologically (oldest first)
         messages.reverse();
@@ -429,21 +443,34 @@ async function createTranscriptAndClose(channel, guild, closedBy, summary, state
             return;
         }
 
-        // Fetch all messages from the ticket channel
+        // Fetch all messages from the ticket channel with timeout protection
         const messages = [];
         let lastId;
+        let fetchCount = 0;
+        const maxFetches = 50; // Prevent infinite loops (50 * 100 = 5000 messages max)
 
-        while (true) {
+        while (fetchCount < maxFetches) {
             const options = { limit: 100 };
             if (lastId) options.before = lastId;
 
-            const fetchedMessages = await channel.messages.fetch(options);
-            if (fetchedMessages.size === 0) break;
+            try {
+                const fetchedMessages = await channel.messages.fetch(options);
 
-            messages.push(...fetchedMessages.values());
-            lastId = fetchedMessages.last().id;
+                if (fetchedMessages.size === 0) break;
 
-            if (fetchedMessages.size < 100) break;
+                messages.push(...fetchedMessages.values());
+                lastId = fetchedMessages.last().id;
+                fetchCount++;
+
+                if (fetchedMessages.size < 100) break;
+
+                // Small delay to avoid rate limits
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (error) {
+                console.error(`[AutoClose] Error fetching messages batch ${fetchCount + 1}:`, error);
+                // Continue with what we have if fetch fails
+                break;
+            }
         }
 
         // Sort messages chronologically (oldest first)

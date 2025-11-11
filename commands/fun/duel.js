@@ -88,7 +88,7 @@ module.exports = {
                 components: [row]
             });
 
-            const collector = response.createMessageComponentCollector({ time: 600000 });
+            const collector = response.createMessageComponentCollector({ time: 6000000 });
 
             collector.on('collect', async (buttonInteraction) => {
                 if (buttonInteraction.user.id !== opponent.id) {
