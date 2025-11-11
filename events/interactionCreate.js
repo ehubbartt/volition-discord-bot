@@ -74,7 +74,7 @@ module.exports = {
 
         if (ticketType === 'join') {
           categoryId = config.TICKET_JOIN_CATEGORY_ID;
-          ticketName = `${config.UNVERIFIED_EMOJI}・join-${interaction.user.id}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `${config.UNVERIFIED_EMOJI}・join-${interaction.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your join ticket! Click **Verify My Account** below to get started.';
         } else if (ticketType === 'general') {
           categoryId = config.TICKET_GENERAL_CATEGORY_ID;
