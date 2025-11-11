@@ -4,7 +4,7 @@ const config = require('../config.json');
 module.exports = {
     name: Events.MessageCreate,
 
-    async execute(message) {
+    async execute (message) {
         // Ignore bot messages
         if (message.author.bot) return;
 
@@ -37,8 +37,6 @@ module.exports = {
                 .setColor('Blue')
                 .setTitle('How to join.')
                 .setDescription(
-                    `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
-                    `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n` +
                     `${b1Emoji} Jump in the clan chat in game.\n` +
                     `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
                 )

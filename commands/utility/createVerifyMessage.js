@@ -19,7 +19,7 @@ module.exports = {
         .setName('createverifymessage')
         .setDescription('(Admin Only) Create a verification message with button for users to verify themselves'),
 
-    async execute(interaction) {
+    async execute (interaction) {
         if (!isAdmin(interaction.member)) {
             return interaction.reply({ content: 'Admin only command.', ephemeral: true });
         }
@@ -68,7 +68,7 @@ module.exports = {
     },
 };
 
-async function handleVerifyButton(interaction) {
+async function handleVerifyButton (interaction) {
     const modal = new ModalBuilder()
         .setCustomId('createverify_modal')
         .setTitle('Verify Your Account');
@@ -88,7 +88,7 @@ async function handleVerifyButton(interaction) {
     await interaction.showModal(modal);
 }
 
-async function handleVerifySubmit(interaction) {
+async function handleVerifySubmit (interaction) {
     const rsn = interaction.fields.getTextInputValue('rsn_input');
     const targetUser = interaction.user;
 
@@ -334,7 +334,7 @@ async function handleVerifySubmit(interaction) {
     }
 }
 
-async function handleGuestJoinButton(interaction) {
+async function handleGuestJoinButton (interaction) {
     const modal = new ModalBuilder()
         .setCustomId('guest_join_modal')
         .setTitle('Join as Guest');
@@ -354,7 +354,7 @@ async function handleGuestJoinButton(interaction) {
     await interaction.showModal(modal);
 }
 
-async function handleGuestJoinSubmit(interaction) {
+async function handleGuestJoinSubmit (interaction) {
     const friendRsn = interaction.fields.getTextInputValue('friend_rsn_input');
     const guestUser = interaction.user;
 
@@ -484,7 +484,7 @@ async function handleGuestJoinSubmit(interaction) {
     }
 }
 
-async function handleIntroButton(interaction) {
+async function handleIntroButton (interaction) {
     const modal = new ModalBuilder()
         .setCustomId('intro_modal')
         .setTitle('Introduce Yourself');
@@ -545,7 +545,7 @@ async function handleIntroButton(interaction) {
     await interaction.showModal(modal);
 }
 
-async function handleIntroSubmit(interaction) {
+async function handleIntroSubmit (interaction) {
     const basicInfo = interaction.fields.getTextInputValue('basic_info');
     const statsInfo = interaction.fields.getTextInputValue('stats_info');
     const clanHistory = interaction.fields.getTextInputValue('clan_history') || 'None / First clan';
@@ -652,8 +652,6 @@ async function handleIntroSubmit(interaction) {
                 .setColor('Blue')
                 .setTitle('How to join.')
                 .setDescription(
-                    `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
-                    `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n` +
                     `${b1Emoji} Jump in the clan chat in game.\n` +
                     `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
                 )
