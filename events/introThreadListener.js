@@ -43,7 +43,8 @@ module.exports = {
             // Ping admins
             const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
             await message.channel.send({
-                content: `${adminMentions} - New member introduction posted!`
+                content: `${adminMentions} - New member introduction posted!`,
+                allowedMentions: { roles: config.ADMIN_ROLE_IDS }
             });
 
             console.log(`[IntroThread] Sent "How to join" embed and pinged admins`);

@@ -40,7 +40,7 @@ module.exports = {
             }
 
             // Create channel name with unverified emoji and unclaimed emoji
-            const channelName = `${config.UNVERIFIED_EMOJI}join-${member.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
+            const channelName = `${config.UNVERIFIED_EMOJI}・join-${member.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
 
             // Create the ticket channel
             const ticketChannel = await member.guild.channels.create({

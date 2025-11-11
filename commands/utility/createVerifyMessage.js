@@ -244,7 +244,8 @@ async function handleVerifySubmit(interaction) {
 
         await interaction.editReply({
             content: replyContent,
-            embeds: [statsEmbed]
+            embeds: [statsEmbed],
+            allowedMentions: { roles: config.ADMIN_ROLE_IDS }
         });
 
         // Update ticket name if in a ticket channel (change unverified -> verified emoji)
@@ -398,7 +399,8 @@ async function handleGuestJoinSubmit(interaction) {
 
             await interaction.editReply({
                 content: `${adminMentions} - Guest verification needed`,
-                embeds: [errorEmbed]
+                embeds: [errorEmbed],
+                allowedMentions: { roles: config.ADMIN_ROLE_IDS }
             });
             return;
         }
@@ -452,7 +454,8 @@ async function handleGuestJoinSubmit(interaction) {
 
         await interaction.editReply({
             content: `${adminMentions} - New guest verified`,
-            embeds: [welcomeEmbed]
+            embeds: [welcomeEmbed],
+            allowedMentions: { roles: config.ADMIN_ROLE_IDS }
         });
 
         console.log(`[GuestJoin] ${guestUser.tag} joined as guest (connected to ${actualRsn})`);
@@ -475,7 +478,8 @@ async function handleGuestJoinSubmit(interaction) {
 
         await interaction.editReply({
             content: `${adminMentions} - Guest join error`,
-            embeds: [errorEmbed]
+            embeds: [errorEmbed],
+            allowedMentions: { roles: config.ADMIN_ROLE_IDS }
         });
     }
 }
@@ -599,6 +603,34 @@ async function handleIntroSubmit(interaction) {
         }
 
         console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
+
+        // Send "How to join" embed and ping admins in the intro channel
+        const b1Emoji = `<:B1:${config.B1_EMOJI_ID}>`;
+        const checkEmoji = `<:CHECK:${config.CHECK_EMOJI_ID}>`;
+
+        const howToJoinEmbed = new EmbedBuilder()
+            .setColor('Blue')
+            .setTitle('How to join.')
+            .setDescription(
+                `**YOU MUST VERIFY YOUR DISCORD BEFORE YOU CAN JOIN/SEE THIS DISCORD.**\n\n` +
+                `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
+                `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n\n` +
+                `**After reqs have been checked:**\n\n` +
+                `${b1Emoji} Jump in the clan chat in game.\n` +
+                `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
+            )
+            .setImage('https://media.discordapp.net/attachments/1085149045456126064/1197653854859313284/Join_Volition_3.png?ex=6913aa92&is=69125912&hm=72f1a38dbc6f80e27af7667560ddb2e865056f0e585cc40c377b2945bf49176d&format=webp&quality=lossless&width=1242&height=936')
+            .setTimestamp();
+
+        // Send the "How to join" embed in the intro channel
+        await introChannel.send({ embeds: [howToJoinEmbed] });
+
+        // Ping admins in the intro channel
+        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+        await introChannel.send({
+            content: `${adminMentions} - New member introduction posted!`,
+            allowedMentions: { roles: config.ADMIN_ROLE_IDS }
+        });
 
         // Confirm to user (ephemeral in the ticket)
         await interaction.editReply({
