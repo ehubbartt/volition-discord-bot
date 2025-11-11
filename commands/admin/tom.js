@@ -3,10 +3,18 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('tom')
-        .setDescription('For Tom Only'),
+        .setDescription('For Tom Only')
+        .addUserOption(option =>
+            option.setname('user')
+            .setDescription('The User To Fuck off')
+            .setrequired(true))
+        .addUserOption(option =>
+            option.setname('user2')
+            .setDescription('The User To Fuck off')
+            .setrequired(false)),
 
     async execute (interaction) {
-        // Check if user is Tom (replace with actual Discord user ID)
+        
         if (interaction.user.id !== '920096803586715678') {
             return interaction.reply({
                 content: 'Fuck off, Get off my shit',
@@ -14,9 +22,16 @@ module.exports = {
             });
         }
 
-        // Direct GIF URL from Giphy (embeds properly in Discord)
+        const preMessage =''
+        const person = interaction.options.getuser('user')
+        const person2 = interaction.options.getuser('user2')
+        if (person2){
+            premessage=`<@${person}> and <@${person2}>`
+        } else {
+            premessage =`<@${person}`
+        }
         const gifUrl = 'https://media.giphy.com/media/44Eq3Ab5LPYn6/giphy.gif';
-        const message = `Alex and Krit politely FUCK OFF\n${gifUrl}`;
+        const message = `${premessage} politely FUCK OFF\n${gifUrl}`;
 
         await interaction.reply({ content: message });
     }
