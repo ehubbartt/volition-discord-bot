@@ -78,15 +78,15 @@ module.exports = {
 
         if (ticketType === 'join') {
           categoryId = config.TICKET_JOIN_CATEGORY_ID;
-          ticketName = `${emojiPrefix}join-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
+          ticketName = `${emojiPrefix}join-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your join ticket! Click **Verify My Account** below to get started.';
         } else if (ticketType === 'general') {
           categoryId = config.TICKET_GENERAL_CATEGORY_ID;
-          ticketName = `general-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
+          ticketName = `general-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your general support ticket! An admin will be with you shortly.';
         } else if (ticketType === 'shop') {
           categoryId = config.TICKET_SHOP_CATEGORY_ID;
-          ticketName = `shop-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/--+/g, '-');
+          ticketName = `shop-${interaction.user.username}${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your shop payout ticket! Please describe what you need and an admin will assist you.';
         }
 

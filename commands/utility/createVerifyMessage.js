@@ -495,48 +495,48 @@ async function handleIntroButton(interaction) {
         .setCustomId('intro_modal')
         .setTitle('Introduce Yourself');
 
-    // Input 1: RSN, Ironman Type, Age (combined to save space)
+    // Input 1: Basic Info - More flexible format
     const basicInfoInput = new TextInputBuilder()
         .setCustomId('basic_info')
-        .setLabel('RSN | Ironman Type | 18+? (Yes/No)')
+        .setLabel('RSN, Account Type & Age')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Example: Zezima | Main | Yes')
+        .setPlaceholder('Example: Zezima, Main, 21 years old')
         .setRequired(true)
         .setMaxLength(100);
 
-    // Input 2: Total Level & Timezone
+    // Input 2: Stats & Location - Flexible format
     const statsInput = new TextInputBuilder()
         .setCustomId('stats_info')
-        .setLabel('Total Level | Time Zone')
+        .setLabel('Total Level & Time Zone')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Example: 2100 | EST (UTC-5)')
+        .setPlaceholder('Example: 2100 total, EST timezone')
         .setRequired(true)
-        .setMaxLength(50);
+        .setMaxLength(100);
 
-    // Input 3: Previous clan and reason for leaving
+    // Input 3: Clan History - Freeform paragraph
     const clanHistoryInput = new TextInputBuilder()
         .setCustomId('clan_history')
-        .setLabel('Previous clan? Reason for leaving?')
+        .setLabel('Previous Clan & Why You Left (optional)')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Example: Was in XYZ clan but looking for more active community')
+        .setPlaceholder('Share your clan history or just put "None" if this is your first clan')
         .setRequired(false)
         .setMaxLength(500);
 
-    // Input 4: Goals & Interests (combining favourite skill, boss, and goal)
+    // Input 4: Goals & Favorites - Freeform paragraph
     const goalsInput = new TextInputBuilder()
         .setCustomId('goals_interests')
-        .setLabel('Fav Skill | Fav Boss | Current Goal')
+        .setLabel('Favorite Content & Current Goals')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Example: Slayer | Vorkath | Working on quest cape')
+        .setPlaceholder('Tell us about your favorite skills, bosses, and what you\'re working on!')
         .setRequired(true)
         .setMaxLength(500);
 
-    // Input 5: What you're looking for and additional info
+    // Input 5: What You're Looking For - Freeform paragraph
     const additionalInput = new TextInputBuilder()
         .setCustomId('additional_info')
-        .setLabel('What are you looking to gain? + Extra info')
+        .setLabel('What Are You Looking For & Anything Else?')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Example: Looking for PvM team and friendly community. I love pets!')
+        .setPlaceholder('What do you hope to gain from joining? Any other info you\'d like to share?')
         .setRequired(true)
         .setMaxLength(1000);
 
@@ -554,67 +554,60 @@ async function handleIntroButton(interaction) {
 async function handleIntroSubmit(interaction) {
     const basicInfo = interaction.fields.getTextInputValue('basic_info');
     const statsInfo = interaction.fields.getTextInputValue('stats_info');
-    const clanHistory = interaction.fields.getTextInputValue('clan_history') || 'N/A';
+    const clanHistory = interaction.fields.getTextInputValue('clan_history') || 'None / First clan';
     const goalsInterests = interaction.fields.getTextInputValue('goals_interests');
     const additionalInfo = interaction.fields.getTextInputValue('additional_info');
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
-        // Parse the basic info (RSN | Type | Age)
-        const basicParts = basicInfo.split('|').map(s => s.trim());
-        const rsn = basicParts[0] || 'Not provided';
-        const ironmanType = basicParts[1] || 'Not provided';
-        const age18Plus = basicParts[2] || 'Not provided';
-
-        // Parse stats info (Total | Timezone)
-        const statsParts = statsInfo.split('|').map(s => s.trim());
-        const totalLevel = statsParts[0] || 'Not provided';
-        const timezone = statsParts[1] || 'Not provided';
-
-        // Parse goals/interests (Skill | Boss | Goal)
-        const goalsParts = goalsInterests.split('|').map(s => s.trim());
-        const favSkill = goalsParts[0] || 'Not provided';
-        const favBoss = goalsParts[1] || 'Not provided';
-        const currentGoal = goalsParts[2] || 'Not provided';
+        console.log(`[Intro] Processing introduction for ${interaction.user.tag}`);
+        console.log(`[Intro] Attempting to fetch intro thread: ${config.INTRO_THREAD_ID}`);
 
         // Post to intro thread
         const introThread = await interaction.client.channels.fetch(config.INTRO_THREAD_ID);
 
         if (!introThread) {
+            console.error('[Intro] Intro thread not found!');
             return interaction.editReply({
                 content: '❌ Could not find the introduction thread. Please contact an admin.'
             });
         }
 
-        // Format the intro message
+        console.log(`[Intro] Found intro thread: ${introThread.name}`);
+
+        // Format the intro message - simplified, more natural format
         const introMessage =
             `**Introduction from ${interaction.user}**\n\n` +
-            `**RSN:** ${rsn}\n` +
-            `**Ironman Type:** ${ironmanType}\n` +
-            `**18+?:** ${age18Plus}\n` +
-            `**Total Level:** ${totalLevel}\n` +
-            `**Time Zone:** ${timezone}\n` +
+            `**Basic Info:** ${basicInfo}\n` +
+            `**Stats & Location:** ${statsInfo}\n` +
             `**Previous Clan:** ${clanHistory}\n` +
-            `**Favourite Skill:** ${favSkill}\n` +
-            `**Favourite Boss/Content:** ${favBoss}\n` +
-            `**Current Goal:** ${currentGoal}\n` +
+            `**Favorites & Goals:** ${goalsInterests}\n` +
             `**What I'm Looking For:** ${additionalInfo}`;
+
+        console.log(`[Intro] Attempting to send message to intro thread...`);
 
         // Post the intro
         await introThread.send(introMessage);
+
+        console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
 
         // Confirm to user
         await interaction.editReply({
             content: '✅ Your introduction has been posted! An admin will help you join the clan in-game shortly.'
         });
 
-        console.log(`[Intro] Posted introduction for ${interaction.user.tag} in intro thread`);
-
     } catch (error) {
         console.error('[Intro] Error posting introduction:', error);
+        console.error('[Intro] Error details:', {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+
         await interaction.editReply({
-            content: '❌ Failed to post your introduction. Please contact an admin for assistance.'
+            content: `❌ Failed to post your introduction. Please contact an admin for assistance.\n\nError: ${error.message}`
         });
     }
 }
