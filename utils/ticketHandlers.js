@@ -94,12 +94,27 @@ async function handleTicketClose(interaction) {
  * Handle ticket close modal submission
  */
 async function handleTicketCloseSubmit(interaction) {
+    // Check if user is admin (double-check permissions)
+    const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
+        interaction.member.roles.cache.has(roleId)
+    );
+
+    if (!isAdmin) {
+        return interaction.reply({
+            content: '❌ Only admins can close tickets.',
+            ephemeral: true
+        });
+    }
+
     const summary = interaction.fields.getTextInputValue('close_summary');
     const channel = interaction.channel;
+
+    console.log(`[TicketClose] Starting close process for ${channel.name} by ${interaction.user.tag}`);
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
+        console.log(`[TicketClose] Fetching ticket state and determining archive channel...`);
         // Get ticket state for transcript
         const state = ticketManager.getTicketState(channel.id);
 
@@ -113,10 +128,13 @@ async function handleTicketCloseSubmit(interaction) {
         const archiveChannelId = ticketCategories[channel.parentId];
 
         if (!archiveChannelId) {
+            console.error(`[TicketClose] No archive channel found for category ${channel.parentId}`);
             return await interaction.editReply({
                 content: '❌ Could not determine archive channel for this ticket.'
             });
         }
+
+        console.log(`[TicketClose] Archive channel ID: ${archiveChannelId}. Fetching messages...`);
 
         // Fetch all messages from the ticket channel
         const messages = [];
@@ -134,6 +152,8 @@ async function handleTicketCloseSubmit(interaction) {
 
             if (fetchedMessages.size < 100) break;
         }
+
+        console.log(`[TicketClose] Fetched ${messages.length} messages. Processing transcript...`);
 
         // Sort messages chronologically (oldest first)
         messages.reverse();
@@ -203,14 +223,19 @@ async function handleTicketCloseSubmit(interaction) {
 
         const fullTranscript = serverInfo + '\n\n' + transcriptLines.join('\n');
 
+        console.log(`[TicketClose] Transcript processed. Fetching archive channel...`);
+
         // Get archive channel
         const archiveChannel = await interaction.guild.channels.fetch(archiveChannelId);
 
         if (!archiveChannel) {
+            console.error(`[TicketClose] Archive channel ${archiveChannelId} not found`);
             return await interaction.editReply({
                 content: '❌ Archive channel not found.'
             });
         }
+
+        console.log(`[TicketClose] Archive channel found: ${archiveChannel.name}. Creating transcript embed...`);
 
         // Create transcript embed
         const transcriptEmbed = new EmbedBuilder()
@@ -238,6 +263,8 @@ async function handleTicketCloseSubmit(interaction) {
         const buffer = Buffer.from(fullTranscript, 'utf-8');
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
         const filename = `transcript-${channel.name}-${timestamp}.txt`;
+
+        console.log(`[TicketClose] Sending transcript to archive channel...`);
 
         // Send embed with file attachment
         await archiveChannel.send({
@@ -269,9 +296,14 @@ async function handleTicketCloseSubmit(interaction) {
 
     } catch (error) {
         console.error('[TicketClose] Error creating transcript:', error);
-        await interaction.editReply({
-            content: '❌ Failed to create transcript. Please try again.'
-        });
+        console.error('[TicketClose] Error stack:', error.stack);
+        try {
+            await interaction.editReply({
+                content: `❌ Failed to create transcript: ${error.message}`
+            });
+        } catch (editError) {
+            console.error('[TicketClose] Failed to send error message:', editError);
+        }
     }
 }
 
