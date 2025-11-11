@@ -209,7 +209,7 @@ module.exports = {
 
       const entries = [
         { p: 29.7, kind: 'vp', label: 'Junk', min: 0, max: 0, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/jABzYyd.png' },
-        { p: 0.1, kind: 'role', label: 'King Gamba role', roleId: KING_GAMBA_ROLE_ID, color: 0x800080, title: 'A King of Gamba has been crowned!', image: 'https://i.imgur.com/zeSTA3O.png' },
+        { p: 0.01, kind: 'role', label: 'King Gamba role', roleId: KING_GAMBA_ROLE_ID, color: 0x800080, title: 'A King of Gamba has been crowned!', image: 'https://i.imgur.com/zeSTA3O.png' },
 
         { p: 50.0, kind: 'vp', label: 'Common (1–3 VP)', min: 1, max: 3, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/EF6qFMM.png' },
         { p: 10.0, kind: 'vp', label: 'Uncommon (4–10 VP)', min: 4, max: 10, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/FyOzqw2.png' },
