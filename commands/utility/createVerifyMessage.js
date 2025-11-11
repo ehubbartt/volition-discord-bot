@@ -592,8 +592,12 @@ async function handleIntroSubmit(interaction) {
             targetChannel = introChannel;
         } else if (introChannel.type === 15) {
             // It's a forum channel (type 15) - create a new thread/post
+            // Get member to access display name
+            const member = await interaction.guild.members.fetch(interaction.user.id);
+            const displayName = member.displayName || interaction.user.globalName || interaction.user.username;
+
             const thread = await introChannel.threads.create({
-                name: `${interaction.user.username}'s Introduction`,
+                name: `${displayName}'s Introduction`,
                 message: { content: introMessage }
             });
             console.log(`[Intro] Created forum post: ${thread.name}`);
@@ -608,28 +612,7 @@ async function handleIntroSubmit(interaction) {
 
         console.log(`[Intro] ✅ Successfully posted introduction for ${interaction.user.tag}`);
 
-        // Send "How to join" embed and ping admins in the intro channel/thread
-        const b1Emoji = `<:B1:${config.B1_EMOJI_ID}>`;
-        const checkEmoji = `<:CHECK:${config.CHECK_EMOJI_ID}>`;
-
-        const howToJoinEmbed = new EmbedBuilder()
-            .setColor('Blue')
-            .setTitle('How to join.')
-            .setDescription(
-                `**YOU MUST VERIFY YOUR DISCORD BEFORE YOU CAN JOIN/SEE THIS DISCORD.**\n\n` +
-                `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
-                `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n\n` +
-                `**After reqs have been checked:**\n\n` +
-                `${b1Emoji} Jump in the clan chat in game.\n` +
-                `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
-            )
-            .setImage('https://media.discordapp.net/attachments/1085149045456126064/1197653854859313284/Join_Volition_3.png?ex=6913aa92&is=69125912&hm=72f1a38dbc6f80e27af7667560ddb2e865056f0e585cc40c377b2945bf49176d&format=webp&quality=lossless&width=1242&height=936')
-            .setTimestamp();
-
-        // Send the "How to join" embed in the target channel (thread for forums, channel for others)
-        await targetChannel.send({ embeds: [howToJoinEmbed] });
-
-        // Ping admins in the target channel
+        // Ping admins in the intro channel/thread
         const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
         await targetChannel.send({
             content: `${adminMentions} - New member introduction posted!`,
@@ -641,7 +624,7 @@ async function handleIntroSubmit(interaction) {
             content: '✅ Your introduction has been posted! An admin will help you join the clan in-game shortly.'
         });
 
-        // Send link to the introduction in the ticket channel (if in a ticket)
+        // Send "How to join" embed and link in the ticket channel (if in a ticket)
         const ticketCategories = [
             config.TICKET_JOIN_CATEGORY_ID,
             config.TICKET_GENERAL_CATEGORY_ID,
@@ -649,9 +632,30 @@ async function handleIntroSubmit(interaction) {
         ];
 
         if (interaction.channel && ticketCategories.includes(interaction.channel.parentId)) {
+            // Send link to the introduction
             await interaction.channel.send({
                 content: `📝 **Introduction Posted!** ${interaction.user}'s introduction has been submitted: ${introUrl}`
             });
+
+            // Send "How to join" embed in the ticket
+            const b1Emoji = `<:B1:${config.B1_EMOJI_ID}>`;
+            const checkEmoji = `<:CHECK:${config.CHECK_EMOJI_ID}>`;
+
+            const howToJoinEmbed = new EmbedBuilder()
+                .setColor('Blue')
+                .setTitle('How to join.')
+                .setDescription(
+                    `**YOU MUST VERIFY YOUR DISCORD BEFORE YOU CAN JOIN/SEE THIS DISCORD.**\n\n` +
+                    `${b1Emoji} You can verify your discord here - <#${config.WISE_OLD_MAN_CHANNEL_ID}>\n` +
+                    `${b1Emoji} After verifying head over to <#${config.CONTACT_US_CHANNEL_ID}> & open up a ticket.\n\n` +
+                    `**After reqs have been checked:**\n\n` +
+                    `${b1Emoji} Jump in the clan chat in game.\n` +
+                    `${b1Emoji} Someone will help you in & rank you ${checkEmoji}`
+                )
+                .setImage('https://media.discordapp.net/attachments/1085149045456126064/1197653854859313284/Join_Volition_3.png?ex=6913aa92&is=69125912&hm=72f1a38dbc6f80e27af7667560ddb2e865056f0e585cc40c377b2945bf49176d&format=webp&quality=lossless&width=1242&height=936')
+                .setTimestamp();
+
+            await interaction.channel.send({ embeds: [howToJoinEmbed] });
         }
 
     } catch (error) {

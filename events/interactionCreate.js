@@ -72,17 +72,22 @@ module.exports = {
         // Determine category based on ticket type
         let categoryId, ticketName, description;
 
+        // Get member to access displayName
+        const member = await interaction.guild.members.fetch(interaction.user.id);
+        // Use displayName (server nickname) or globalName (new display name) as fallback to username
+        const displayName = member.displayName || interaction.user.globalName || interaction.user.username;
+
         if (ticketType === 'join') {
           categoryId = config.TICKET_JOIN_CATEGORY_ID;
-          ticketName = `${config.UNVERIFIED_EMOJI}・join-${interaction.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `${config.UNVERIFIED_EMOJI}・join-${displayName}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your join ticket! Click **Verify My Account** below to get started.';
         } else if (ticketType === 'general') {
           categoryId = config.TICKET_GENERAL_CATEGORY_ID;
-          ticketName = `general-${interaction.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `general-${displayName}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your general support ticket! An admin will be with you shortly.';
         } else if (ticketType === 'shop') {
           categoryId = config.TICKET_SHOP_CATEGORY_ID;
-          ticketName = `shop-${interaction.user.username}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
+          ticketName = `shop-${displayName}・${config.UNCLAIMED_EMOJI}`.toLowerCase();
           description = 'Welcome to your shop payout ticket! Please describe what you need and an admin will assist you.';
         }
 
