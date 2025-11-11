@@ -21,7 +21,8 @@
     "enabled": true,
     "autoUpdateNicknames": true,
     "requirementCheck": true,
-    "pingAdminOnFailure": true
+    "pingAdminOnFailure": true,
+    "useIntroModal": true
   },
   "ticketSystem": {
     "_description": "Support ticket features",

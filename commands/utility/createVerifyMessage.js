@@ -12,6 +12,7 @@ const axios = require('axios');
 const config = require('../../config.json');
 const { determineRank, formatRankWithEmoji } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
+const features = require('../../utils/features');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -246,6 +247,51 @@ async function handleVerifySubmit(interaction) {
             embeds: [statsEmbed]
         });
 
+        // If requirements met, send welcome message with intro button
+        if (meetsRequirements) {
+            const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;
+
+            const welcomeMessage =
+                `## Welcome to Volition! ${vpEmoji}\n\n` +
+                `We ask you kindly that __your discord name on this server matches your in game name__, the clan bot will have already adjusted this for you.\n\n` +
+                `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
+                `* Head over to <#1350979144950743161> & fill out the pinned information.\n\n` +
+                `Once this is done we will help you join the clan in game.`;
+
+            // Check if intro modal is enabled
+            const useIntroModal = await features.isEnabled('verification.useIntroModal');
+
+            if (useIntroModal) {
+                // Create intro button to open modal
+                const introButton = new ButtonBuilder()
+                    .setCustomId('intro_start')
+                    .setLabel('Fill Out Introduction')
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji('📝');
+
+                const row = new ActionRowBuilder().addComponents(introButton);
+
+                await interaction.followUp({
+                    content: welcomeMessage,
+                    components: [row]
+                });
+            } else {
+                // Create link button to intro thread
+                const introLinkButton = new ButtonBuilder()
+                    .setLabel('Go to Introduction Thread')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${config.guildId}/${config.INTRO_THREAD_ID}`)
+                    .setEmoji('📝');
+
+                const row = new ActionRowBuilder().addComponents(introLinkButton);
+
+                await interaction.followUp({
+                    content: welcomeMessage,
+                    components: [row]
+                });
+            }
+        }
+
     } catch (error) {
         console.error('Error during verification:', error);
 
@@ -409,7 +455,138 @@ async function handleGuestJoinSubmit(interaction) {
     }
 }
 
+async function handleIntroButton(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('intro_modal')
+        .setTitle('Introduce Yourself');
+
+    // Input 1: RSN, Ironman Type, Age (combined to save space)
+    const basicInfoInput = new TextInputBuilder()
+        .setCustomId('basic_info')
+        .setLabel('RSN | Ironman Type | 18+? (Yes/No)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Example: Zezima | Main | Yes')
+        .setRequired(true)
+        .setMaxLength(100);
+
+    // Input 2: Total Level & Timezone
+    const statsInput = new TextInputBuilder()
+        .setCustomId('stats_info')
+        .setLabel('Total Level | Time Zone')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Example: 2100 | EST (UTC-5)')
+        .setRequired(true)
+        .setMaxLength(50);
+
+    // Input 3: Previous clan and reason for leaving
+    const clanHistoryInput = new TextInputBuilder()
+        .setCustomId('clan_history')
+        .setLabel('Previous clan? Reason for leaving?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Example: Was in XYZ clan but looking for more active community')
+        .setRequired(false)
+        .setMaxLength(500);
+
+    // Input 4: Goals & Interests (combining favourite skill, boss, and goal)
+    const goalsInput = new TextInputBuilder()
+        .setCustomId('goals_interests')
+        .setLabel('Fav Skill | Fav Boss | Current Goal')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Example: Slayer | Vorkath | Working on quest cape')
+        .setRequired(true)
+        .setMaxLength(500);
+
+    // Input 5: What you're looking for and additional info
+    const additionalInput = new TextInputBuilder()
+        .setCustomId('additional_info')
+        .setLabel('What are you looking to gain? + Extra info')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Example: Looking for PvM team and friendly community. I love pets!')
+        .setRequired(true)
+        .setMaxLength(1000);
+
+    const row1 = new ActionRowBuilder().addComponents(basicInfoInput);
+    const row2 = new ActionRowBuilder().addComponents(statsInput);
+    const row3 = new ActionRowBuilder().addComponents(clanHistoryInput);
+    const row4 = new ActionRowBuilder().addComponents(goalsInput);
+    const row5 = new ActionRowBuilder().addComponents(additionalInput);
+
+    modal.addComponents(row1, row2, row3, row4, row5);
+
+    await interaction.showModal(modal);
+}
+
+async function handleIntroSubmit(interaction) {
+    const basicInfo = interaction.fields.getTextInputValue('basic_info');
+    const statsInfo = interaction.fields.getTextInputValue('stats_info');
+    const clanHistory = interaction.fields.getTextInputValue('clan_history') || 'N/A';
+    const goalsInterests = interaction.fields.getTextInputValue('goals_interests');
+    const additionalInfo = interaction.fields.getTextInputValue('additional_info');
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+        // Parse the basic info (RSN | Type | Age)
+        const basicParts = basicInfo.split('|').map(s => s.trim());
+        const rsn = basicParts[0] || 'Not provided';
+        const ironmanType = basicParts[1] || 'Not provided';
+        const age18Plus = basicParts[2] || 'Not provided';
+
+        // Parse stats info (Total | Timezone)
+        const statsParts = statsInfo.split('|').map(s => s.trim());
+        const totalLevel = statsParts[0] || 'Not provided';
+        const timezone = statsParts[1] || 'Not provided';
+
+        // Parse goals/interests (Skill | Boss | Goal)
+        const goalsParts = goalsInterests.split('|').map(s => s.trim());
+        const favSkill = goalsParts[0] || 'Not provided';
+        const favBoss = goalsParts[1] || 'Not provided';
+        const currentGoal = goalsParts[2] || 'Not provided';
+
+        // Post to intro thread
+        const introThread = await interaction.client.channels.fetch(config.INTRO_THREAD_ID);
+
+        if (!introThread) {
+            return interaction.editReply({
+                content: '❌ Could not find the introduction thread. Please contact an admin.'
+            });
+        }
+
+        // Format the intro message
+        const introMessage =
+            `**Introduction from ${interaction.user}**\n\n` +
+            `**RSN:** ${rsn}\n` +
+            `**Ironman Type:** ${ironmanType}\n` +
+            `**18+?:** ${age18Plus}\n` +
+            `**Total Level:** ${totalLevel}\n` +
+            `**Time Zone:** ${timezone}\n` +
+            `**Previous Clan:** ${clanHistory}\n` +
+            `**Favourite Skill:** ${favSkill}\n` +
+            `**Favourite Boss/Content:** ${favBoss}\n` +
+            `**Current Goal:** ${currentGoal}\n` +
+            `**What I'm Looking For:** ${additionalInfo}`;
+
+        // Post the intro
+        await introThread.send(introMessage);
+
+        // Confirm to user
+        await interaction.editReply({
+            content: '✅ Your introduction has been posted! An admin will help you join the clan in-game shortly.'
+        });
+
+        console.log(`[Intro] Posted introduction for ${interaction.user.tag} in intro thread`);
+
+    } catch (error) {
+        console.error('[Intro] Error posting introduction:', error);
+        await interaction.editReply({
+            content: '❌ Failed to post your introduction. Please contact an admin for assistance.'
+        });
+    }
+}
+
 module.exports.handleVerifyButton = handleVerifyButton;
 module.exports.handleVerifySubmit = handleVerifySubmit;
 module.exports.handleGuestJoinButton = handleGuestJoinButton;
 module.exports.handleGuestJoinSubmit = handleGuestJoinSubmit;
+module.exports.handleIntroButton = handleIntroButton;
+module.exports.handleIntroSubmit = handleIntroSubmit;
