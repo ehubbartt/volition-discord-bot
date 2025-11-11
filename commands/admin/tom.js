@@ -1,19 +1,23 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
-    data: new SlashCommandBuilder ()
-    .setname('Tom')
-    .setdescription('For Tom Only')
+    data: new SlashCommandBuilder()
+        .setName('tom')
+        .setDescription('For Tom Only'),
 
-    async execute(interaction) {
-        // Check if user is Tom
-        if (interaction.user.id !== 'tomd0'){
-            return interaction.reply ({
+    async execute (interaction) {
+        // Check if user is Tom (replace with actual Discord user ID)
+        if (interaction.user.id !== '920096803586715678') {
+            return interaction.reply({
                 content: 'Fuck off, Get off my shit',
-            })
-        } 
-        const gifUrl= 'https://giphy.com/gifs/middle-finger-mister-rogers-fred-44Eq3Ab5LPYn6'
-        const message= `Alex and Krit politely FUCK OFF ${gifUrl}`
-        await interaction.channel.send ({content: message})
+                ephemeral: true
+            });
+        }
+
+        // Direct GIF URL from Giphy (embeds properly in Discord)
+        const gifUrl = 'https://media.giphy.com/media/44Eq3Ab5LPYn6/giphy.gif';
+        const message = `Alex and Krit politely FUCK OFF\n${gifUrl}`;
+
+        await interaction.reply({ content: message });
     }
-}
+};
