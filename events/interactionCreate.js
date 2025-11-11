@@ -44,8 +44,8 @@ module.exports = {
       }
     }
 
-    // Handle ticket creation dropdown
-    if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_create') {
+    // Handle ticket creation buttons
+    if (interaction.isButton() && interaction.customId.startsWith('ticket_create_')) {
       // Check if ticket system is enabled
       if (!await features.isEnabled('ticketSystem.enabled')) {
         return interaction.reply({
@@ -55,7 +55,8 @@ module.exports = {
       }
 
       const { PermissionFlagsBits, ChannelType } = require('discord.js');
-      const ticketType = interaction.values[0];
+      // Extract ticket type from button customId (e.g., 'ticket_create_join' -> 'join')
+      const ticketType = interaction.customId.replace('ticket_create_', '');
 
       // Check if specific ticket type is enabled
       if (ticketType === 'join' && !await features.isEnabled('ticketSystem.allowJoinTickets')) {

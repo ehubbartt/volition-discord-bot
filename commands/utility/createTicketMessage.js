@@ -2,8 +2,8 @@ const {
     SlashCommandBuilder,
     EmbedBuilder,
     ActionRowBuilder,
-    StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder
+    ButtonBuilder,
+    ButtonStyle
 } = require('discord.js');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
@@ -38,29 +38,26 @@ module.exports = {
             .setFooter({ text: 'Volition Clan Support' })
             .setTimestamp();
 
-        // Create the dropdown menu
-        const select = new StringSelectMenuBuilder()
-            .setCustomId('ticket_create')
-            .setPlaceholder('Select ticket type')
-            .addOptions(
-                new StringSelectMenuOptionBuilder()
-                    .setLabel('Join Ticket')
-                    .setDescription('Apply to join the clan')
-                    .setValue('join')
-                    .setEmoji('🔰'),
-                new StringSelectMenuOptionBuilder()
-                    .setLabel('General Support')
-                    .setDescription('Ask questions or get help')
-                    .setValue('general')
-                    .setEmoji('💬'),
-                new StringSelectMenuOptionBuilder()
-                    .setLabel('Shop Payout')
-                    .setDescription('Request VP shop payout')
-                    .setValue('shop')
-                    .setEmoji('💰')
-            );
+        // Create buttons for each ticket type
+        const joinButton = new ButtonBuilder()
+            .setCustomId('ticket_create_join')
+            .setLabel('Join Ticket')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🔰');
 
-        const row = new ActionRowBuilder().addComponents(select);
+        const generalButton = new ButtonBuilder()
+            .setCustomId('ticket_create_general')
+            .setLabel('General Support')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('💬');
+
+        const shopButton = new ButtonBuilder()
+            .setCustomId('ticket_create_shop')
+            .setLabel('Shop Payout')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('💰');
+
+        const row = new ActionRowBuilder().addComponents(joinButton, generalButton, shopButton);
 
         // Send the ticket panel
         await targetChannel.send({
