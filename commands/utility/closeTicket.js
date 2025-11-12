@@ -77,7 +77,7 @@ module.exports = {
 
         // Send ephemeral message visible only to admins
         await channel.send({
-            content: config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' '),
+            content: config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' '),
             embeds: [adminEmbed],
             components: [row]
         });

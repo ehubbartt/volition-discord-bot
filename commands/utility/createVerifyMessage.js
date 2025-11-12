@@ -234,13 +234,14 @@ async function handleVerifySubmit (interaction) {
         statsEmbed.setTimestamp();
 
         // Send the result embed
-        let replyContent = null;
-        let components = [];
+        await interaction.editReply({
+            embeds: [statsEmbed]
+        });
 
-        // If requirements not met, ping all admin roles and add Force Verify button
+        // If requirements not met, send a separate message to ping admins
+        // (editing doesn't trigger pings, so we need to send a new message)
         if (!meetsRequirements) {
-            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
-            replyContent = `${adminMentions} - User needs assistance with requirements`;
+            const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
 
             // Add Force Verify button (admin only)
             const forceVerifyButton = new ButtonBuilder()
@@ -250,15 +251,14 @@ async function handleVerifySubmit (interaction) {
                 .setEmoji('🔓');
 
             const buttonRow = new ActionRowBuilder().addComponents(forceVerifyButton);
-            components.push(buttonRow);
-        }
 
-        await interaction.editReply({
-            content: replyContent,
-            embeds: [statsEmbed],
-            components: components,
-            allowedMentions: { roles: config.ADMIN_ROLE_IDS }
-        });
+            // Send follow-up message with ping
+            await interaction.followUp({
+                content: `${adminMentions} - User needs assistance with requirements`,
+                components: [buttonRow],
+                allowedMentions: { roles: config.ADMINS_TO_PING }
+            });
+        }
 
         // Update ticket name if in a ticket channel (change unverified -> verified emoji)
         const ticketManager = require('../../utils/ticketManager');
@@ -405,7 +405,7 @@ async function handleGuestJoinSubmit (interaction) {
 
         if (!friendInClan) {
             // Friend NOT in clan - error and ping admins
-            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+            const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
 
             const errorEmbed = new EmbedBuilder()
                 .setColor('Red')
@@ -463,7 +463,7 @@ async function handleGuestJoinSubmit (interaction) {
         }
 
         // Send admin notification and welcome message
-        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+        const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
 
         const welcomeEmbed = new EmbedBuilder()
             .setColor('Green')
@@ -498,7 +498,7 @@ async function handleGuestJoinSubmit (interaction) {
     } catch (error) {
         console.error('[GuestJoin] Error during guest join:', error);
 
-        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+        const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
 
         const errorEmbed = new EmbedBuilder()
             .setColor('Red')
@@ -661,7 +661,7 @@ async function handleIntroSubmit (interaction) {
 
         if (interaction.channel && ticketCategories.includes(interaction.channel.parentId)) {
             // Ping admins in the join ticket
-            const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+            const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
             await interaction.channel.send({
                 content: `${adminMentions} - New member introduction posted!\n📝 **Introduction Posted!** ${interaction.user}'s introduction has been submitted: ${introUrl}`,
                 allowedMentions: { roles: config.ADMIN_ROLE_IDS }
@@ -742,7 +742,7 @@ async function handleGuestKnowsNobody (interaction) {
     });
 
     try {
-        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+        const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
 
         const reviewEmbed = new EmbedBuilder()
             .setColor('Orange')

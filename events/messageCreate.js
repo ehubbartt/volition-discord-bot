@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const config = require('../config.json');
 const ticketManager = require('../utils/ticketManager');
+const { isAdmin, isHeadAdmin } = require('../utils/permissions');
 
 module.exports = {
     name: Events.MessageCreate,
@@ -26,11 +27,9 @@ module.exports = {
         // Auto-claim ticket when first admin responds
         if (!state.claimed) {
             // Check if message author is an admin
-            const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-                message.member.roles.cache.has(roleId)
-            );
+            const userIsAdmin = isAdmin(message.member);
 
-            if (isAdmin) {
+            if (userIsAdmin) {
                 // Claim the ticket for this admin
                 ticketManager.claimTicket(message.channel.id, message.author.id, message.author.tag);
 
@@ -45,6 +44,7 @@ module.exports = {
                     console.log(`[AutoClaim] ${message.author.tag} auto-claimed ticket ${message.channel.name}`);
 
                     // Update permissions: Only the claimer (and ticket creator) can send messages
+                    // Head admins always have permission to bypass this restriction
                     const { PermissionFlagsBits } = require('discord.js');
 
                     // Remove send permission from all admin roles
@@ -64,7 +64,14 @@ module.exports = {
                         ReadMessageHistory: true
                     });
 
-                    console.log(`[AutoClaim] Set exclusive send permissions for ${message.author.tag}`);
+                    // Give send permission to all head admin roles (bypass ticket lock)
+                    for (const headAdminRoleId of config.HEAD_ADMIN_ROLE_IDS) {
+                        await message.channel.permissionOverwrites.edit(headAdminRoleId, {
+                            SendMessages: true
+                        });
+                    }
+
+                    console.log(`[AutoClaim] Set exclusive send permissions for ${message.author.tag} (head admins can bypass)`);
 
                     // Send a subtle claim notification
                     const { EmbedBuilder } = require('discord.js');

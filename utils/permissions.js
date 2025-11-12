@@ -18,6 +18,22 @@ function isAdmin(member) {
     return adminRoleIDs.some(roleId => member.roles.cache.has(roleId));
 }
 
+/**
+ * Check if a member has any of the head admin roles
+ * Head admins have elevated permissions like bypassing ticket claim restrictions
+ * @param {GuildMember} member - Discord guild member
+ * @returns {boolean} - True if member has at least one head admin role
+ */
+function isHeadAdmin(member) {
+    if (!member || !member.roles) return false;
+
+    const headAdminRoleIDs = config.HEAD_ADMIN_ROLE_IDS || [];
+
+    // Check if member has any of the head admin roles
+    return headAdminRoleIDs.some(roleId => member.roles.cache.has(roleId));
+}
+
 module.exports = {
-    isAdmin
+    isAdmin,
+    isHeadAdmin
 };

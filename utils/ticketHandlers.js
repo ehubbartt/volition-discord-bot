@@ -1,17 +1,16 @@
 const { EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const config = require('../config.json');
 const ticketManager = require('./ticketManager');
+const { isAdmin, isHeadAdmin } = require('./permissions');
 
 /**
  * Handle ticket claim button
  */
 async function handleTicketClaim (interaction) {
     // Check if user is admin
-    const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
-        interaction.member.roles.cache.has(roleId)
-    );
+    const userIsAdmin = isAdmin(interaction.member);
 
-    if (!isAdmin) {
+    if (!userIsAdmin) {
         return interaction.reply({
             content: '❌ Only admins can claim tickets.',
             ephemeral: true
@@ -104,7 +103,14 @@ async function handleTicketClaim (interaction) {
             ReadMessageHistory: true
         });
 
-        console.log(`[TicketClaim] Set exclusive send permissions for ${interaction.user.tag}`);
+        // Step 4: Give send permission to all head admin roles (bypass ticket lock)
+        for (const headAdminRoleId of config.HEAD_ADMIN_ROLE_IDS) {
+            await channel.permissionOverwrites.edit(headAdminRoleId, {
+                SendMessages: true
+            });
+        }
+
+        console.log(`[TicketClaim] Set exclusive send permissions for ${interaction.user.tag} (head admins can bypass)`);
     } catch (error) {
         console.error('[TicketClaim] Failed to update permissions:', error);
     }
