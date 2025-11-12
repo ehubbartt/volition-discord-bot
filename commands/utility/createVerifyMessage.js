@@ -68,7 +68,44 @@ module.exports = {
     },
 };
 
-async function handleVerifyButton (interaction) {
+async function handleVerifyButton (interaction, bypassCheck = false) {
+    // Check if user already has verified role (unless bypassing)
+    const member = interaction.member;
+    const hasVerifiedRole = config.verifiedRoleID && member.roles.cache.has(config.verifiedRoleID);
+
+    if (hasVerifiedRole && !bypassCheck) {
+        // User already verified - show warning with confirmation
+        const warningEmbed = new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle('⚠️ Already Verified')
+            .setDescription(
+                'You have already been verified!\n\n' +
+                'Are you sure you want to verify again? This may overwrite your current verification.'
+            )
+            .setTimestamp();
+
+        const confirmButton = new ButtonBuilder()
+            .setCustomId('verify_confirm_reuse')
+            .setLabel('Yes, Verify Again')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('✅');
+
+        const cancelButton = new ButtonBuilder()
+            .setCustomId('verify_cancel_reuse')
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('❌');
+
+        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+        return interaction.reply({
+            embeds: [warningEmbed],
+            components: [row],
+            ephemeral: true
+        });
+    }
+
+    // User not verified yet - show modal normally
     const modal = new ModalBuilder()
         .setCustomId('createverify_modal')
         .setTitle('Verify Your Account');
@@ -348,8 +385,44 @@ async function handleVerifySubmit (interaction) {
     }
 }
 
-async function handleGuestJoinButton (interaction) {
-    // Ask if they know someone in the clan
+async function handleGuestJoinButton (interaction, bypassCheck = false) {
+    // Check if user already has verified role (unless bypassing)
+    const member = interaction.member;
+    const hasVerifiedRole = config.verifiedRoleID && member.roles.cache.has(config.verifiedRoleID);
+
+    if (hasVerifiedRole && !bypassCheck) {
+        // User already verified - show warning with confirmation
+        const warningEmbed = new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle('⚠️ Already Verified')
+            .setDescription(
+                'You have already been verified!\n\n' +
+                'Are you sure you want to join as a guest? This may affect your current verification status.'
+            )
+            .setTimestamp();
+
+        const confirmButton = new ButtonBuilder()
+            .setCustomId('guest_confirm_reuse')
+            .setLabel('Yes, Join as Guest')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('✅');
+
+        const cancelButton = new ButtonBuilder()
+            .setCustomId('guest_cancel_reuse')
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('❌');
+
+        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+        return interaction.reply({
+            embeds: [warningEmbed],
+            components: [row],
+            ephemeral: true
+        });
+    }
+
+    // User not verified yet - show guest options normally
     const knowSomeoneEmbed = new EmbedBuilder()
         .setColor('Blue')
         .setTitle('👋 Join as Guest')

@@ -24,6 +24,11 @@ module.exports = {
         // Check if ticket state exists
         const state = ticketManager.getTicketState(message.channel.id);
 
+        // If no ticket state exists, this isn't an active ticket (could be archive channel)
+        if (!state || !state.createdBy) {
+            return; // Not an active ticket
+        }
+
         // Auto-claim ticket when first admin responds
         if (!state.claimed) {
             // Check if message author is an admin

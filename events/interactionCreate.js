@@ -475,6 +475,59 @@ module.exports = {
         }
       }
 
+      // Handle verify/guest confirmation buttons
+      if (interaction.customId === 'verify_confirm_reuse') {
+        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
+        if (createVerifyCommand?.handleVerifyButton) {
+          try {
+            await interaction.update({ components: [] }); // Remove buttons
+            await createVerifyCommand.handleVerifyButton(interaction, true); // Pass bypass flag
+          }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
+      if (interaction.customId === 'verify_cancel_reuse') {
+        try {
+          await interaction.update({
+            embeds: [{
+              color: 0x808080,
+              title: '❌ Cancelled',
+              description: 'Verification cancelled.',
+              timestamp: new Date().toISOString()
+            }],
+            components: []
+          });
+        }
+        catch (error) { console.error(error); }
+      }
+
+      if (interaction.customId === 'guest_confirm_reuse') {
+        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
+        if (createVerifyCommand?.handleGuestJoinButton) {
+          try {
+            await interaction.update({ components: [] }); // Remove buttons
+            await createVerifyCommand.handleGuestJoinButton(interaction, true); // Pass bypass flag
+          }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
+      if (interaction.customId === 'guest_cancel_reuse') {
+        try {
+          await interaction.update({
+            embeds: [{
+              color: 0x808080,
+              title: '❌ Cancelled',
+              description: 'Guest join cancelled.',
+              timestamp: new Date().toISOString()
+            }],
+            components: []
+          });
+        }
+        catch (error) { console.error(error); }
+      }
+
       // Handle new ticket system buttons
       if (interaction.customId === 'ticket_claim') {
         const ticketHandlers = require('../utils/ticketHandlers');
