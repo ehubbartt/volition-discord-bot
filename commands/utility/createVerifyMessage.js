@@ -223,6 +223,32 @@ async function handleVerifySubmit (interaction) {
                 roleError = error.message;
                 console.error('[CreateVerify] Failed to update roles:', error);
             }
+
+            // Save to database - link Discord ID to WOM ID
+            try {
+                const existingPlayer = await db.getPlayerByWomId(womId);
+                if (existingPlayer) {
+                    // Update existing player with Discord ID
+                    await db.updatePlayer(existingPlayer.id, {
+                        discord_id: targetUser.id,
+                        rsn: actualRsn,
+                        wom_id: womId
+                    });
+                    console.log(`[CreateVerify] Updated database: Linked Discord ID ${targetUser.tag} to WOM ID ${womId}`);
+                } else {
+                    // Create new player with Discord ID
+                    await db.createPlayer({
+                        discord_id: targetUser.id,
+                        rsn: actualRsn,
+                        wom_id: womId,
+                        clan_joined_at: null // Will be set when they join clan
+                    }, 0);
+                    console.log(`[CreateVerify] Created database entry: Linked Discord ID ${targetUser.tag} to WOM ID ${womId}`);
+                }
+            } catch (dbError) {
+                console.error('[CreateVerify] Failed to save to database:', dbError);
+                // Don't fail the whole verification if database save fails - they still got roles
+            }
         }
 
         // Create result embed
