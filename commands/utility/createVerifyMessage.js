@@ -233,22 +233,7 @@ async function handleVerifySubmit (interaction) {
         statsEmbed.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
         statsEmbed.setTimestamp();
 
-        // Clear the "looking up" message first
-        await interaction.editReply({ content: null });
-
-        // If requirements not met, send admin ping FIRST
-        if (!meetsRequirements) {
-            const adminsToPing = config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS;
-            const adminMentions = adminsToPing.map(roleId => `<@&${roleId}>`).join(' ');
-
-            // Send ping message (this will actually ping and appear first)
-            await interaction.channel.send({
-                content: `${adminMentions} - User needs assistance with requirements`,
-                allowedMentions: { roles: adminsToPing }
-            });
-        }
-
-        // Send the result embed with Force Verify button if needed (as a follow-up, not edit)
+        // Build reply options
         const replyOptions = {
             embeds: [statsEmbed]
         };
@@ -263,8 +248,19 @@ async function handleVerifySubmit (interaction) {
             replyOptions.components = [new ActionRowBuilder().addComponents(forceVerifyButton)];
         }
 
-        // Use followUp to send as a new message (appears after the ping)
-        await interaction.followUp(replyOptions);
+        // Send the result embed
+        await interaction.editReply(replyOptions);
+
+        // If requirements not met, send admin ping as a follow-up (appears after embed)
+        if (!meetsRequirements) {
+            const adminsToPing = config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS;
+            const adminMentions = adminsToPing.map(roleId => `<@&${roleId}>`).join(' ');
+
+            await interaction.channel.send({
+                content: `${adminMentions} - User needs assistance with requirements`,
+                allowedMentions: { roles: adminsToPing }
+            });
+        }
 
         // Update ticket name if in a ticket channel (change unverified -> verified emoji)
         const ticketManager = require('../../utils/ticketManager');
