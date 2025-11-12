@@ -474,6 +474,169 @@ module.exports = {
         catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
       }
 
+      // Handle force verify buttons
+      if (interaction.customId.startsWith('force_verify_')) {
+        const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
+          interaction.member.roles.cache.has(roleId)
+        );
+
+        if (!isAdmin) {
+          return interaction.reply({
+            content: '❌ Only admins can force verify users.',
+            ephemeral: true
+          });
+        }
+
+        try {
+          const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+
+          if (interaction.customId.startsWith('force_verify_guest_')) {
+            // Force verify guest
+            const userId = interaction.customId.replace('force_verify_guest_', '');
+            const member = await interaction.guild.members.fetch(userId);
+
+            await interaction.deferReply({ ephemeral: false });
+
+            // Remove unverified role and add verified role
+            if (config.unverifiedRoleID && member.roles.cache.has(config.unverifiedRoleID)) {
+              await member.roles.remove(config.unverifiedRoleID);
+            }
+            if (config.verifiedRoleID) {
+              await member.roles.add(config.verifiedRoleID);
+            }
+
+            // Update ticket name if in a ticket channel
+            const ticketCategories = [
+              config.TICKET_JOIN_CATEGORY_ID,
+              config.TICKET_GENERAL_CATEGORY_ID,
+              config.TICKET_SHOP_CATEGORY_ID
+            ];
+
+            if (ticketCategories.includes(interaction.channel.parentId)) {
+              const ticketManager = require('../utils/ticketManager');
+              ticketManager.markVerified(interaction.channel.id);
+
+              const newName = interaction.channel.name.replace(config.UNVERIFIED_EMOJI, config.VERIFIED_EMOJI);
+              try {
+                await interaction.channel.setName(newName);
+              } catch (error) {
+                console.error('[ForceVerify] Failed to update channel name:', error);
+              }
+            }
+
+            // Send success message
+            const successEmbed = new EmbedBuilder()
+              .setColor('Green')
+              .setTitle('✅ User Force Verified (Guest)')
+              .setDescription(
+                `${member} has been manually verified by ${interaction.user}.\n\n` +
+                `**Roles Updated:**\n` +
+                `• Removed: Unverified\n` +
+                `• Added: Verified\n\n` +
+                `Welcome to Volition! 🎉`
+              )
+              .setTimestamp();
+
+            await interaction.editReply({
+              embeds: [successEmbed]
+            });
+
+            // Disable the button
+            await interaction.message.edit({ components: [] });
+
+            console.log(`[ForceVerify] ${interaction.user.tag} force verified guest ${member.user.tag}`);
+
+          } else {
+            // Force verify regular user (format: force_verify_userId_rsn)
+            const parts = interaction.customId.split('_');
+            const userId = parts[2];
+            const rsn = parts.slice(3).join('_');
+            const member = await interaction.guild.members.fetch(userId);
+
+            await interaction.deferReply({ ephemeral: false });
+
+            // Remove unverified role and add verified role
+            if (config.unverifiedRoleID && member.roles.cache.has(config.unverifiedRoleID)) {
+              await member.roles.remove(config.unverifiedRoleID);
+            }
+            if (config.verifiedRoleID) {
+              await member.roles.add(config.verifiedRoleID);
+            }
+
+            // Update ticket name if in a ticket channel
+            const ticketCategories = [
+              config.TICKET_JOIN_CATEGORY_ID,
+              config.TICKET_GENERAL_CATEGORY_ID,
+              config.TICKET_SHOP_CATEGORY_ID
+            ];
+
+            if (ticketCategories.includes(interaction.channel.parentId)) {
+              const ticketManager = require('../utils/ticketManager');
+              ticketManager.markVerified(interaction.channel.id);
+
+              const newName = interaction.channel.name.replace(config.UNVERIFIED_EMOJI, config.VERIFIED_EMOJI);
+              try {
+                await interaction.channel.setName(newName);
+              } catch (error) {
+                console.error('[ForceVerify] Failed to update channel name:', error);
+              }
+            }
+
+            // Send success message
+            const successEmbed = new EmbedBuilder()
+              .setColor('Green')
+              .setTitle('✅ User Force Verified')
+              .setDescription(
+                `${member} has been manually verified by ${interaction.user}.\n\n` +
+                `**RSN:** ${rsn}\n` +
+                `**Roles Updated:**\n` +
+                `• Removed: Unverified\n` +
+                `• Added: Verified`
+              )
+              .setTimestamp();
+
+            await interaction.editReply({
+              embeds: [successEmbed]
+            });
+
+            // Disable the button and send intro flow
+            await interaction.message.edit({ components: [] });
+
+            // Continue with intro flow
+            const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;
+            const welcomeMessage =
+              `## You've been verified! ${vpEmoji}\n\n` +
+              `We ask you kindly that __your discord name on this server matches your in game name__.\n\n` +
+              `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
+              `* Head over to <#1350979144950743161> & fill out the pinned information.\n\n` +
+              `Once this is done we will help you join the clan in game.`;
+
+            const introButton = new ButtonBuilder()
+              .setCustomId('intro_start')
+              .setLabel('Fill Out Introduction')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('📝');
+
+            const row = new ActionRowBuilder().addComponents(introButton);
+
+            await interaction.channel.send({
+              content: `${member} ${welcomeMessage}`,
+              components: [row]
+            });
+
+            console.log(`[ForceVerify] ${interaction.user.tag} force verified ${member.user.tag} (RSN: ${rsn})`);
+          }
+
+        } catch (error) {
+          console.error('[ForceVerify] Error during force verify:', error);
+          if (interaction.deferred) {
+            await interaction.editReply({ content: `❌ Error: ${error.message}` });
+          } else {
+            await interaction.reply({ content: `❌ Error: ${error.message}`, ephemeral: true });
+          }
+        }
+      }
+
       // Handle ticket delete button
       if (interaction.customId === 'ticket_delete') {
         const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>

@@ -6,7 +6,7 @@ module.exports = {
         .setName('allset')
         .setDescription('Send the "You\'re all set!" welcome message with server info'),
 
-    async execute(interaction) {
+    async execute (interaction) {
         // Check if user is admin
         const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
             interaction.member.roles.cache.has(roleId)

@@ -235,16 +235,28 @@ async function handleVerifySubmit (interaction) {
 
         // Send the result embed
         let replyContent = null;
+        let components = [];
 
-        // If requirements not met, ping all admin roles
+        // If requirements not met, ping all admin roles and add Force Verify button
         if (!meetsRequirements) {
             const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
             replyContent = `${adminMentions} - User needs assistance with requirements`;
+
+            // Add Force Verify button (admin only)
+            const forceVerifyButton = new ButtonBuilder()
+                .setCustomId(`force_verify_${interaction.user.id}_${actualRsn}`)
+                .setLabel('Force Verify (Admin Only)')
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('🔓');
+
+            const buttonRow = new ActionRowBuilder().addComponents(forceVerifyButton);
+            components.push(buttonRow);
         }
 
         await interaction.editReply({
             content: replyContent,
             embeds: [statsEmbed],
+            components: components,
             allowedMentions: { roles: config.ADMIN_ROLE_IDS }
         });
 
@@ -397,9 +409,20 @@ async function handleGuestJoinSubmit (interaction) {
                 )
                 .setTimestamp();
 
+            // Add Force Verify button for guest (admin only)
+            const forceVerifyGuestButton = new ButtonBuilder()
+                .setCustomId(`force_verify_guest_${guestUser.id}`)
+                .setLabel('Force Verify Guest (Admin Only)')
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji('🔓');
+
+            const buttonRow = new ActionRowBuilder().addComponents(forceVerifyGuestButton);
+
             await interaction.editReply({
+                //separate owners and admins and fix pings for red dot
                 content: `${adminMentions} - Guest verification needed`,
                 embeds: [errorEmbed],
+                components: [buttonRow],
                 allowedMentions: { roles: config.ADMIN_ROLE_IDS }
             });
             return;
