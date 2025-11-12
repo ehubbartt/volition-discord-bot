@@ -127,6 +127,10 @@ module.exports = {
           ],
         });
 
+        // Set ticket creator
+        const ticketManager = require('../utils/ticketManager');
+        ticketManager.setTicketCreator(ticketChannel.id, interaction.user.id, interaction.user.tag);
+
         // Send admin control panel first
         const claimButton = new ButtonBuilder()
           .setCustomId('ticket_claim')

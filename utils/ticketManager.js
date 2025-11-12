@@ -17,7 +17,10 @@ function getTicketState(channelId) {
         ticketStates.set(channelId, {
             claimed: false,
             claimedBy: null,
+            claimedByTag: null,
             claimedAt: null,
+            createdBy: null,
+            createdByTag: null,
             softClosing: false,
             softCloseStart: null,
             softCloseSummary: null,
@@ -25,6 +28,19 @@ function getTicketState(channelId) {
         });
     }
     return ticketStates.get(channelId);
+}
+
+/**
+ * Set ticket creator
+ * @param {string} channelId - Ticket channel ID
+ * @param {string} userId - User ID who created ticket
+ * @param {string} userTag - User tag
+ */
+function setTicketCreator(channelId, userId, userTag) {
+    const state = getTicketState(channelId);
+    state.createdBy = userId;
+    state.createdByTag = userTag;
+    return state;
 }
 
 /**
@@ -162,6 +178,7 @@ function getSoftClosingTickets() {
 
 module.exports = {
     getTicketState,
+    setTicketCreator,
     claimTicket,
     startSoftClose,
     resetSoftCloseTimer,

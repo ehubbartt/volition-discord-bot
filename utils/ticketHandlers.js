@@ -28,6 +28,9 @@ async function handleTicketClaim(interaction) {
         });
     }
 
+    // Get previous claimer if exists
+    const previousClaimer = state.claimedBy;
+
     // Claim the ticket
     ticketManager.claimTicket(channelId, interaction.user.id, interaction.user.tag);
 
@@ -45,10 +48,44 @@ async function handleTicketClaim(interaction) {
         console.error('[TicketClaim] Failed to update channel name:', error);
     }
 
+    // Update permissions: Only the claimer (and ticket creator) can send messages
+    const { PermissionFlagsBits } = require('discord.js');
+    try {
+        // Remove send permission from previous claimer if exists
+        if (previousClaimer && previousClaimer !== interaction.user.id) {
+            await channel.permissionOverwrites.edit(previousClaimer, {
+                SendMessages: false
+            });
+            console.log(`[TicketClaim] Removed send permissions from previous claimer`);
+        }
+
+        // Remove send permission from all admin roles
+        for (const roleId of config.ADMIN_ROLE_IDS) {
+            await channel.permissionOverwrites.edit(roleId, {
+                SendMessages: false
+            });
+        }
+
+        // Give send permission to new claimer
+        await channel.permissionOverwrites.edit(interaction.user.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+        });
+
+        console.log(`[TicketClaim] Set exclusive send permissions for ${interaction.user.tag}`);
+    } catch (error) {
+        console.error('[TicketClaim] Failed to update permissions:', error);
+    }
+
     // Send claim message
     const claimEmbed = new EmbedBuilder()
         .setColor('Green')
-        .setDescription(`🎫 Ticket claimed by ${interaction.user}`)
+        .setDescription(
+            `🎫 Ticket claimed by ${interaction.user}\n\n` +
+            `**⚠️ Only ${interaction.user} can respond in this ticket.**\n` +
+            `Other admins cannot send messages until they claim the ticket.`
+        )
         .setTimestamp();
 
     await interaction.reply({
@@ -193,16 +230,23 @@ async function handleTicketCloseSubmit(interaction) {
             `<Server-Info>\n` +
             `    Server: ${interaction.guild.name} (${interaction.guild.id})\n` +
             `    Channel: ${channel.name} (${channel.id})\n` +
-            `    Messages: ${messages.length}\n\n` +
+            `    Messages: ${messages.length}\n\n`;
+
+        // Add creator info
+        if (state.createdBy) {
+            serverInfo += `<Ticket-Creator>\n    Created by: ${state.createdByTag} (${state.createdBy}) - <@${state.createdBy}>\n\n`;
+        }
+
+        // Add claim info if claimed
+        if (state.claimed) {
+            serverInfo += `<Ticket-Claimed>\n    Claimed by: ${state.claimedByTag} (${state.claimedBy}) - <@${state.claimedBy}>\n    Claimed at: ${state.claimedAt}\n\n`;
+        }
+
+        serverInfo +=
             `<User-Info>\n` +
             `${sortedUsers}\n\n` +
             `<Admin-Summary>\n` +
             `    ${summary}\n`;
-
-        // Add claim info if claimed
-        if (state.claimed) {
-            serverInfo += `\n<Ticket-Claimed>\n    Claimed by: ${state.claimedByTag} (${state.claimedBy})\n    Claimed at: ${state.claimedAt}\n`;
-        }
 
         // Format readable transcript
         const transcriptLines = messages.map(msg => {
@@ -494,18 +538,24 @@ async function createTranscriptAndClose(channel, guild, closedBy, summary, state
             `<Server-Info>\n` +
             `    Server: ${guild.name} (${guild.id})\n` +
             `    Channel: ${channel.name} (${channel.id})\n` +
-            `    Messages: ${messages.length}\n\n` +
-            `<User-Info>\n` +
-            `${sortedUsers}\n\n` +
-            `<Admin-Summary>\n` +
-            `    ${summary}\n`;
+            `    Messages: ${messages.length}\n\n`;
+
+        // Add creator info
+        if (state.createdBy) {
+            serverInfo += `<Ticket-Creator>\n    Created by: ${state.createdByTag} (${state.createdBy}) - <@${state.createdBy}>\n\n`;
+        }
 
         // Add claim info if claimed
         if (state.claimed) {
-            serverInfo += `\n<Ticket-Claimed>\n    Claimed by: ${state.claimedByTag} (${state.claimedBy})\n    Claimed at: ${state.claimedAt}\n`;
+            serverInfo += `<Ticket-Claimed>\n    Claimed by: ${state.claimedByTag} (${state.claimedBy}) - <@${state.claimedBy}>\n    Claimed at: ${state.claimedAt}\n\n`;
         }
 
-        serverInfo += `\n<Auto-Closed>\n    Soft-closed and auto-archived after 24 hours of inactivity\n`;
+        serverInfo +=
+            `<User-Info>\n` +
+            `${sortedUsers}\n\n` +
+            `<Admin-Summary>\n` +
+            `    ${summary}\n\n` +
+            `<Auto-Closed>\n    Soft-closed and auto-archived after 24 hours of inactivity\n`;
 
         // Format readable transcript
         const transcriptLines = messages.map(msg => {

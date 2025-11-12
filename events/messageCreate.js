@@ -44,16 +44,39 @@ module.exports = {
                     await message.channel.setName(newName);
                     console.log(`[AutoClaim] ${message.author.tag} auto-claimed ticket ${message.channel.name}`);
 
+                    // Update permissions: Only the claimer (and ticket creator) can send messages
+                    const { PermissionFlagsBits } = require('discord.js');
+
+                    // Remove send permission from all admin roles
+                    for (const roleId of config.ADMIN_ROLE_IDS) {
+                        await message.channel.permissionOverwrites.edit(roleId, {
+                            SendMessages: false
+                        });
+                    }
+
+                    // Give send permission to the claimer
+                    await message.channel.permissionOverwrites.edit(message.author.id, {
+                        ViewChannel: true,
+                        SendMessages: true,
+                        ReadMessageHistory: true
+                    });
+
+                    console.log(`[AutoClaim] Set exclusive send permissions for ${message.author.tag}`);
+
                     // Send a subtle claim notification
                     const { EmbedBuilder } = require('discord.js');
                     const claimEmbed = new EmbedBuilder()
                         .setColor('Green')
-                        .setDescription(`🎫 Ticket automatically claimed by ${message.author}`)
+                        .setDescription(
+                            `🎫 Ticket automatically claimed by ${message.author}\n\n` +
+                            `**⚠️ Only ${message.author} can respond in this ticket.**\n` +
+                            `Other admins cannot send messages until they claim the ticket.`
+                        )
                         .setTimestamp();
 
                     await message.channel.send({ embeds: [claimEmbed] });
                 } catch (error) {
-                    console.error('[AutoClaim] Failed to update channel name:', error);
+                    console.error('[AutoClaim] Failed to update channel name or permissions:', error);
                 }
             }
         }
