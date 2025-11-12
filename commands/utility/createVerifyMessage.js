@@ -233,30 +233,34 @@ async function handleVerifySubmit (interaction) {
         statsEmbed.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
         statsEmbed.setTimestamp();
 
-        // Send the result embed (with admin ping if requirements not met)
-        let replyContent = null;
-        let replyComponents = [];
+        // If requirements not met, send admin ping BEFORE the embed (pings don't work in editReply)
+        if (!meetsRequirements) {
+            const adminsToPing = config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS;
+            const adminMentions = adminsToPing.map(roleId => `<@&${roleId}>`).join(' ');
+
+            // Send ping message first (this will actually ping)
+            await interaction.channel.send({
+                content: `${adminMentions} - User needs assistance with requirements`,
+                allowedMentions: { roles: adminsToPing }
+            });
+        }
+
+        // Send the result embed with Force Verify button if needed
+        const replyOptions = {
+            embeds: [statsEmbed]
+        };
 
         if (!meetsRequirements) {
-            // Add admin ping and Force Verify button for users who don't meet requirements
-            const adminsToPing = config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS;
-            replyContent = adminsToPing.map(roleId => `<@&${roleId}>`).join(' ') + ' - User needs assistance with requirements';
-
             const forceVerifyButton = new ButtonBuilder()
                 .setCustomId(`force_verify_${interaction.user.id}_${actualRsn}`)
                 .setLabel('Force Verify (Admin Only)')
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🔓');
 
-            replyComponents = [new ActionRowBuilder().addComponents(forceVerifyButton)];
+            replyOptions.components = [new ActionRowBuilder().addComponents(forceVerifyButton)];
         }
 
-        await interaction.editReply({
-            content: replyContent,
-            embeds: [statsEmbed],
-            components: replyComponents,
-            allowedMentions: { roles: config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS }
-        });
+        await interaction.editReply(replyOptions);
 
         // Update ticket name if in a ticket channel (change unverified -> verified emoji)
         const ticketManager = require('../../utils/ticketManager');
