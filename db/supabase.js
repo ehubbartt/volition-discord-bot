@@ -181,7 +181,8 @@ async function getLeaderboard(limit = 10) {
 async function getRandomTask() {
   const { data: tasks, error } = await supabase
     .from('tasks')
-    .select('*');
+    .select('*')
+    .eq('completed', false);
 
   if (error) throw error;
   if (!tasks || tasks.length === 0) return null;
@@ -190,17 +191,15 @@ async function getRandomTask() {
 }
 
 async function moveTaskToCompleted(taskId, taskText) {
-  const { error: insertError } = await supabase
-    .from('completed_tasks')
-    .insert({ task: taskText });
-
-  if (insertError) throw insertError;
-  const { error: deleteError } = await supabase
+  const { error } = await supabase
     .from('tasks')
-    .delete()
+    .update({
+      completed: true,
+      completed_at: new Date().toISOString()
+    })
     .eq('id', taskId);
 
-  if (deleteError) throw deleteError;
+  if (error) throw error;
 }
 
 async function getWeeklyTaskAndMove() {
@@ -214,7 +213,8 @@ async function getWeeklyTaskAndMove() {
 async function getRandomWordle() {
   const { data: wordles, error } = await supabase
     .from('wordles')
-    .select('*');
+    .select('*')
+    .eq('completed', false);
 
   if (error) throw error;
   if (!wordles || wordles.length === 0) return null;
@@ -224,17 +224,15 @@ async function getRandomWordle() {
 }
 
 async function moveWordleToCompleted(wordleId, wordleUrl) {
-  const { error: insertError } = await supabase
-    .from('completed_wordles')
-    .insert({ wordle_url: wordleUrl });
-
-  if (insertError) throw insertError;
-  const { error: deleteError } = await supabase
+  const { error } = await supabase
     .from('wordles')
-    .delete()
+    .update({
+      completed: true,
+      completed_at: new Date().toISOString()
+    })
     .eq('id', wordleId);
 
-  if (deleteError) throw deleteError;
+  if (error) throw error;
 }
 
 async function getDailyWordleAndMove() {
