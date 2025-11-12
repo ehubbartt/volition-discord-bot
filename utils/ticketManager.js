@@ -19,6 +19,7 @@ function getTicketState(channelId) {
             claimedBy: null,
             claimedByTag: null,
             claimedAt: null,
+            claimHistory: [], // Array of {adminId, adminTag, claimedAt}
             createdBy: null,
             createdByTag: null,
             softClosing: false,
@@ -51,10 +52,21 @@ function setTicketCreator(channelId, userId, userTag) {
  */
 function claimTicket(channelId, adminId, adminTag) {
     const state = getTicketState(channelId);
+    const now = new Date().toISOString();
+
+    // Add to claim history
+    state.claimHistory.push({
+        adminId: adminId,
+        adminTag: adminTag,
+        claimedAt: now
+    });
+
+    // Set current claimer
     state.claimed = true;
     state.claimedBy = adminId;
     state.claimedByTag = adminTag;
-    state.claimedAt = new Date().toISOString();
+    state.claimedAt = now;
+
     return state;
 }
 

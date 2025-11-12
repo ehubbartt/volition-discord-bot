@@ -5,7 +5,7 @@ const ticketManager = require('../utils/ticketManager');
 module.exports = {
     name: Events.MessageCreate,
 
-    async execute(message) {
+    async execute (message) {
         // Ignore bot messages
         if (message.author.bot) return;
 
@@ -67,11 +67,7 @@ module.exports = {
                     const { EmbedBuilder } = require('discord.js');
                     const claimEmbed = new EmbedBuilder()
                         .setColor('Green')
-                        .setDescription(
-                            `🎫 Ticket automatically claimed by ${message.author}\n\n` +
-                            `**⚠️ Only ${message.author} can respond in this ticket.**\n` +
-                            `Other admins cannot send messages until they claim the ticket.`
-                        )
+                        .setDescription(`🎫 Ticket claimed by ${message.author}`)
                         .setTimestamp();
 
                     await message.channel.send({ embeds: [claimEmbed] });

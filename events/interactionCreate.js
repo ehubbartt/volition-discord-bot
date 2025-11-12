@@ -528,16 +528,17 @@ module.exports = {
               }
             }
 
-            // Send success message
+            // Send success message (NO intro button for guests)
             const successEmbed = new EmbedBuilder()
               .setColor('Green')
-              .setTitle('✅ User Force Verified (Guest)')
+              .setTitle('✅ Guest Force Verified')
               .setDescription(
-                `${member} has been manually verified by ${interaction.user}.\n\n` +
+                `${member} has been manually verified as a **guest** by ${interaction.user}.\n\n` +
                 `**Roles Updated:**\n` +
                 `• Removed: Unverified\n` +
                 `• Added: Verified\n\n` +
-                `Welcome to Volition! 🎉`
+                `Welcome to Volition! 🎉\n\n` +
+                `**Note:** As a guest, no introduction is required.`
               )
               .setTimestamp();
 
@@ -548,7 +549,7 @@ module.exports = {
             // Disable the button
             await interaction.message.edit({ components: [] });
 
-            console.log(`[ForceVerify] ${interaction.user.tag} force verified guest ${member.user.tag}`);
+            console.log(`[ForceVerify] ${interaction.user.tag} force verified guest ${member.user.tag} (no intro required)`);
 
           } else {
             // Force verify regular user (format: force_verify_userId_rsn)
@@ -612,7 +613,7 @@ module.exports = {
               `## You've been verified! ${vpEmoji}\n\n` +
               `We ask you kindly that __your discord name on this server matches your in game name__.\n\n` +
               `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
-              `* Head over to <#1350979144950743161> & fill out the pinned information.\n\n` +
+              `* Use the button below to send an introductory message in <#1350979144950743161>.\n\n` +
               `Once this is done we will help you join the clan in game.`;
 
             const introButton = new ButtonBuilder()

@@ -8,9 +8,13 @@ module.exports = {
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('The user to force verify')
-                .setRequired(true)),
+                .setRequired(true))
+        .addBooleanOption(option =>
+            option.setName('guest')
+                .setDescription('Is this user a guest? (guests do not get intro message)')
+                .setRequired(false)),
 
-    async execute(interaction) {
+    async execute (interaction) {
         // Check if user is admin
         const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
             interaction.member.roles.cache.has(roleId)
@@ -24,6 +28,7 @@ module.exports = {
         }
 
         const targetUser = interaction.options.getUser('user');
+        const isGuest = interaction.options.getBoolean('guest') || false;
         const member = await interaction.guild.members.fetch(targetUser.id);
 
         await interaction.deferReply({ ephemeral: true });
@@ -41,16 +46,7 @@ module.exports = {
                 console.log(`[ForceVerify] Added verified role to ${targetUser.tag}`);
             }
 
-            // Send confirmation to admin
-            await interaction.editReply({
-                content: `✅ Force verified ${targetUser} (${targetUser.tag})\n\n` +
-                    `Roles updated:\n` +
-                    `• Removed: Unverified\n` +
-                    `• Added: Verified\n\n` +
-                    `**Note:** This user will need to complete their introduction manually if in a join ticket.`
-            });
-
-            // Send intro button to the channel they're in (if it's a ticket channel)
+            // Update ticket name if in a ticket channel
             const ticketCategories = [
                 config.TICKET_JOIN_CATEGORY_ID,
                 config.TICKET_GENERAL_CATEGORY_ID,
@@ -58,7 +54,6 @@ module.exports = {
             ];
 
             if (ticketCategories.includes(interaction.channel.parentId)) {
-                // Update ticket name if in a ticket channel (change unverified -> verified emoji)
                 const ticketManager = require('../../utils/ticketManager');
                 ticketManager.markVerified(interaction.channel.id);
 
@@ -69,8 +64,29 @@ module.exports = {
                 } catch (error) {
                     console.error('[ForceVerify] Failed to update channel name:', error);
                 }
+            }
 
-                // Send the intro button and welcome message
+            // Send confirmation to admin
+            if (isGuest) {
+                await interaction.editReply({
+                    content: `✅ Force verified ${targetUser} as a **guest** (${targetUser.tag})\n\n` +
+                        `Roles updated:\n` +
+                        `• Removed: Unverified\n` +
+                        `• Added: Verified\n\n` +
+                        `**Note:** No introduction required for guests.`
+                });
+            } else {
+                await interaction.editReply({
+                    content: `✅ Force verified ${targetUser} (${targetUser.tag})\n\n` +
+                        `Roles updated:\n` +
+                        `• Removed: Unverified\n` +
+                        `• Added: Verified\n\n` +
+                        `**Note:** Introduction message sent in ticket channel.`
+                });
+            }
+
+            // Send intro button ONLY if NOT a guest and in a ticket channel
+            if (!isGuest && ticketCategories.includes(interaction.channel.parentId)) {
                 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
                 const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;
 
@@ -78,7 +94,7 @@ module.exports = {
                     `## You've been verified! ${vpEmoji}\n\n` +
                     `We ask you kindly that __your discord name on this server matches your in game name__.\n\n` +
                     `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
-                    `* Head over to <#1350979144950743161> & fill out the pinned information.\n\n` +
+                    `* Use the button below to send an introductory message in <#1350979144950743161>.\n\n` +
                     `Once this is done we will help you join the clan in game.`;
 
                 const introButton = new ButtonBuilder()
@@ -93,9 +109,14 @@ module.exports = {
                     content: `${targetUser} ${welcomeMessage}`,
                     components: [row]
                 });
+            } else if (isGuest && ticketCategories.includes(interaction.channel.parentId)) {
+                // Send simple welcome for guest
+                await interaction.channel.send({
+                    content: `${targetUser} Welcome to Volition! 🎉 You've been verified as a guest. No introduction needed - enjoy your stay!`
+                });
             }
 
-            console.log(`[ForceVerify] ${interaction.user.tag} force verified ${targetUser.tag}`);
+            console.log(`[ForceVerify] ${interaction.user.tag} force verified ${targetUser.tag}${isGuest ? ' (guest)' : ''}`);
 
         } catch (error) {
             console.error('[ForceVerify] Error during force verify:', error);

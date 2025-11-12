@@ -5,7 +5,7 @@ const ticketManager = require('./ticketManager');
 /**
  * Handle ticket claim button
  */
-async function handleTicketClaim(interaction) {
+async function handleTicketClaim (interaction) {
     // Check if user is admin
     const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
         interaction.member.roles.cache.has(roleId)
@@ -21,17 +21,18 @@ async function handleTicketClaim(interaction) {
     const channelId = interaction.channel.id;
     const state = ticketManager.getTicketState(channelId);
 
-    if (state.claimed) {
+    // Get previous claimer if exists
+    const previousClaimer = state.claimedBy;
+
+    // Check if same person is trying to claim again
+    if (state.claimed && previousClaimer === interaction.user.id) {
         return interaction.reply({
-            content: `⚠️ This ticket has already been claimed by <@${state.claimedBy}>.`,
+            content: `⚠️ You have already claimed this ticket.`,
             ephemeral: true
         });
     }
 
-    // Get previous claimer if exists
-    const previousClaimer = state.claimedBy;
-
-    // Claim the ticket
+    // Claim the ticket (or re-claim from another admin)
     ticketManager.claimTicket(channelId, interaction.user.id, interaction.user.tag);
 
     // Update channel name - replace unclaimed emoji with claimed emoji
@@ -81,24 +82,30 @@ async function handleTicketClaim(interaction) {
     // Send claim message
     const claimEmbed = new EmbedBuilder()
         .setColor('Green')
-        .setDescription(
-            `🎫 Ticket claimed by ${interaction.user}\n\n` +
-            `**⚠️ Only ${interaction.user} can respond in this ticket.**\n` +
-            `Other admins cannot send messages until they claim the ticket.`
-        )
         .setTimestamp();
+
+    if (previousClaimer && previousClaimer !== interaction.user.id) {
+        // Re-claim from another admin
+        claimEmbed.setDescription(
+            `🎫 Ticket re-claimed by ${interaction.user}\n` +
+            `(Previously claimed by <@${previousClaimer}>)`);
+    } else {
+        // First claim
+        claimEmbed.setDescription(
+            `🎫 Ticket claimed by ${interaction.user}`);
+    }
 
     await interaction.reply({
         embeds: [claimEmbed]
     });
 
-    console.log(`[TicketClaim] ${interaction.user.tag} claimed ticket ${channel.name}`);
+    console.log(`[TicketClaim] ${interaction.user.tag} ${previousClaimer ? 're-' : ''}claimed ticket ${channel.name}${previousClaimer ? ` from ${state.claimHistory[state.claimHistory.length - 2]?.adminTag}` : ''}`);
 }
 
 /**
  * Handle ticket close button - shows modal for summary
  */
-async function handleTicketClose(interaction) {
+async function handleTicketClose (interaction) {
     // Check if user is admin
     const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
         interaction.member.roles.cache.has(roleId)
@@ -133,7 +140,7 @@ async function handleTicketClose(interaction) {
 /**
  * Handle ticket close modal submission
  */
-async function handleTicketCloseSubmit(interaction) {
+async function handleTicketCloseSubmit (interaction) {
     // Check if user is admin (double-check permissions)
     const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
         interaction.member.roles.cache.has(roleId)
@@ -371,7 +378,7 @@ async function handleTicketCloseSubmit(interaction) {
 /**
  * Handle ticket soft close button - shows modal for summary
  */
-async function handleTicketSoftClose(interaction) {
+async function handleTicketSoftClose (interaction) {
     // Check if user is admin
     const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
         interaction.member.roles.cache.has(roleId)
@@ -406,7 +413,7 @@ async function handleTicketSoftClose(interaction) {
 /**
  * Handle ticket soft close modal submission
  */
-async function handleTicketSoftCloseSubmit(interaction) {
+async function handleTicketSoftCloseSubmit (interaction) {
     const summary = interaction.fields.getTextInputValue('soft_close_summary');
     const channel = interaction.channel;
 
@@ -471,7 +478,7 @@ async function handleTicketSoftCloseSubmit(interaction) {
 /**
  * Create transcript and close channel (helper function)
  */
-async function createTranscriptAndClose(channel, guild, closedBy, summary, state) {
+async function createTranscriptAndClose (channel, guild, closedBy, summary, state) {
     try {
         // Determine archive channel based on ticket category
         const ticketCategories = {

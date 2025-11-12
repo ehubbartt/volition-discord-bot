@@ -293,7 +293,7 @@ async function handleVerifySubmit (interaction) {
                 `## You meet the requirements! ${vpEmoji}\n\n` +
                 `We ask you kindly that __your discord name on this server matches your in game name__, the clan bot will have already adjusted this for you.\n\n` +
                 `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
-                `* Head over to <#1350979144950743161> & fill out the pinned information.\n\n` +
+                `* Use the button below to send an introductory message in <#1350979144950743161>.\n\n` +
                 `Once this is done we will help you join the clan in game.`;
 
             // Check if intro modal is enabled
