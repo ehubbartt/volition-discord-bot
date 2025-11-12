@@ -55,11 +55,10 @@ async function handleTicketClaim (interaction) {
     });
 
     // Update channel name - replace unclaimed emoji with claimed emoji
-    // Also replace verified emoji (green circle) with claimed emoji, but NOT unverified (red circle)
+    // Keep verification status emoji (red/green circle) unchanged
     const channel = interaction.channel;
     let newName = channel.name
-        .replace(config.UNCLAIMED_EMOJI, config.CLAIMED_EMOJI)
-        .replace(config.VERIFIED_EMOJI, config.CLAIMED_EMOJI);
+        .replace(config.UNCLAIMED_EMOJI, config.CLAIMED_EMOJI);
 
     try {
         await channel.setName(newName);

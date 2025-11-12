@@ -34,10 +34,9 @@ module.exports = {
                 ticketManager.claimTicket(message.channel.id, message.author.id, message.author.tag);
 
                 // Update channel name - replace unclaimed emoji with claimed emoji
-                // Also replace verified emoji (green circle) with claimed emoji, but NOT unverified (red circle)
+                // Keep verification status emoji (red/green circle) unchanged
                 let newName = message.channel.name
-                    .replace(config.UNCLAIMED_EMOJI, config.CLAIMED_EMOJI)
-                    .replace(config.VERIFIED_EMOJI, config.CLAIMED_EMOJI);
+                    .replace(config.UNCLAIMED_EMOJI, config.CLAIMED_EMOJI);
 
                 try {
                     await message.channel.setName(newName);
