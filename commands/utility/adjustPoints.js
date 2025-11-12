@@ -68,7 +68,7 @@ module.exports = {
                 }
 
                 // Adjust points
-                const existingPoints = player.player_points?.points || 0;
+                const existingPoints = player.points || 0;
                 const newTotalPoints = existingPoints + pointsToAdd;
 
                 await db.addPoints(player.rsn, pointsToAdd);

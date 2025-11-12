@@ -64,7 +64,7 @@ module.exports = {
             }
 
             // Get points
-            const points = player.player_points?.points || 0;
+            const points = player.points || 0;
             const rsn = player.rsn;
 
             const embed = new EmbedBuilder()

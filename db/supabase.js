@@ -13,13 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function getPlayerByRSN(rsn) {
   const { data, error } = await supabase
     .from('players')
-    .select(`
-      *,
-      player_points (
-        points,
-        last_loot_date
-      )
-    `)
+    .select('*')
     .ilike('rsn', rsn)
     .single();
 
@@ -34,13 +28,7 @@ async function getPlayerByRSN(rsn) {
 async function getPlayerByDiscordId(discordId) {
   const { data, error } = await supabase
     .from('players')
-    .select(`
-      *,
-      player_points (
-        points,
-        last_loot_date
-      )
-    `)
+    .select('*')
     .eq('discord_id', discordId)
     .single();
 
@@ -53,15 +41,9 @@ async function getPlayerByDiscordId(discordId) {
 }
 
 async function getPlayerByWomId(womId) {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('players')
-    .select(`
-      *,
-      player_points (
-        points,
-        last_loot_date
-      )
-    `)
+    .select('*')
     .eq('wom_id', womId)
     .single();
 
@@ -76,13 +58,7 @@ async function getPlayerByWomId(womId) {
 async function getAllPlayers() {
   const { data, error } = await supabase
     .from('players')
-    .select(`
-      *,
-      player_points (
-        points,
-        last_loot_date
-      )
-    `);
+    .select('*');
 
   if (error) throw error;
   return data || [];
@@ -96,26 +72,15 @@ async function createPlayer(playerData, initialPoints = 0) {
       discord_id: playerData.discord_id || null,
       wom_id: playerData.wom_id || null,
       clan_joined_at: playerData.clan_joined_at || null,
+      points: initialPoints,
+      last_loot_date: null,
     })
     .select()
     .single();
 
   if (playerError) throw playerError;
-  const { data: points, error: pointsError } = await supabase
-    .from('player_points')
-    .insert({
-      player_id: player.id,
-      points: initialPoints,
-    })
-    .select()
-    .single();
 
-  if (pointsError) throw pointsError;
-
-  return {
-    ...player,
-    player_points: points,
-  };
+  return player;
 }
 
 async function updatePlayer(playerId, updates) {
@@ -144,8 +109,8 @@ async function deletePlayer(playerId) {
 
 async function getPoints(rsn) {
   const player = await getPlayerByRSN(rsn);
-  if (!player || !player.player_points) return 0;
-  return player.player_points.points || 0;
+  if (!player) return 0;
+  return player.points || 0;
 }
 
 async function addPoints(rsn, amount) {
@@ -154,13 +119,13 @@ async function addPoints(rsn, amount) {
     throw new Error(`Player not found: ${rsn}`);
   }
 
-  const currentPoints = player.player_points?.points || 0;
+  const currentPoints = player.points || 0;
   const newPoints = currentPoints + amount;
 
   const { data, error } = await supabase
-    .from('player_points')
+    .from('players')
     .update({ points: newPoints })
-    .eq('player_id', player.id)
+    .eq('id', player.id)
     .select()
     .single();
 
@@ -175,9 +140,9 @@ async function setPoints(rsn, points) {
   }
 
   const { data, error } = await supabase
-    .from('player_points')
+    .from('players')
     .update({ points })
-    .eq('player_id', player.id)
+    .eq('id', player.id)
     .select()
     .single();
 
@@ -192,32 +157,25 @@ async function updateLastLootDate(rsn, date) {
   }
 
   const { error } = await supabase
-    .from('player_points')
+    .from('players')
     .update({ last_loot_date: date })
-    .eq('player_id', player.id);
+    .eq('id', player.id);
 
   if (error) throw error;
 }
 
 async function getLeaderboard(limit = 10) {
   const { data, error } = await supabase
-    .from('player_points')
-    .select(`
-      points,
-      players:player_id (
-        rsn
-      )
-    `)
+    .from('players')
+    .select('rsn, points')
     .order('points', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
-  return (data || [])
-    .filter(row => row.players)
-    .map(row => ({
-      rsn: row.players.rsn,
-      points: row.points || 0,
-    }));
+  return (data || []).map(row => ({
+    rsn: row.rsn,
+    points: row.points || 0,
+  }));
 }
 
 async function getRandomTask() {

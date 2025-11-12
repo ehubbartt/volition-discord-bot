@@ -310,8 +310,8 @@ module.exports = {
         }
 
         const rsn = player.rsn;
-        const currentPoints = player.player_points?.points || 0;
-        const lastLootDate = player.player_points?.last_loot_date;
+        const currentPoints = player.points || 0;
+        const lastLootDate = player.last_loot_date;
 
         if (free) {
           if (lastLootDate === today) {

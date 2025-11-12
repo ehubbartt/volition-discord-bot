@@ -88,8 +88,8 @@ module.exports = {
                 const player = await db.getPlayerByRSN(rsn);
                 let newTotalPoints;
 
-                if (player && player.player_points) {
-                    const existingPoints = player.player_points.points || 0;
+                if (player) {
+                    const existingPoints = player.points || 0;
                     newTotalPoints = existingPoints + points;
                     await db.addPoints(rsn, points);
                 } else {

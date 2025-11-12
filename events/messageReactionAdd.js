@@ -63,7 +63,7 @@ module.exports = {
             }
             console.log(`${user.tag} is allowed to award points.`);
 
-            const existingPoints = player.player_points?.points || 0;
+            const existingPoints = player.points || 0;
             const newTotalPoints = existingPoints + pointsAwarded;
 
             console.log(`Updating points for ${rsn}: ${existingPoints} → ${newTotalPoints}`);
