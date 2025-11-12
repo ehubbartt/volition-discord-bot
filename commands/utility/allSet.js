@@ -30,16 +30,22 @@ module.exports = {
         const lootCrateChannel = config.LOOT_CRATE_INFO_CHANNEL_ID !== 'NEEDS_ID' ? `<#${config.LOOT_CRATE_INFO_CHANNEL_ID}>` : '⁠📦・volition-loot-crate-info';
         const assignRolesChannel = config.ASSIGN_ROLES_CHANNEL_ID !== 'NEEDS_ID' ? `<#${config.ASSIGN_ROLES_CHANNEL_ID}>` : '⁠📧・assign-roles';
 
-        const message =
-            `**You're all set!**\n\n` +
-            `Other areas of interest on this discord server;\n\n` +
-            `${vpChannel} - gain an understanding of our Volition Points system. ${vpEmoji}\n` +
-            `${lootCrateChannel} - Claim your daily Volition loot crate & see how you can win prizes! ${lcEmoji}\n` +
-            `${assignRolesChannel} - customise your pings according to your interests. ${alertEmoji}\n\n` +
-            `Welcome to Volition again and happy scaping! 🥳${hasbgrinEmoji}`;
+        const allSetEmbed = new EmbedBuilder()
+            .setColor('Green')
+            .setTitle('🎉 You\'re All Set!')
+            .setDescription(
+                `Welcome to Volition! Here are some areas of interest on this Discord server:\n\n` +
+                `${vpChannel} - Gain an understanding of our Volition Points system ${vpEmoji}\n` +
+                `${lootCrateChannel} - Claim your daily loot crate & see how you can win prizes! ${lcEmoji}\n` +
+                `${assignRolesChannel} - Customise your pings according to your interests ${alertEmoji}\n\n` +
+                `Welcome to Volition and happy scaping! 🥳${hasbgrinEmoji}`
+            )
+            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setFooter({ text: 'Enjoy your stay with us!' })
+            .setTimestamp();
 
-        // Send the message to the channel
-        await interaction.channel.send({ content: message });
+        // Send the embed to the channel
+        await interaction.channel.send({ embeds: [allSetEmbed] });
 
         // Confirm to admin (ephemeral)
         await interaction.reply({
