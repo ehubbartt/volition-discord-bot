@@ -306,6 +306,36 @@ async function processMemberJoin (rsn, originalMessage) {
         // Check if player exists in database and get their Discord ID
         const existingPlayer = await db.getPlayerByWomId(womId);
         let discordId = existingPlayer?.discord_id || null;
+        let autoLinked = false;
+
+        // If no Discord ID, try to auto-link by searching for member with matching nickname
+        if (!discordId) {
+            console.log(`[JOIN] No Discord ID found - attempting auto-link by nickname...`);
+            try {
+                // Search all guild members for one with matching display name or username
+                const allMembers = await originalMessage.guild.members.fetch();
+                const matchingMember = allMembers.find(m => {
+                    const displayName = m.displayName?.toLowerCase();
+                    const username = m.user.username?.toLowerCase();
+                    const globalName = m.user.globalName?.toLowerCase();
+                    const rsnLower = rsn.toLowerCase();
+
+                    return displayName === rsnLower ||
+                           username === rsnLower ||
+                           globalName === rsnLower;
+                });
+
+                if (matchingMember) {
+                    discordId = matchingMember.id;
+                    autoLinked = true;
+                    console.log(`[JOIN] ✅ Auto-linked Discord user: ${matchingMember.user.tag} (matched by nickname)`);
+                } else {
+                    console.log(`[JOIN] ⚠️ Could not find Discord member with nickname matching "${rsn}"`);
+                }
+            } catch (error) {
+                console.error(`[JOIN] ⚠️ Error during auto-link search:`, error.message);
+            }
+        }
 
         // Try to find Discord member if we have their ID
         let member = null;
@@ -382,18 +412,18 @@ async function processMemberJoin (rsn, originalMessage) {
             await db.updatePlayer(existingPlayer.id, {
                 rsn: rsn,
                 wom_id: womId,
-                discord_id: discordId, // Preserve existing discord_id
+                discord_id: discordId, // Update with auto-linked ID if found
                 clan_joined_at: clanJoinedAt
             });
-            console.log(`[JOIN] ✅ Updated existing player in database`);
+            console.log(`[JOIN] ✅ Updated existing player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
         } else {
             await db.createPlayer({
                 rsn: rsn,
                 wom_id: womId,
-                discord_id: null,
+                discord_id: discordId, // Use auto-linked ID if found, otherwise null
                 clan_joined_at: clanJoinedAt
             }, 0);
-            console.log(`[JOIN] ✅ Created new player in database`);
+            console.log(`[JOIN] ✅ Created new player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
         }
 
         // Send custom notification with full stats
@@ -403,8 +433,10 @@ async function processMemberJoin (rsn, originalMessage) {
         const confirmDetails = `**Player:** ${rsn}\n` +
             `**Total Level:** ${totalLevel}\n` +
             `**EHB:** ${ehb} | **EHP:** ${ehp}\n` +
-            `**Rank:** ${rank}\n` +
+            `**Rank:** ${formatRankWithEmoji(rank, originalMessage.guild)}\n` +
             `**Discord:** ${discordId ? `<@${discordId}>` : 'Not linked'}\n` +
+            (autoLinked ? `**Auto-Linked:** ✅ Matched by nickname\n` : '') +
+            `**Discord Roles:** ${rankAssigned ? '✅ Assigned' : (discordId ? '⚠️ Not assigned (check permissions)' : 'N/A (not linked)')}\n` +
             `**Database:** ✅ Synced`;
         await sendSyncConfirmation(originalMessage, 'Member Join Auto-Synced', confirmDetails);
 
