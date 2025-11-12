@@ -347,23 +347,35 @@ async function handleVerifySubmit (interaction) {
 }
 
 async function handleGuestJoinButton (interaction) {
-    const modal = new ModalBuilder()
-        .setCustomId('guest_join_modal')
-        .setTitle('Join as Guest');
+    // Ask if they know someone in the clan
+    const knowSomeoneEmbed = new EmbedBuilder()
+        .setColor('Blue')
+        .setTitle('👋 Join as Guest')
+        .setDescription(
+            'Do you know someone in the Volition clan?\n\n' +
+            '• **Yes** - You can provide their RSN to verify\n' +
+            '• **No** - An admin will review your request'
+        );
 
-    const rsnInput = new TextInputBuilder()
-        .setCustomId('friend_rsn_input')
-        .setLabel("Enter your friend/main's RSN:")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Enter the RSN of a clan member')
-        .setRequired(true)
-        .setMinLength(1)
-        .setMaxLength(12);
+    const yesButton = new ButtonBuilder()
+        .setCustomId('guest_knows_someone')
+        .setLabel('Yes, I know someone')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅');
 
-    const firstRow = new ActionRowBuilder().addComponents(rsnInput);
-    modal.addComponents(firstRow);
+    const noButton = new ButtonBuilder()
+        .setCustomId('guest_knows_nobody')
+        .setLabel('No, I don\'t know anyone')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('❌');
 
-    await interaction.showModal(modal);
+    const row = new ActionRowBuilder().addComponents(yesButton, noButton);
+
+    await interaction.reply({
+        embeds: [knowSomeoneEmbed],
+        components: [row],
+        ephemeral: true
+    });
 }
 
 async function handleGuestJoinSubmit (interaction) {
@@ -699,9 +711,106 @@ async function handleIntroSubmit (interaction) {
     }
 }
 
+async function handleGuestKnowsSomeone (interaction) {
+    // User knows someone - show modal to enter their RSN
+    const modal = new ModalBuilder()
+        .setCustomId('guest_join_modal')
+        .setTitle('Join as Guest');
+
+    const rsnInput = new TextInputBuilder()
+        .setCustomId('friend_rsn_input')
+        .setLabel("Enter your friend/main's RSN:")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Enter the RSN of a clan member')
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(12);
+
+    const firstRow = new ActionRowBuilder().addComponents(rsnInput);
+    modal.addComponents(firstRow);
+
+    await interaction.showModal(modal);
+}
+
+async function handleGuestKnowsNobody (interaction) {
+    // User doesn't know anyone - ping admins for review
+    const guestUser = interaction.user;
+
+    await interaction.reply({
+        content: '📝 Submitting your guest request to admins...',
+        ephemeral: true
+    });
+
+    try {
+        const adminMentions = config.ADMIN_ROLE_IDS.map(roleId => `<@&${roleId}>`).join(' ');
+
+        const reviewEmbed = new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle('🔍 Guest Request - Manual Review Needed')
+            .setDescription(
+                `${guestUser} wants to join as a guest but doesn't know anyone in the clan.\n\n` +
+                `**Action Required:**\n` +
+                `An admin should review this request and use the Force Verify button below if approved.`
+            )
+            .addFields(
+                { name: 'Guest User', value: `${guestUser} (${guestUser.tag})`, inline: false },
+                { name: 'Status', value: 'Awaiting admin approval', inline: false }
+            )
+            .setTimestamp();
+
+        // Add Force Verify button for guest (admin only)
+        const forceVerifyGuestButton = new ButtonBuilder()
+            .setCustomId(`force_verify_guest_${guestUser.id}`)
+            .setLabel('Force Verify Guest (Admin Only)')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅');
+
+        const buttonRow = new ActionRowBuilder().addComponents(forceVerifyGuestButton);
+
+        // Check if in a ticket channel
+        const ticketCategories = [
+            config.TICKET_JOIN_CATEGORY_ID,
+            config.TICKET_GENERAL_CATEGORY_ID,
+            config.TICKET_SHOP_CATEGORY_ID
+        ];
+
+        if (ticketCategories.includes(interaction.channel.parentId)) {
+            // In ticket - send to ticket channel
+            await interaction.channel.send({
+                content: `${adminMentions} - Guest verification needed`,
+                embeds: [reviewEmbed],
+                components: [buttonRow],
+                allowedMentions: { roles: config.ADMIN_ROLE_IDS }
+            });
+        } else {
+            // Not in ticket - send to general channel or reply
+            await interaction.followUp({
+                content: `${adminMentions} - Guest verification needed`,
+                embeds: [reviewEmbed],
+                components: [buttonRow],
+                allowedMentions: { roles: config.ADMIN_ROLE_IDS }
+            });
+        }
+
+        await interaction.editReply({
+            content: '✅ Your guest request has been submitted! An admin will review it shortly.'
+        });
+
+        console.log(`[GuestJoin] ${guestUser.tag} requested guest access (knows nobody)`);
+
+    } catch (error) {
+        console.error('[GuestJoin] Error submitting guest request:', error);
+        await interaction.editReply({
+            content: `❌ Failed to submit guest request. Please contact an admin directly.\n\nError: ${error.message}`
+        });
+    }
+}
+
 module.exports.handleVerifyButton = handleVerifyButton;
 module.exports.handleVerifySubmit = handleVerifySubmit;
 module.exports.handleGuestJoinButton = handleGuestJoinButton;
 module.exports.handleGuestJoinSubmit = handleGuestJoinSubmit;
+module.exports.handleGuestKnowsSomeone = handleGuestKnowsSomeone;
+module.exports.handleGuestKnowsNobody = handleGuestKnowsNobody;
 module.exports.handleIntroButton = handleIntroButton;
 module.exports.handleIntroSubmit = handleIntroSubmit;

@@ -451,6 +451,22 @@ module.exports = {
         }
       }
 
+      if (interaction.customId === 'guest_knows_someone') {
+        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
+        if (createVerifyCommand?.handleGuestKnowsSomeone) {
+          try { await createVerifyCommand.handleGuestKnowsSomeone(interaction); }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
+      if (interaction.customId === 'guest_knows_nobody') {
+        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
+        if (createVerifyCommand?.handleGuestKnowsNobody) {
+          try { await createVerifyCommand.handleGuestKnowsNobody(interaction); }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
       if (interaction.customId === 'intro_start') {
         const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
         if (createVerifyCommand?.handleIntroButton) {

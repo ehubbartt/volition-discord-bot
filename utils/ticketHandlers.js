@@ -35,51 +35,7 @@ async function handleTicketClaim (interaction) {
     // Claim the ticket (or re-claim from another admin)
     ticketManager.claimTicket(channelId, interaction.user.id, interaction.user.tag);
 
-    // Update channel name - replace unclaimed emoji with claimed emoji
-    // Also replace verified emoji (green circle) with claimed emoji, but NOT unverified (red circle)
-    const channel = interaction.channel;
-    let newName = channel.name
-        .replace(config.UNCLAIMED_EMOJI, config.CLAIMED_EMOJI)
-        .replace(config.VERIFIED_EMOJI, config.CLAIMED_EMOJI);
-
-    try {
-        await channel.setName(newName);
-        console.log(`[TicketClaim] Updated channel name to: ${newName}`);
-    } catch (error) {
-        console.error('[TicketClaim] Failed to update channel name:', error);
-    }
-
-    // Update permissions: Only the claimer (and ticket creator) can send messages
-    const { PermissionFlagsBits } = require('discord.js');
-    try {
-        // Remove send permission from previous claimer if exists
-        if (previousClaimer && previousClaimer !== interaction.user.id) {
-            await channel.permissionOverwrites.edit(previousClaimer, {
-                SendMessages: false
-            });
-            console.log(`[TicketClaim] Removed send permissions from previous claimer`);
-        }
-
-        // Remove send permission from all admin roles
-        for (const roleId of config.ADMIN_ROLE_IDS) {
-            await channel.permissionOverwrites.edit(roleId, {
-                SendMessages: false
-            });
-        }
-
-        // Give send permission to new claimer
-        await channel.permissionOverwrites.edit(interaction.user.id, {
-            ViewChannel: true,
-            SendMessages: true,
-            ReadMessageHistory: true
-        });
-
-        console.log(`[TicketClaim] Set exclusive send permissions for ${interaction.user.tag}`);
-    } catch (error) {
-        console.error('[TicketClaim] Failed to update permissions:', error);
-    }
-
-    // Send claim message
+    // Send claim message FIRST before modifying permissions
     const claimEmbed = new EmbedBuilder()
         .setColor('Green')
         .setTimestamp();
@@ -98,6 +54,49 @@ async function handleTicketClaim (interaction) {
     await interaction.reply({
         embeds: [claimEmbed]
     });
+
+    // Update channel name - replace unclaimed emoji with claimed emoji
+    // Also replace verified emoji (green circle) with claimed emoji, but NOT unverified (red circle)
+    const channel = interaction.channel;
+    let newName = channel.name
+        .replace(config.UNCLAIMED_EMOJI, config.CLAIMED_EMOJI)
+        .replace(config.VERIFIED_EMOJI, config.CLAIMED_EMOJI);
+
+    try {
+        await channel.setName(newName);
+        console.log(`[TicketClaim] Updated channel name to: ${newName}`);
+    } catch (error) {
+        console.error('[TicketClaim] Failed to update channel name:', error);
+    }
+
+    // Update permissions: Only the claimer (and ticket creator) can send messages
+    try {
+        // First, give send permission to new claimer
+        await channel.permissionOverwrites.edit(interaction.user.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+        });
+
+        // Then remove send permission from all admin roles
+        for (const roleId of config.ADMIN_ROLE_IDS) {
+            await channel.permissionOverwrites.edit(roleId, {
+                SendMessages: false
+            });
+        }
+
+        // Remove send permission from previous claimer if exists
+        if (previousClaimer && previousClaimer !== interaction.user.id) {
+            await channel.permissionOverwrites.edit(previousClaimer, {
+                SendMessages: false
+            });
+            console.log(`[TicketClaim] Removed send permissions from previous claimer`);
+        }
+
+        console.log(`[TicketClaim] Set exclusive send permissions for ${interaction.user.tag}`);
+    } catch (error) {
+        console.error('[TicketClaim] Failed to update permissions:', error);
+    }
 
     console.log(`[TicketClaim] ${interaction.user.tag} ${previousClaimer ? 're-' : ''}claimed ticket ${channel.name}${previousClaimer ? ` from ${state.claimHistory[state.claimHistory.length - 2]?.adminTag}` : ''}`);
 }
