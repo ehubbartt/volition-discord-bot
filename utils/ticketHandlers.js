@@ -71,17 +71,23 @@ async function handleTicketClaim (interaction) {
 
     // Update permissions: Only the claimer (and ticket creator) can send messages
     try {
-        // Step 1: Remove send permission from previous claimer FIRST (if exists)
-        if (previousClaimer && previousClaimer !== interaction.user.id) {
-            await channel.permissionOverwrites.edit(previousClaimer, {
-                ViewChannel: true,
-                SendMessages: false,
-                ReadMessageHistory: true
-            });
-            console.log(`[TicketClaim] Removed send permissions from previous claimer`);
-            // Small delay to ensure Discord processes this
-            await new Promise(resolve => setTimeout(resolve, 200));
+        // Step 1: Clear ALL admin user-specific permission overrides (from previous claims)
+        // This prevents accumulation of explicit denials that would block re-claims
+        const existingOverwrites = channel.permissionOverwrites.cache;
+        for (const [id, overwrite] of existingOverwrites) {
+            // Check if this is a user (not a role) and they have admin role
+            if (overwrite.type === 1) { // Type 1 = Member
+                const member = await channel.guild.members.fetch(id).catch(() => null);
+                if (member && config.ADMIN_ROLE_IDS.some(roleId => member.roles.cache.has(roleId))) {
+                    // Don't delete the ticket creator's permissions
+                    if (id !== state.createdBy && id !== interaction.user.id) {
+                        await channel.permissionOverwrites.delete(id);
+                        console.log(`[TicketClaim] Cleared permissions for admin user ${id}`);
+                    }
+                }
+            }
         }
+        await new Promise(resolve => setTimeout(resolve, 200));
 
         // Step 2: Remove send permission from all admin roles
         for (const roleId of config.ADMIN_ROLE_IDS) {
@@ -89,7 +95,6 @@ async function handleTicketClaim (interaction) {
                 SendMessages: false
             });
         }
-        // Small delay to ensure Discord processes role permissions
         await new Promise(resolve => setTimeout(resolve, 200));
 
         // Step 3: Give send permission to new claimer (this overrides role restrictions)
