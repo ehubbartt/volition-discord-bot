@@ -477,14 +477,28 @@ module.exports = {
 
       // Handle verify/guest confirmation buttons
       if (interaction.customId === 'verify_confirm_reuse') {
-        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
-        if (createVerifyCommand?.handleVerifyButton) {
-          try {
-            await interaction.update({ components: [] }); // Remove buttons
-            await createVerifyCommand.handleVerifyButton(interaction, true); // Pass bypass flag
-          }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+        try {
+          // Show the RSN input modal directly (can't update then show modal)
+          const modal = new ModalBuilder()
+            .setCustomId('createverify_modal')
+            .setTitle('Verify Your Account');
+
+          const rsnInput = new TextInputBuilder()
+            .setCustomId('rsn_input')
+            .setLabel('Enter your RSN exactly as it appears in game:')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Enter your exact in-game name')
+            .setRequired(true)
+            .setMinLength(1)
+            .setMaxLength(12);
+
+          const firstRow = new ActionRowBuilder().addComponents(rsnInput);
+          modal.addComponents(firstRow);
+
+          await interaction.showModal(modal);
         }
+        catch (error) { console.error(error); }
       }
 
       if (interaction.customId === 'verify_cancel_reuse') {
@@ -503,14 +517,38 @@ module.exports = {
       }
 
       if (interaction.customId === 'guest_confirm_reuse') {
-        const createVerifyCommand = require('../commands/utility/createVerifyMessage.js');
-        if (createVerifyCommand?.handleGuestJoinButton) {
-          try {
-            await interaction.update({ components: [] }); // Remove buttons
-            await createVerifyCommand.handleGuestJoinButton(interaction, true); // Pass bypass flag
-          }
-          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+        try {
+          // Show guest options directly (can't update then reply)
+          const knowSomeoneEmbed = new EmbedBuilder()
+            .setColor('Blue')
+            .setTitle('👋 Join as Guest')
+            .setDescription(
+              'Do you know someone in the Volition clan?\n\n' +
+              '• **Yes** - You can provide their RSN to verify\n' +
+              '• **No** - An admin will review your request'
+            );
+
+          const yesButton = new ButtonBuilder()
+            .setCustomId('guest_knows_someone')
+            .setLabel('Yes, I know someone')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅');
+
+          const noButton = new ButtonBuilder()
+            .setCustomId('guest_knows_nobody')
+            .setLabel('No, I don\'t know anyone')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('❌');
+
+          const row = new ActionRowBuilder().addComponents(yesButton, noButton);
+
+          await interaction.update({
+            embeds: [knowSomeoneEmbed],
+            components: [row]
+          });
         }
+        catch (error) { console.error(error); }
       }
 
       if (interaction.customId === 'guest_cancel_reuse') {
