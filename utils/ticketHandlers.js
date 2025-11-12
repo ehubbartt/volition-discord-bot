@@ -71,27 +71,33 @@ async function handleTicketClaim (interaction) {
 
     // Update permissions: Only the claimer (and ticket creator) can send messages
     try {
-        // First, give send permission to new claimer
-        await channel.permissionOverwrites.edit(interaction.user.id, {
-            ViewChannel: true,
-            SendMessages: true,
-            ReadMessageHistory: true
-        });
+        // Step 1: Remove send permission from previous claimer FIRST (if exists)
+        if (previousClaimer && previousClaimer !== interaction.user.id) {
+            await channel.permissionOverwrites.edit(previousClaimer, {
+                ViewChannel: true,
+                SendMessages: false,
+                ReadMessageHistory: true
+            });
+            console.log(`[TicketClaim] Removed send permissions from previous claimer`);
+            // Small delay to ensure Discord processes this
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
 
-        // Then remove send permission from all admin roles
+        // Step 2: Remove send permission from all admin roles
         for (const roleId of config.ADMIN_ROLE_IDS) {
             await channel.permissionOverwrites.edit(roleId, {
                 SendMessages: false
             });
         }
+        // Small delay to ensure Discord processes role permissions
+        await new Promise(resolve => setTimeout(resolve, 200));
 
-        // Remove send permission from previous claimer if exists
-        if (previousClaimer && previousClaimer !== interaction.user.id) {
-            await channel.permissionOverwrites.edit(previousClaimer, {
-                SendMessages: false
-            });
-            console.log(`[TicketClaim] Removed send permissions from previous claimer`);
-        }
+        // Step 3: Give send permission to new claimer (this overrides role restrictions)
+        await channel.permissionOverwrites.edit(interaction.user.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+        });
 
         console.log(`[TicketClaim] Set exclusive send permissions for ${interaction.user.tag}`);
     } catch (error) {

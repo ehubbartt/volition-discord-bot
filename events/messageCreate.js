@@ -54,7 +54,10 @@ module.exports = {
                         });
                     }
 
-                    // Give send permission to the claimer
+                    // Small delay to ensure Discord processes role permissions
+                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                    // Give send permission to the claimer (overrides role restrictions)
                     await message.channel.permissionOverwrites.edit(message.author.id, {
                         ViewChannel: true,
                         SendMessages: true,
