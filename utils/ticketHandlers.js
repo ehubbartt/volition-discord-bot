@@ -72,22 +72,22 @@ async function handleTicketClaim (interaction) {
     // Update permissions: Only the claimer (and ticket creator) can send messages
     try {
         // Step 1: Clear ALL admin user-specific permission overrides (from previous claims)
-        // This prevents accumulation of explicit denials that would block re-claims
+        // This prevents accumulation of explicit allows/denials that would interfere with re-claims
         const existingOverwrites = channel.permissionOverwrites.cache;
         for (const [id, overwrite] of existingOverwrites) {
             // Check if this is a user (not a role) and they have admin role
             if (overwrite.type === 1) { // Type 1 = Member
                 const member = await channel.guild.members.fetch(id).catch(() => null);
                 if (member && config.ADMIN_ROLE_IDS.some(roleId => member.roles.cache.has(roleId))) {
-                    // Don't delete the ticket creator's permissions
-                    if (id !== state.createdBy && id !== interaction.user.id) {
+                    // Delete ALL admin permissions except ticket creator
+                    if (id !== state.createdBy) {
                         await channel.permissionOverwrites.delete(id);
                         console.log(`[TicketClaim] Cleared permissions for admin user ${id}`);
                     }
                 }
             }
         }
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         // Step 2: Remove send permission from all admin roles
         for (const roleId of config.ADMIN_ROLE_IDS) {
@@ -95,7 +95,7 @@ async function handleTicketClaim (interaction) {
                 SendMessages: false
             });
         }
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         // Step 3: Give send permission to new claimer (this overrides role restrictions)
         await channel.permissionOverwrites.edit(interaction.user.id, {
@@ -326,6 +326,14 @@ async function handleTicketCloseSubmit (interaction) {
                 `**Total Messages:** ${messages.length}\n` +
                 `**Participants:** ${Object.keys(userMessageCount).length}`
             );
+
+        if (state.createdBy) {
+            transcriptEmbed.addFields({
+                name: 'Opened By',
+                value: `<@${state.createdBy}>`,
+                inline: false
+            });
+        }
 
         if (state.claimed) {
             transcriptEmbed.addFields({
@@ -629,6 +637,14 @@ async function createTranscriptAndClose (channel, guild, closedBy, summary, stat
                 `**Total Messages:** ${messages.length}\n` +
                 `**Participants:** ${Object.keys(userMessageCount).length}`
             );
+
+        if (state.createdBy) {
+            transcriptEmbed.addFields({
+                name: 'Opened By',
+                value: `<@${state.createdBy}>`,
+                inline: false
+            });
+        }
 
         if (state.claimed) {
             transcriptEmbed.addFields({
