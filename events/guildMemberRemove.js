@@ -50,20 +50,60 @@ async function markJoinTicketAsLeft(member, playerData) {
         // So we need to search by channel name pattern instead
         // Channel format: 🟢・join-displayname・📌 or 🔴・join-displayname・🆕
         // Note: displayName could be server nickname, globalName, or username
-        const displayName = member.displayName || member.user.globalName || member.user.username;
-        const searchPattern = `join-${displayName.toLowerCase()}`;
+
+        // Try multiple search patterns in case user changed nickname after ticket creation
+        const searchPatterns = [
+            member.displayName,                    // Current server nickname or globalName
+            member.user.globalName,                // Current global display name
+            member.user.username,                  // Current username
+        ].filter(Boolean).map(name => `join-${name.toLowerCase()}`);
+
+        // Remove duplicates
+        const uniquePatterns = [...new Set(searchPatterns)];
 
         let userTicket = null;
-        for (const [, channel] of channels) {
-            if (channel.name.includes(searchPattern)) {
-                userTicket = channel;
-                console.log(`[MEMBER_LEAVE] Found open join ticket: ${channel.name}`);
-                break;
+
+        // First, try to find by channel name patterns
+        for (const pattern of uniquePatterns) {
+            for (const [, channel] of channels) {
+                if (channel.name.includes(pattern)) {
+                    userTicket = channel;
+                    console.log(`[MEMBER_LEAVE] Found open join ticket: ${channel.name} (matched pattern: ${pattern})`);
+                    break;
+                }
+            }
+            if (userTicket) break;
+        }
+
+        // If not found by name, try to find by checking first message author
+        // This handles cases where nickname changed after ticket creation
+        if (!userTicket) {
+            console.log(`[MEMBER_LEAVE] Name-based search failed, checking message history...`);
+            for (const [, channel] of channels) {
+                try {
+                    // Skip channels that don't look like join tickets
+                    if (!channel.name.includes('join-')) continue;
+
+                    // Fetch oldest messages
+                    const messages = await channel.messages.fetch({ limit: 10 });
+                    const messagesArray = Array.from(messages.values()).reverse(); // Oldest first
+
+                    // Find first non-bot message
+                    const firstUserMessage = messagesArray.find(msg => !msg.author.bot);
+                    if (firstUserMessage && firstUserMessage.author.id === discordId) {
+                        userTicket = channel;
+                        console.log(`[MEMBER_LEAVE] Found open join ticket by message history: ${channel.name}`);
+                        break;
+                    }
+                } catch (error) {
+                    // Skip channels we can't access
+                    continue;
+                }
             }
         }
 
         if (!userTicket) {
-            console.log(`[MEMBER_LEAVE] No open join ticket found for ${userTag}`);
+            console.log(`[MEMBER_LEAVE] No open join ticket found for ${userTag} (tried patterns: ${uniquePatterns.join(', ')})`);
             return;
         }
 
