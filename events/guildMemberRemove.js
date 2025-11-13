@@ -53,10 +53,6 @@ async function markJoinTicketAsLeft(member, playerData) {
         const displayName = member.displayName || member.user.globalName || member.user.username;
         const searchPattern = `join-${displayName.toLowerCase()}`;
 
-        console.log(`[MEMBER_LEAVE] Debug - username: ${member.user.username}, globalName: ${member.user.globalName}, displayName: ${member.displayName}`);
-        console.log(`[MEMBER_LEAVE] Searching for pattern: ${searchPattern}`);
-        console.log(`[MEMBER_LEAVE] Available channels: ${Array.from(channels.values()).map(c => c.name).join(', ')}`);
-
         let userTicket = null;
         for (const [, channel] of channels) {
             if (channel.name.includes(searchPattern)) {
