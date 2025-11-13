@@ -70,8 +70,26 @@ module.exports = {
         'Brewaholic': '<:AP:1213784678419406858>',  
       };
 
+      // Mapping from Discord rank names to WOM role names
+      const discordToWomRank = {
+        ':Sweat: Sweat': null, // No WOM equivalent
+        ':MasterGeneral: Master General': null, // No WOM equivalent
+        ':TouchGrass: Touch Grass': null, // No WOM equivalent
+        ':WR: Wrath': 'wrath',
+        ':TZ: Top Dawgs': 'tzkal',
+        ':GO: Mind Goblin': 'goblin',
+        ':SA: Holy': 'sage',
+        ':S_~1: Skull': 'skulled',
+        ':SL: SLAAAAAY': 'slayer',
+        ':GU: Guthixian': 'guthixian',
+        ':de: Black Hearts': 'defiler',
+        ':HE: Discord Kitten': 'hellcat',
+        ':AP: Brewaholic': 'apothecary',
+      };
+
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
       let mismatchOutput = [];
+      let clanRankUpgradeNeeded = [];
       // Store user mentions for later use
       let userMentions = [];
 
@@ -122,8 +140,24 @@ module.exports = {
               }
             }
           } else if (!hasCorrectRank) {
-            // Rank would be a downgrade - skip it
+            // Rank would be a downgrade - skip automatic change
             console.log(`[UpdateRanks] ⏭️ Skipped downgrade for ${rsn}: keeping ${currentRank} (earned rank: ${calculatedRank}, ${ehb} EHB)`);
+          }
+
+          // Check if in-game clan rank needs to be upgraded to match Discord rank
+          if (clanMember && currentRank && currentRank !== 'None') {
+            const womRole = clanMember.role;
+            const expectedWomRole = discordToWomRank[currentRank];
+
+            // Only check if the Discord rank has a WOM equivalent
+            if (expectedWomRole && womRole !== expectedWomRole) {
+              // Discord rank is higher than clan rank - needs manual upgrade in WOM
+              const currentRankEmoji = rankEmojiMap[currentRank] || '';
+              clanRankUpgradeNeeded.push(
+                `<@${member.id}> - RSN: **${rsn}** - Discord Rank: ${currentRankEmoji} **${currentRank}** - WOM Clan Rank: **${womRole}** (should be **${expectedWomRole}**)`
+              );
+              console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${currentRank})`);
+            }
           }
         }
       }
@@ -170,6 +204,22 @@ module.exports = {
           .setTitle('No ranks were updated.')
 
         await interaction.followUp({ embeds: [embed] });
+      }
+
+      // Send clan rank upgrade warnings if any
+      if (clanRankUpgradeNeeded.length > 0) {
+        const clanUpgradeChunks = chunkArray(clanRankUpgradeNeeded, 1000);
+
+        for (let i = 0; i < clanUpgradeChunks.length; i++) {
+          const embed = new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle(i === 0 ? '🔼 WOM Clan Rank Upgrade Needed' : `🔼 WOM Clan Rank Upgrade Needed (Part ${i + 1} of ${clanUpgradeChunks.length})`)
+            .setDescription('The following players have **higher Discord ranks** than their WOM clan rank. Their in-game clan rank needs to be manually upgraded on WiseOldMan:')
+            .addFields({ name: 'Players Needing Clan Rank Upgrade:', value: clanUpgradeChunks[i] })
+            .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
+
+          await interaction.followUp({ embeds: [embed] });
+        }
       }
 
 
