@@ -14,7 +14,7 @@ module.exports = {
             const playerData = await db.getPlayerByDiscordId(member.id);
 
             // Find and mark their join ticket if they have one
-            await markJoinTicketAsLeft(member.guild, member.id, member.user.tag, playerData);
+            await markJoinTicketAsLeft(member, playerData);
 
         } catch (error) {
             console.error(`[MEMBER_LEAVE] Error processing member leave for ${member.user.tag}:`, error);
@@ -24,32 +24,42 @@ module.exports = {
 
 /**
  * Find and mark a user's join ticket when they leave Discord
- * @param {Guild} guild - Discord guild
- * @param {string} discordId - User's Discord ID
- * @param {string} userTag - User's Discord tag
+ * @param {GuildMember} member - The member who left
  * @param {Object} playerData - Player data object (if registered)
  */
-async function markJoinTicketAsLeft(guild, discordId, userTag, playerData) {
+async function markJoinTicketAsLeft(member, playerData) {
+    const userTag = member.user.tag;
+    const discordId = member.id;
+
     console.log(`[MEMBER_LEAVE] Checking for open join ticket for ${userTag} (${discordId})...`);
 
     try {
         // Find join ticket category
-        const joinCategory = await guild.channels.fetch(config.TICKET_JOIN_CATEGORY_ID);
+        const joinCategory = await member.guild.channels.fetch(config.TICKET_JOIN_CATEGORY_ID);
         if (!joinCategory) {
             console.log(`[MEMBER_LEAVE] Join ticket category not found`);
             return;
         }
 
         // Get all channels in join ticket category
-        const channels = guild.channels.cache.filter(
+        const channels = member.guild.channels.cache.filter(
             channel => channel.parentId === config.TICKET_JOIN_CATEGORY_ID
         );
 
-        // Find channel where the user has permissions (they were added when ticket was created)
+        // When user leaves Discord, their permissions are removed from channels
+        // So we need to search by channel name pattern instead
+        // Channel format: 🟢・join-displayname・📌 or 🔴・join-displayname・🆕
+        // Note: displayName could be server nickname, globalName, or username
+        const displayName = member.displayName || member.user.globalName || member.user.username;
+        const searchPattern = `join-${displayName.toLowerCase()}`;
+
+        console.log(`[MEMBER_LEAVE] Debug - username: ${member.user.username}, globalName: ${member.user.globalName}, displayName: ${member.displayName}`);
+        console.log(`[MEMBER_LEAVE] Searching for pattern: ${searchPattern}`);
+        console.log(`[MEMBER_LEAVE] Available channels: ${Array.from(channels.values()).map(c => c.name).join(', ')}`);
+
         let userTicket = null;
-        for (const [channelId, channel] of channels) {
-            const permissions = channel.permissionOverwrites.cache.get(discordId);
-            if (permissions) {
+        for (const [, channel] of channels) {
+            if (channel.name.includes(searchPattern)) {
                 userTicket = channel;
                 console.log(`[MEMBER_LEAVE] Found open join ticket: ${channel.name}`);
                 break;
@@ -103,8 +113,8 @@ async function markJoinTicketAsLeft(guild, discordId, userTag, playerData) {
 
             await ticketHandlers.createTranscriptAndClose(
                 userTicket,
-                guild,
-                guild.members.me.user,
+                member.guild,
+                member.guild.members.me.user,
                 finalSummary,
                 state
             );
