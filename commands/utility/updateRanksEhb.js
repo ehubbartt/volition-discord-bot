@@ -102,6 +102,20 @@ module.exports = {
         'wrath'
       ];
 
+      // Mapping from WOM role names to Discord rank display names (for showing expected rank with emoji)
+      const womRoleToDiscordRank = {
+        'apothecary': 'Brewaholic',
+        'hellcat': 'Discord Kitten',
+        'defiler': 'Black Hearts',
+        'guthixian': 'Guthixian',
+        'slayer': 'SLAAAAAY',
+        'skulled': 'Skull',
+        'sage': 'Holy',
+        'goblin': 'Mind Goblin',
+        'tzkal': 'Top Dawgs',
+        'wrath': 'Wrath'
+      };
+
       // Helper function to determine why someone earned a rank
       const getRankReason = (rank, ehb, joinedTimestamp) => {
         if (!joinedTimestamp) return `${ehb} EHB`;
@@ -224,8 +238,17 @@ module.exports = {
               // Discord rank is higher than clan rank - needs manual upgrade in WOM
               const currentRankEmoji = rankEmojiMap[currentRank] || '';
               const reason = getRankReason(currentRank, ehb, member.joinedTimestamp);
+
+              // Get emoji and name for current WOM role
+              const currentWomRankName = womRoleToDiscordRank[womRole] || womRole;
+              const currentWomEmoji = rankEmojiMap[currentWomRankName] || '';
+
+              // Get emoji and name for expected WOM role
+              const expectedWomRankName = womRoleToDiscordRank[expectedWomRole] || expectedWomRole;
+              const expectedWomEmoji = rankEmojiMap[expectedWomRankName] || '';
+
               clanRankUpgradeNeeded.push(
-                `<@${member.id}> - RSN: **${rsn}** - Discord Rank: ${currentRankEmoji} **${currentRank}** (${reason}) - WOM Clan Rank: **${womRole}** (should be **${expectedWomRole}**)`
+                `<@${member.id}> - RSN: **${rsn}** - Discord Rank: ${currentRankEmoji} **${currentRank}** (${reason}) - WOM Clan Rank: ${currentWomEmoji} **${currentWomRankName}** → Should be: ${expectedWomEmoji} **${expectedWomRankName}**`
               );
               console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${currentRank}, ${reason})`);
             }
