@@ -248,7 +248,7 @@ module.exports = {
               const expectedWomEmoji = rankEmojiMap[expectedWomRankName] || '';
 
               clanRankUpgradeNeeded.push(
-                `<@${member.id}> - RSN: **${rsn}** - Discord Rank: ${currentRankEmoji} **${currentRank}** (${reason}) - WOM Clan Rank: ${currentWomEmoji} **${currentWomRankName}** → Should be: ${expectedWomEmoji} **${expectedWomRankName}**`
+                `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM Clan Rank: ${currentWomEmoji} **${currentWomRankName}** → Should be: ${expectedWomEmoji} **${expectedWomRankName}**`
               );
               console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${currentRank}, ${reason})`);
             }
