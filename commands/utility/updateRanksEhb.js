@@ -87,6 +87,35 @@ module.exports = {
         ':AP: Brewaholic': 'apothecary',
       };
 
+      // Helper function to determine why someone earned a rank
+      const getRankReason = (rank, ehb, joinedTimestamp) => {
+        if (!joinedTimestamp) return `${ehb} EHB`;
+
+        const timeInClan = Date.now() - joinedTimestamp;
+        const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
+        const monthsInClan = daysInClan / 30;
+        const yearsInClan = daysInClan / 365;
+
+        // Check time-based ranks (based on determineRank logic from sync.js)
+        switch (rank) {
+          case ':GU: Guthixian':
+            if (ehb >= 500) return `${ehb} EHB`;
+            if (yearsInClan >= 2) return `${Math.floor(yearsInClan * 10) / 10} years in clan`;
+            return `${ehb} EHB`;
+          case ':de: Black Hearts':
+            if (ehb >= 350) return `${ehb} EHB`;
+            if (yearsInClan >= 1) return `${Math.floor(yearsInClan * 10) / 10} years in clan`;
+            return `${ehb} EHB`;
+          case ':HE: Discord Kitten':
+            if (ehb >= 200) return `${ehb} EHB`;
+            if (monthsInClan >= 6) return `${Math.floor(monthsInClan)} months in clan`;
+            return `${ehb} EHB`;
+          default:
+            // All other ranks are purely EHB-based
+            return `${ehb} EHB`;
+        }
+      };
+
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
       let mismatchOutput = [];
       let clanRankUpgradeNeeded = [];
@@ -176,10 +205,11 @@ module.exports = {
             if (expectedWomRole && womRole !== expectedWomRole && RANK_HIERARCHY.includes(currentRank)) {
               // Discord rank is higher than clan rank - needs manual upgrade in WOM
               const currentRankEmoji = rankEmojiMap[currentRank] || '';
+              const reason = getRankReason(currentRank, ehb, member.joinedTimestamp);
               clanRankUpgradeNeeded.push(
-                `<@${member.id}> - RSN: **${rsn}** - Discord Rank: ${currentRankEmoji} **${currentRank}** - WOM Clan Rank: **${womRole}** (should be **${expectedWomRole}**)`
+                `<@${member.id}> - RSN: **${rsn}** - Discord Rank: ${currentRankEmoji} **${currentRank}** (${reason}) - WOM Clan Rank: **${womRole}** (should be **${expectedWomRole}**)`
               );
-              console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${currentRank})`);
+              console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${currentRank}, ${reason})`);
             }
           }
         }
