@@ -160,8 +160,11 @@ module.exports = {
           const clanMember = clanMembers.find(m => m.player.username === rsn);
           const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
-          // Determine the rank using centralized function
-          const calculatedRank = determineRank(ehb, member.joinedTimestamp);
+          // Get clan join timestamp from WOM data (when they joined the OSRS clan)
+          const clanJoinedAt = clanMember?.createdAt ? new Date(clanMember.createdAt).getTime() : null;
+
+          // Determine the rank using centralized function with CLAN join time, not Discord join time
+          const calculatedRank = determineRank(ehb, clanJoinedAt);
           const calculatedRankId = RANK_ROLES[calculatedRank];
 
           const memberRoles = member.roles.cache;
@@ -237,7 +240,7 @@ module.exports = {
             if (expectedWomRole && womRole !== expectedWomRole && RANK_HIERARCHY.includes(currentRank) && standardWomRoles.includes(womRole)) {
               // Discord rank is higher than clan rank - needs manual upgrade in WOM
               const currentRankEmoji = rankEmojiMap[currentRank] || '';
-              const reason = getRankReason(currentRank, ehb, member.joinedTimestamp);
+              const reason = getRankReason(currentRank, ehb, clanJoinedAt);
 
               // Get emoji and name for current WOM role
               const currentWomRankName = womRoleToDiscordRank[womRole] || womRole;
@@ -302,17 +305,26 @@ module.exports = {
 
       // Send clan rank upgrade warnings if any
       if (clanRankUpgradeNeeded.length > 0) {
-        const clanUpgradeChunks = chunkArray(clanRankUpgradeNeeded, 1000);
+        try {
+          const testChannel = await guild.channels.fetch(config.TEST_CHANNEL_ID);
 
-        for (let i = 0; i < clanUpgradeChunks.length; i++) {
-          const embed = new EmbedBuilder()
-            .setColor('Orange')
-            .setTitle(i === 0 ? '🔼 WOM Clan Rank Upgrade Needed' : `🔼 WOM Clan Rank Upgrade Needed (Part ${i + 1} of ${clanUpgradeChunks.length})`)
-            .setDescription('The following players have **higher Discord ranks** than their WOM clan rank. Their in-game clan rank needs to be manually upgraded on WiseOldMan:')
-            .addFields({ name: 'Players Needing Clan Rank Upgrade:', value: clanUpgradeChunks[i] })
-            .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
+          if (testChannel) {
+            const clanUpgradeChunks = chunkArray(clanRankUpgradeNeeded, 1000);
 
-          await interaction.followUp({ embeds: [embed] });
+            for (let i = 0; i < clanUpgradeChunks.length; i++) {
+              const embed = new EmbedBuilder()
+                .setColor('Orange')
+                .setTitle(i === 0 ? '🔼 WOM Clan Rank Upgrade Needed' : `🔼 WOM Clan Rank Upgrade Needed (Part ${i + 1} of ${clanUpgradeChunks.length})`)
+                .setDescription('The following players have **higher Discord ranks** than their WOM clan rank. Their in-game clan rank needs to be manually upgraded on WiseOldMan:')
+                .addFields({ name: 'Players Needing Clan Rank Upgrade:', value: clanUpgradeChunks[i] })
+                .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
+
+              await testChannel.send({ embeds: [embed] });
+            }
+            console.log(`[UpdateRanks] 🔼 Sent ${clanUpgradeChunks.length} WOM clan rank upgrade warning(s) to #test`);
+          }
+        } catch (error) {
+          console.error('[UpdateRanks] Error sending clan rank upgrade warnings to test channel:', error);
         }
       }
 
