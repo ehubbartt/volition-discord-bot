@@ -9,6 +9,95 @@ const ticketManager = require('../utils/ticketManager');
 const ticketHandlers = require('../utils/ticketHandlers');
 
 /**
+ * Reconstruct ticket state from channel data (for when bot restarts and loses in-memory state)
+ * @param {Channel} channel - Ticket channel
+ * @param {Object} state - Ticket state object to populate
+ */
+async function reconstructTicketState(channel, state) {
+    try {
+        console.log(`[SoftCloseChecker] Reconstructing ticket state for ${channel.name}...`);
+
+        // Fetch all messages to find the first user message (ticket creator)
+        const allMessages = await channel.messages.fetch({ limit: 100 });
+        const messagesArray = Array.from(allMessages.values()).reverse(); // Oldest first
+
+        // Find first message from a non-bot user (ticket creator)
+        const firstUserMessage = messagesArray.find(msg => !msg.author.bot);
+        if (firstUserMessage && !state.createdBy) {
+            state.createdBy = firstUserMessage.author.id;
+            state.createdByTag = firstUserMessage.author.tag;
+            console.log(`[SoftCloseChecker] Found ticket creator: ${state.createdByTag}`);
+        }
+
+        // Find ALL "Ticket claimed by" embeds to identify all claimers
+        const claimMessages = messagesArray.filter(msg =>
+            msg.embeds.length > 0 &&
+            msg.embeds[0].description?.includes('Ticket claimed by')
+        );
+
+        if (claimMessages.length > 0) {
+            // Initialize claim history if not exists
+            if (!state.claimHistory) {
+                state.claimHistory = [];
+            }
+
+            for (const claimMessage of claimMessages) {
+                // Extract user ID from mention in embed description
+                const mentionMatch = claimMessage.embeds[0].description.match(/<@(\d+)>/);
+                if (mentionMatch) {
+                    const claimerId = mentionMatch[1];
+
+                    // Check if this claimer is already in history
+                    const alreadyExists = state.claimHistory.some(entry => entry.adminId === claimerId);
+                    if (!alreadyExists) {
+                        const claimer = await channel.guild.members.fetch(claimerId).catch(() => null);
+                        if (claimer) {
+                            state.claimHistory.push({
+                                adminId: claimerId,
+                                adminTag: claimer.user.tag,
+                                claimedAt: claimMessage.createdAt.toISOString()
+                            });
+                            console.log(`[SoftCloseChecker] Found ticket claimer: ${claimer.user.tag}`);
+                        }
+                    }
+                }
+            }
+
+            // Set current claimed state to the last claimer
+            if (state.claimHistory.length > 0) {
+                const lastClaim = state.claimHistory[state.claimHistory.length - 1];
+                state.claimed = true;
+                state.claimedBy = lastClaim.adminId;
+                state.claimedByTag = lastClaim.adminTag;
+                state.claimedAt = lastClaim.claimedAt;
+            }
+        }
+
+        // If still no claimer, check permissions for exclusive send access
+        if (!state.claimed) {
+            const permissionOverwrites = channel.permissionOverwrites.cache;
+            for (const [id, overwrite] of permissionOverwrites) {
+                // Type 1 = Member (not role)
+                if (overwrite.type === 1 && overwrite.allow.has('SendMessages')) {
+                    const member = await channel.guild.members.fetch(id).catch(() => null);
+                    if (member && config.ADMIN_ROLE_IDS.some(roleId => member.roles.cache.has(roleId))) {
+                        state.claimed = true;
+                        state.claimedBy = id;
+                        state.claimedByTag = member.user.tag;
+                        state.claimedAt = channel.createdAt.toISOString(); // Fallback to channel creation
+                        console.log(`[SoftCloseChecker] Inferred claimer from permissions: ${state.claimedByTag}`);
+                        break;
+                    }
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('[SoftCloseChecker] Error reconstructing ticket state:', error);
+    }
+}
+
+/**
  * Check all soft-closing tickets and close expired ones
  * @param {Client} client - Discord client
  */
@@ -66,6 +155,12 @@ async function checkSoftClosingTickets(client) {
 
                         // Get ticket state (or create empty one)
                         const state = ticketManager.getTicketState(channelId);
+
+                        // If state is missing creator/claimer info (bot restarted), try to reconstruct from channel
+                        if (!state.createdBy || !state.claimed) {
+                            await reconstructTicketState(channel, state);
+                        }
+
                         const summary = state.softCloseSummary || 'Auto-closed after 24 hours of inactivity';
 
                         // Close the ticket

@@ -4,6 +4,95 @@ const ticketManager = require('./ticketManager');
 const { isAdmin, isHeadAdmin } = require('./permissions');
 
 /**
+ * Reconstruct ticket state from channel data (for when bot restarts and loses in-memory state)
+ * @param {Channel} channel - Ticket channel
+ * @param {Object} state - Ticket state object to populate
+ */
+async function reconstructTicketStateFromChannel(channel, state) {
+    try {
+        console.log(`[TicketHandler] Reconstructing ticket state for ${channel.name}...`);
+
+        // Fetch all messages to find the first user message (ticket creator)
+        const allMessages = await channel.messages.fetch({ limit: 100 });
+        const messagesArray = Array.from(allMessages.values()).reverse(); // Oldest first
+
+        // Find first message from a non-bot user (ticket creator)
+        const firstUserMessage = messagesArray.find(msg => !msg.author.bot);
+        if (firstUserMessage && !state.createdBy) {
+            state.createdBy = firstUserMessage.author.id;
+            state.createdByTag = firstUserMessage.author.tag;
+            console.log(`[TicketHandler] Found ticket creator: ${state.createdByTag}`);
+        }
+
+        // Find ALL "Ticket claimed by" embeds to identify all claimers
+        const claimMessages = messagesArray.filter(msg =>
+            msg.embeds.length > 0 &&
+            msg.embeds[0].description?.includes('Ticket claimed by')
+        );
+
+        if (claimMessages.length > 0) {
+            // Initialize claim history if not exists
+            if (!state.claimHistory) {
+                state.claimHistory = [];
+            }
+
+            for (const claimMessage of claimMessages) {
+                // Extract user ID from mention in embed description
+                const mentionMatch = claimMessage.embeds[0].description.match(/<@(\d+)>/);
+                if (mentionMatch) {
+                    const claimerId = mentionMatch[1];
+
+                    // Check if this claimer is already in history
+                    const alreadyExists = state.claimHistory.some(entry => entry.adminId === claimerId);
+                    if (!alreadyExists) {
+                        const claimer = await channel.guild.members.fetch(claimerId).catch(() => null);
+                        if (claimer) {
+                            state.claimHistory.push({
+                                adminId: claimerId,
+                                adminTag: claimer.user.tag,
+                                claimedAt: claimMessage.createdAt.toISOString()
+                            });
+                            console.log(`[TicketHandler] Found ticket claimer: ${claimer.user.tag}`);
+                        }
+                    }
+                }
+            }
+
+            // Set current claimed state to the last claimer
+            if (state.claimHistory.length > 0) {
+                const lastClaim = state.claimHistory[state.claimHistory.length - 1];
+                state.claimed = true;
+                state.claimedBy = lastClaim.adminId;
+                state.claimedByTag = lastClaim.adminTag;
+                state.claimedAt = lastClaim.claimedAt;
+            }
+        }
+
+        // If still no claimer, check permissions for exclusive send access
+        if (!state.claimed) {
+            const permissionOverwrites = channel.permissionOverwrites.cache;
+            for (const [id, overwrite] of permissionOverwrites) {
+                // Type 1 = Member (not role)
+                if (overwrite.type === 1 && overwrite.allow.has('SendMessages')) {
+                    const member = await channel.guild.members.fetch(id).catch(() => null);
+                    if (member && config.ADMIN_ROLE_IDS.some(roleId => member.roles.cache.has(roleId))) {
+                        state.claimed = true;
+                        state.claimedBy = id;
+                        state.claimedByTag = member.user.tag;
+                        state.claimedAt = channel.createdAt.toISOString(); // Fallback to channel creation
+                        console.log(`[TicketHandler] Inferred claimer from permissions: ${state.claimedByTag}`);
+                        break;
+                    }
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('[TicketHandler] Error reconstructing ticket state:', error);
+    }
+}
+
+/**
  * Handle ticket claim button
  */
 async function handleTicketClaim (interaction) {
@@ -180,6 +269,11 @@ async function handleTicketCloseSubmit (interaction) {
         // Get ticket state for transcript
         const state = ticketManager.getTicketState(channel.id);
 
+        // If state is missing creator/claimer info (bot restarted), try to reconstruct from channel
+        if (!state.createdBy || !state.claimed) {
+            await reconstructTicketStateFromChannel(channel, state);
+        }
+
         // Determine archive channel based on ticket category
         const ticketCategories = {
             [config.TICKET_JOIN_CATEGORY_ID]: config.TICKET_JOIN_ARCHIVE_ID,
@@ -259,8 +353,15 @@ async function handleTicketCloseSubmit (interaction) {
             serverInfo += `<Ticket-Creator>\n    Created by: ${state.createdByTag} (${state.createdBy}) - <@${state.createdBy}>\n\n`;
         }
 
-        // Add claim info if claimed
-        if (state.claimed) {
+        // Add claim history if claimed
+        if (state.claimHistory && state.claimHistory.length > 0) {
+            serverInfo += `<Ticket-Claimed-History>\n`;
+            state.claimHistory.forEach((claim, index) => {
+                serverInfo += `    ${index + 1}. ${claim.adminTag} (${claim.adminId}) - <@${claim.adminId}> at ${claim.claimedAt}\n`;
+            });
+            serverInfo += '\n';
+        } else if (state.claimed) {
+            // Fallback for old format (single claimer)
             serverInfo += `<Ticket-Claimed>\n    Claimed by: ${state.claimedByTag} (${state.claimedBy}) - <@${state.claimedBy}>\n    Claimed at: ${state.claimedAt}\n\n`;
         }
 
@@ -340,7 +441,20 @@ async function handleTicketCloseSubmit (interaction) {
             });
         }
 
-        if (state.claimed) {
+        // Show all claimers if available
+        if (state.claimHistory && state.claimHistory.length > 0) {
+            const claimersText = state.claimHistory.map((claim, index) => {
+                const timestamp = Math.floor(new Date(claim.claimedAt).getTime() / 1000);
+                return `${index + 1}. <@${claim.adminId}> at <t:${timestamp}:F>`;
+            }).join('\n');
+
+            transcriptEmbed.addFields({
+                name: `Claimed By (${state.claimHistory.length} ${state.claimHistory.length === 1 ? 'admin' : 'admins'})`,
+                value: claimersText,
+                inline: false
+            });
+        } else if (state.claimed) {
+            // Fallback for old format (single claimer)
             transcriptEmbed.addFields({
                 name: 'Claimed By',
                 value: `<@${state.claimedBy}> at <t:${Math.floor(new Date(state.claimedAt).getTime() / 1000)}:F>`,
@@ -503,6 +617,11 @@ async function handleTicketSoftCloseSubmit (interaction) {
  */
 async function createTranscriptAndClose (channel, guild, closedBy, summary, state) {
     try {
+        // If state is missing creator/claimer info (bot restarted), try to reconstruct from channel
+        if (!state.createdBy || !state.claimed) {
+            await reconstructTicketStateFromChannel(channel, state);
+        }
+
         // Determine archive channel based on ticket category
         const ticketCategories = {
             [config.TICKET_JOIN_CATEGORY_ID]: config.TICKET_JOIN_ARCHIVE_ID,
@@ -575,8 +694,15 @@ async function createTranscriptAndClose (channel, guild, closedBy, summary, stat
             serverInfo += `<Ticket-Creator>\n    Created by: ${state.createdByTag} (${state.createdBy}) - <@${state.createdBy}>\n\n`;
         }
 
-        // Add claim info if claimed
-        if (state.claimed) {
+        // Add claim history if claimed
+        if (state.claimHistory && state.claimHistory.length > 0) {
+            serverInfo += `<Ticket-Claimed-History>\n`;
+            state.claimHistory.forEach((claim, index) => {
+                serverInfo += `    ${index + 1}. ${claim.adminTag} (${claim.adminId}) - <@${claim.adminId}> at ${claim.claimedAt}\n`;
+            });
+            serverInfo += '\n';
+        } else if (state.claimed) {
+            // Fallback for old format (single claimer)
             serverInfo += `<Ticket-Claimed>\n    Claimed by: ${state.claimedByTag} (${state.claimedBy}) - <@${state.claimedBy}>\n    Claimed at: ${state.claimedAt}\n\n`;
         }
 
@@ -651,7 +777,20 @@ async function createTranscriptAndClose (channel, guild, closedBy, summary, stat
             });
         }
 
-        if (state.claimed) {
+        // Show all claimers if available
+        if (state.claimHistory && state.claimHistory.length > 0) {
+            const claimersText = state.claimHistory.map((claim, index) => {
+                const timestamp = Math.floor(new Date(claim.claimedAt).getTime() / 1000);
+                return `${index + 1}. <@${claim.adminId}> at <t:${timestamp}:F>`;
+            }).join('\n');
+
+            transcriptEmbed.addFields({
+                name: `Claimed By (${state.claimHistory.length} ${state.claimHistory.length === 1 ? 'admin' : 'admins'})`,
+                value: claimersText,
+                inline: false
+            });
+        } else if (state.claimed) {
+            // Fallback for old format (single claimer)
             transcriptEmbed.addFields({
                 name: 'Claimed By',
                 value: `<@${state.claimedBy}> at <t:${Math.floor(new Date(state.claimedAt).getTime() / 1000)}:F>`,
