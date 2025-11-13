@@ -87,6 +87,21 @@ module.exports = {
         ':AP: Brewaholic': 'apothecary',
       };
 
+      // Standard WOM roles that are part of the progression system
+      // Special roles like 'moderator', 'maxed', 'deputy_owner', etc. are excluded
+      const standardWomRoles = [
+        'apothecary',
+        'hellcat',
+        'defiler',
+        'guthixian',
+        'slayer',
+        'skulled',
+        'sage',
+        'goblin',
+        'tzkal',
+        'wrath'
+      ];
+
       // Helper function to determine why someone earned a rank
       const getRankReason = (rank, ehb, joinedTimestamp) => {
         if (!joinedTimestamp) return `${ehb} EHB`;
@@ -201,8 +216,11 @@ module.exports = {
             const womRole = clanMember.role;
             const expectedWomRole = discordToWomRank[currentRank];
 
-            // Only check if the Discord rank is part of standard progression AND has a WOM equivalent
-            if (expectedWomRole && womRole !== expectedWomRole && RANK_HIERARCHY.includes(currentRank)) {
+            // Only check if:
+            // 1. Discord rank is part of standard progression (RANK_HIERARCHY)
+            // 2. Discord rank has a WOM equivalent
+            // 3. Current WOM role is a standard role (not moderator, maxed, etc.)
+            if (expectedWomRole && womRole !== expectedWomRole && RANK_HIERARCHY.includes(currentRank) && standardWomRoles.includes(womRole)) {
               // Discord rank is higher than clan rank - needs manual upgrade in WOM
               const currentRankEmoji = rankEmojiMap[currentRank] || '';
               const reason = getRankReason(currentRank, ehb, member.joinedTimestamp);
