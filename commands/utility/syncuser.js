@@ -85,7 +85,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                             `**Removed Player:**\n` +
                             `• RSN: ${existingPlayer.rsn}\n` +
                             `• Discord: ${existingPlayer.discord_id ? `<@${existingPlayer.discord_id}>` : 'Not linked'}\n` +
-                            `• VP Balance: ${existingPlayer.player_points?.points || 0}\n` +
+                            `• VP Balance: ${existingPlayer.points || 0}\n` +
                             `• WOM ID: ${existingPlayer.wom_id}\n\n` +
                             `**Reason:** Player is no longer in the WOM clan\n\n` +
                             `If this was a mistake, please:\n` +

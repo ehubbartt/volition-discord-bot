@@ -43,8 +43,8 @@ module.exports = {
                 return interaction.editReply({ content: `<@${opponent.id}> is not registered in the system.` });
             }
 
-            const challengerPoints = challengerPlayer.player_points?.points || 0;
-            const opponentPoints = opponentPlayer.player_points?.points || 0;
+            const challengerPoints = challengerPlayer.points || 0;
+            const opponentPoints = opponentPlayer.points || 0;
 
             if (challengerPoints < wager) {
                 return interaction.editReply({
@@ -113,8 +113,8 @@ module.exports = {
                     const updatedChallengerPlayer = await db.getPlayerByDiscordId(challenger.id);
                     const updatedOpponentPlayer = await db.getPlayerByDiscordId(opponent.id);
 
-                    const currentChallengerPoints = updatedChallengerPlayer.player_points?.points || 0;
-                    const currentOpponentPoints = updatedOpponentPlayer.player_points?.points || 0;
+                    const currentChallengerPoints = updatedChallengerPlayer.points || 0;
+                    const currentOpponentPoints = updatedOpponentPlayer.points || 0;
 
                     if (currentChallengerPoints < wager) {
                         const errorEmbed = new EmbedBuilder()
@@ -146,8 +146,8 @@ module.exports = {
                     await db.addPoints(winnerPlayer.rsn, wager);
                     await db.addPoints(loserPlayer.rsn, -wager);
 
-                    const winnerNewPoints = (winnerPlayer.player_points?.points || 0) + wager;
-                    const loserNewPoints = (loserPlayer.player_points?.points || 0) - wager;
+                    const winnerNewPoints = (winnerPlayer.points || 0) + wager;
+                    const loserNewPoints = (loserPlayer.points || 0) - wager;
 
                     // Log duel analytics
                     analytics.logDuel(

@@ -571,7 +571,7 @@ async function processMemberLeave (rsn, originalMessage) {
             console.log(`[LEAVE] ✅ Found in database:`);
             console.log(`  - RSN: ${existingPlayer.rsn}`);
             console.log(`  - Discord ID: ${existingPlayer.discord_id || 'Not linked'}`);
-            console.log(`  - VP Balance: ${existingPlayer.player_points?.points || 0}`);
+            console.log(`  - VP Balance: ${existingPlayer.points || 0}`);
 
             // Remove from database
             try {
@@ -594,7 +594,7 @@ async function processMemberLeave (rsn, originalMessage) {
         // Send confirmation to log channel
         const confirmDetails = `**Player:** ${rsn}\n` +
             `**Discord:** ${existingPlayer?.discord_id ? `<@${existingPlayer.discord_id}>` : 'Not linked'}\n` +
-            `**VP Balance:** ${existingPlayer?.player_points?.points || 0}\n` +
+            `**VP Balance:** ${existingPlayer?.points || 0}\n` +
             `**Database:** ${existingPlayer ? '✅ Removed' : 'ℹ️ Was not in database'}`;
         await sendSyncConfirmation(originalMessage, 'Member Leave Auto-Synced', confirmDetails);
 
@@ -706,7 +706,7 @@ async function sendLeaveNotification (rsn, womId, playerData, originalMessage) {
             embed.setDescription(`**${rsn}** has left the clan and been removed from the database.`);
             embed.addFields(
                 { name: 'Discord Account', value: playerData.discord_id ? `<@${playerData.discord_id}>` : 'Not linked', inline: true },
-                { name: 'Previous VP Balance', value: (playerData.player_points?.points || 0).toString(), inline: true },
+                { name: 'Previous VP Balance', value: (playerData.points || 0).toString(), inline: true },
                 { name: 'Database Status', value: '✅ Removed from database', inline: false }
             );
         } else {
