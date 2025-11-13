@@ -13,7 +13,7 @@ const ticketHandlers = require('../utils/ticketHandlers');
  * @param {Channel} channel - Ticket channel
  * @param {Object} state - Ticket state object to populate
  */
-async function reconstructTicketState(channel, state) {
+async function reconstructTicketState (channel, state) {
     try {
         console.log(`[SoftCloseChecker] Reconstructing ticket state for ${channel.name}...`);
 
@@ -101,7 +101,7 @@ async function reconstructTicketState(channel, state) {
  * Check all soft-closing tickets and close expired ones
  * @param {Client} client - Discord client
  */
-async function checkSoftClosingTickets(client) {
+async function checkSoftClosingTickets (client) {
     console.log('[SoftCloseChecker] Starting check for expired soft-closing tickets...');
 
     try {
@@ -127,7 +127,7 @@ async function checkSoftClosingTickets(client) {
             // Get all channels in this category
             const channels = guild.channels.cache.filter(
                 channel => channel.parentId === categoryId &&
-                          channel.name.includes(config.SOFT_CLOSE_EMOJI)
+                    channel.name.includes(config.SOFT_CLOSE_EMOJI)
             );
 
             for (const [channelId, channel] of channels) {
@@ -190,7 +190,7 @@ async function checkSoftClosingTickets(client) {
  * Schedule the soft-close checker to run every hour
  * @param {Client} client - Discord client
  */
-function startSoftCloseChecker(client) {
+function startSoftCloseChecker (client) {
     console.log('[SoftCloseChecker] Starting soft-close checker job...');
 
     // Run immediately on startup
@@ -200,12 +200,12 @@ function startSoftCloseChecker(client) {
         });
     }, 5000); // Wait 5 seconds after bot is ready
 
-    // Run every hour (3600000 ms)
+    //run every 10 minutes
     setInterval(() => {
         checkSoftClosingTickets(client).catch(error => {
             console.error('[SoftCloseChecker] Error during scheduled check:', error);
         });
-    }, 3600000); // 1 hour
+    }, 600000);
 
     console.log('[SoftCloseChecker] ✅ Scheduled to run every hour + on startup');
 }
