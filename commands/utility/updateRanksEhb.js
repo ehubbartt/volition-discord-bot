@@ -6,7 +6,7 @@ const { EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
-const { RANK_ROLES, determineRank, isRankUpgrade } = require('./sync');
+const { RANK_ROLES, determineRank, isRankUpgrade, RANK_HIERARCHY } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
@@ -90,6 +90,7 @@ module.exports = {
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
       let mismatchOutput = [];
       let clanRankUpgradeNeeded = [];
+      let rankUpAnnouncements = []; // For broadcasting to #rank-ups channel
       // Store user mentions for later use
       let userMentions = [];
 
@@ -133,10 +134,32 @@ module.exports = {
                 mismatchOutput.push(
                   `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **${currentRank}** - Updated to: ${calculatedRankEmoji} **${calculatedRank}**`
                 );
+                // Add to rank-up announcements (initial rank assignment)
+                rankUpAnnouncements.push({
+                  member,
+                  rsn,
+                  ehb,
+                  oldRank: currentRank,
+                  oldRankEmoji: currentRankEmoji,
+                  newRank: calculatedRank,
+                  newRankEmoji: calculatedRankEmoji,
+                  isInitial: true
+                });
               } else {
                 mismatchOutput.push(
                   `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${currentRankEmoji} **${currentRank}** - Upgraded to: ${calculatedRankEmoji} **${calculatedRank}**`
                 );
+                // Add to rank-up announcements (upgrade)
+                rankUpAnnouncements.push({
+                  member,
+                  rsn,
+                  ehb,
+                  oldRank: currentRank,
+                  oldRankEmoji: currentRankEmoji,
+                  newRank: calculatedRank,
+                  newRankEmoji: calculatedRankEmoji,
+                  isInitial: false
+                });
               }
             }
           } else if (!hasCorrectRank) {
@@ -149,8 +172,8 @@ module.exports = {
             const womRole = clanMember.role;
             const expectedWomRole = discordToWomRank[currentRank];
 
-            // Only check if the Discord rank has a WOM equivalent
-            if (expectedWomRole && womRole !== expectedWomRole) {
+            // Only check if the Discord rank is part of standard progression AND has a WOM equivalent
+            if (expectedWomRole && womRole !== expectedWomRole && RANK_HIERARCHY.includes(currentRank)) {
               // Discord rank is higher than clan rank - needs manual upgrade in WOM
               const currentRankEmoji = rankEmojiMap[currentRank] || '';
               clanRankUpgradeNeeded.push(
@@ -219,6 +242,51 @@ module.exports = {
             .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
 
           await interaction.followUp({ embeds: [embed] });
+        }
+      }
+
+      // Broadcast rank-ups to #rank-ups channel
+      if (rankUpAnnouncements.length > 0) {
+        try {
+          const rankUpsChannel = await guild.channels.fetch(config.RANK_UPS_CHANNEL_ID);
+
+          if (rankUpsChannel) {
+            for (const announcement of rankUpAnnouncements) {
+              const { member, rsn, ehb, oldRank, oldRankEmoji, newRank, newRankEmoji, isInitial } = announcement;
+
+              const embed = new EmbedBuilder()
+                .setColor('Gold')
+                .setTitle('🎉 Rank Up!')
+                .setDescription(
+                  isInitial
+                    ? `Congratulations <@${member.id}>! You've been assigned your first rank!`
+                    : `Congratulations <@${member.id}>! You've ranked up!`
+                )
+                .addFields(
+                  { name: 'RSN', value: rsn, inline: true },
+                  { name: 'EHB', value: ehb.toString(), inline: true },
+                  { name: '\u200B', value: '\u200B', inline: true }
+                )
+                .setThumbnail(member.user.displayAvatarURL())
+                .setTimestamp();
+
+              if (!isInitial) {
+                embed.addFields(
+                  { name: 'Previous Rank', value: `${oldRankEmoji} ${oldRank.replace(/^:[^:]+:\s*/, '')}`, inline: true },
+                  { name: 'New Rank', value: `${newRankEmoji} ${newRank.replace(/^:[^:]+:\s*/, '')}`, inline: true }
+                );
+              } else {
+                embed.addFields(
+                  { name: 'Rank', value: `${newRankEmoji} ${newRank.replace(/^:[^:]+:\s*/, '')}`, inline: false }
+                );
+              }
+
+              await rankUpsChannel.send({ embeds: [embed] });
+            }
+            console.log(`[UpdateRanks] 📢 Broadcast ${rankUpAnnouncements.length} rank-up(s) to #rank-ups`);
+          }
+        } catch (error) {
+          console.error('[UpdateRanks] Error broadcasting to rank-ups channel:', error);
         }
       }
 
