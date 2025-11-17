@@ -264,8 +264,8 @@ module.exports = {
         { p: 2.82, name: 'Bond', color: 0x00FF00, image: 'https://i.imgur.com/K9rLNtO.png' },
         { p: 0.4, name: '25M GP', color: 0x800080, image: 'https://i.imgur.com/bEkl6mC.png' },
         { p: 0.1, name: 'Dragon Claws', color: 0x800080, image: 'https://i.imgur.com/Szu9nxV.png' },
-        { p: 0.08, name: '100M GP', color: 0x800080, image: 'https://i.imgur.com/CPxoJ4k.png' },
-        { p: 0.05, name: 'Twisted Bow', color: 0x800080, image: 'https://i.imgur.com/RzONkPT.png' }
+        { p: 0.13, name: '100M GP', color: 0x800080, image: 'https://i.imgur.com/CPxoJ4k.png' },
+        { p: 0.00, name: 'Twisted Bow', color: 0x800080, image: 'https://i.imgur.com/RzONkPT.png' }
       ];
 
       const rr = Math.random() * 100;
