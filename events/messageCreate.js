@@ -18,6 +18,8 @@ module.exports = {
         ];
 
         if (!ticketCategories.includes(message.channel.parentId)) {
+            console.log("not parent id");
+
             return; // Not in a ticket channel
         }
 
@@ -26,11 +28,12 @@ module.exports = {
         // Exclude archive channels and other non-ticket channels
         const channelName = message.channel.name;
         const isTicketChannel = (channelName.startsWith('join-') ||
-                                channelName.startsWith('general-') ||
-                                channelName.startsWith('shop-')) &&
-                               !channelName.includes('archive');
+            channelName.startsWith('general-') ||
+            channelName.startsWith('shop-')) &&
+            !channelName.includes('archive');
 
         if (!isTicketChannel) {
+            console.log("not in a ticket channel");
             return; // Not a ticket channel (e.g., archive or info channel)
         }
 
