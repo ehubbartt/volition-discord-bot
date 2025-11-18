@@ -702,13 +702,41 @@ async function sendLeaveNotification (rsn, womId, playerData, originalMessage) {
             .setTitle('👋 Member Left and Auto-Synced')
             .setTimestamp();
 
+        // Calculate time in clan if we have clan_joined_at
+        let timeInClanText = null;
+        if (playerData?.clan_joined_at) {
+            const joinedAt = new Date(playerData.clan_joined_at).getTime();
+            const leftAt = Date.now();
+            const timeInClan = leftAt - joinedAt;
+
+            const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
+            const monthsInClan = daysInClan / 30;
+            const yearsInClan = daysInClan / 365;
+
+            if (yearsInClan >= 1) {
+                timeInClanText = `${Math.floor(yearsInClan * 10) / 10} years`;
+            } else if (monthsInClan >= 1) {
+                timeInClanText = `${Math.floor(monthsInClan)} months`;
+            } else {
+                timeInClanText = `${daysInClan} days`;
+            }
+        }
+
         if (playerData) {
             embed.setDescription(`**${rsn}** has left the clan and been removed from the database.`);
-            embed.addFields(
+
+            const fields = [
                 { name: 'Discord Account', value: playerData.discord_id ? `<@${playerData.discord_id}>` : 'Not linked', inline: true },
-                { name: 'Previous VP Balance', value: (playerData.points || 0).toString(), inline: true },
-                { name: 'Database Status', value: '✅ Removed from database', inline: false }
-            );
+                { name: 'Previous VP Balance', value: (playerData.points || 0).toString(), inline: true }
+            ];
+
+            if (timeInClanText) {
+                fields.push({ name: 'Time in Clan', value: timeInClanText, inline: true });
+            }
+
+            fields.push({ name: 'Database Status', value: '✅ Removed from database', inline: false });
+
+            embed.addFields(...fields);
         } else {
             embed.setDescription(`**${rsn}** has left the clan.`);
             embed.addFields(
