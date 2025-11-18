@@ -23,12 +23,15 @@ module.exports = {
 
         // Check if channel name matches ticket naming pattern
         // Tickets are named like: "join-username・🆕", "general-username・📌", "shop-username・🆕"
-        const isTicketChannel = message.channel.name.includes('join-') ||
-                               message.channel.name.includes('general-') ||
-                               message.channel.name.includes('shop-');
+        // Exclude archive channels and other non-ticket channels
+        const channelName = message.channel.name;
+        const isTicketChannel = (channelName.startsWith('join-') ||
+                                channelName.startsWith('general-') ||
+                                channelName.startsWith('shop-')) &&
+                               !channelName.includes('archive');
 
         if (!isTicketChannel) {
-            return; // Not a ticket channel (e.g., could be info channel in category)
+            return; // Not a ticket channel (e.g., archive or info channel)
         }
 
         // Get or create ticket state
