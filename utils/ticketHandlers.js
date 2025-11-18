@@ -8,7 +8,7 @@ const { isAdmin, isHeadAdmin } = require('./permissions');
  * @param {Channel} channel - Ticket channel
  * @param {Object} state - Ticket state object to populate
  */
-async function reconstructTicketStateFromChannel(channel, state) {
+async function reconstructTicketStateFromChannel (channel, state) {
     try {
         console.log(`[TicketHandler] Reconstructing ticket state for ${channel.name}...`);
 
@@ -131,7 +131,7 @@ async function handleTicketClaim (interaction) {
     if (previousClaimer && previousClaimer !== interaction.user.id) {
         // Re-claim from another admin
         claimEmbed.setDescription(
-            `🎫 Ticket re-claimed by ${interaction.user}\n` +
+            `🎫 Ticket claimed by ${interaction.user}\n` +
             `(Previously claimed by <@${previousClaimer}>)`);
     } else {
         // First claim
