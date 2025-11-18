@@ -21,13 +21,18 @@ module.exports = {
             return; // Not in a ticket channel
         }
 
-        // Check if ticket state exists
-        const state = ticketManager.getTicketState(message.channel.id);
+        // Check if channel name matches ticket naming pattern
+        // Tickets are named like: "join-username・🆕", "general-username・📌", "shop-username・🆕"
+        const isTicketChannel = message.channel.name.includes('join-') ||
+                               message.channel.name.includes('general-') ||
+                               message.channel.name.includes('shop-');
 
-        // If no ticket state exists, this isn't an active ticket (could be archive channel)
-        if (!state || !state.createdBy) {
-            return; // Not an active ticket
+        if (!isTicketChannel) {
+            return; // Not a ticket channel (e.g., could be info channel in category)
         }
+
+        // Get or create ticket state
+        const state = ticketManager.getTicketState(message.channel.id);
 
         // Auto-claim ticket when first admin responds
         if (!state.claimed) {
