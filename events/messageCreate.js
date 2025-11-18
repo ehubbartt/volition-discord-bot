@@ -18,8 +18,6 @@ module.exports = {
         ];
 
         if (!ticketCategories.includes(message.channel.parentId)) {
-            console.log("not parent id");
-
             return; // Not in a ticket channel
         }
 
@@ -27,13 +25,12 @@ module.exports = {
         // Tickets are named like: "join-username・🆕", "general-username・📌", "shop-username・🆕"
         // Exclude archive channels and other non-ticket channels
         const channelName = message.channel.name;
-        const isTicketChannel = (channelName.startsWith('join-') ||
-            channelName.startsWith('general-') ||
-            channelName.startsWith('shop-')) &&
+        const isTicketChannel = (channelName.includes('join-') ||
+            channelName.includes('general-') ||
+            channelName.includes('shop-')) &&
             !channelName.includes('archive');
 
         if (!isTicketChannel) {
-            console.log("not in a ticket channel");
             return; // Not a ticket channel (e.g., archive or info channel)
         }
 
