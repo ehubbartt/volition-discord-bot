@@ -13,6 +13,7 @@ const config = require('../../config.json');
 const { determineRank, formatRankWithEmoji } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
 const features = require('../../utils/features');
+const db = require('../../db/supabase');
 
 module.exports = {
     data: new SlashCommandBuilder()
