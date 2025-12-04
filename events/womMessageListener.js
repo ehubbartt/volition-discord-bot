@@ -110,7 +110,8 @@ async function handleNameChangeMessage (description, title, originalMessage) {
 
         // Format: "Member Name Changed"
         // Description: "Nutistic → nut bot"
-        const nameChangeMatch = description.match(/([a-zA-Z0-9\s_-]+)\s*→\s*([a-zA-Z0-9\s_-]+)/i);
+        // Support multiple arrow characters: → (U+2192), ➔ (U+2794), ⟶ (U+27F6), -> (ASCII)
+        const nameChangeMatch = description.match(/([a-zA-Z0-9\s_-]+)\s*(?:→|➔|⟶|->)\s*([a-zA-Z0-9\s_-]+)/i);
 
         if (!nameChangeMatch) {
             console.log('[NAME CHANGE] ❌ Could not extract old and new name from message');
@@ -212,6 +213,34 @@ async function handleLeaveMessage (description, originalMessage) {
                         console.log('[LEAVE] ✅ Extracted RSN from unicode emoji:', rsn);
                     }
                 }
+            }
+        }
+
+        // 4. Plain comma-separated names (no header, just names like "Cheap Vodka, NoSplitsBtw")
+        if (rsns.length === 0) {
+            // Check if description looks like comma-separated names (no special formatting)
+            // Must contain a comma and not contain common header words
+            const lowerDesc = description.toLowerCase();
+            const hasNoHeader = !lowerDesc.includes('member') && !lowerDesc.includes('left') && !lowerDesc.includes('group');
+            if (description.includes(',') && hasNoHeader) {
+                console.log('[LEAVE] Trying plain comma-separated format');
+                const names = description.split(',').map(n => n.trim());
+                for (const name of names) {
+                    if (name && name.length > 0 && name.length <= 12 && !name.match(/^\d+$/)) {
+                        rsns.push(name);
+                        console.log('[LEAVE] ✅ Extracted RSN from comma-separated format:', name);
+                    }
+                }
+            }
+        }
+
+        // 5. Single name fallback (plain text, no formatting)
+        if (rsns.length === 0) {
+            const trimmed = description.trim();
+            // OSRS names: 1-12 chars, alphanumeric, spaces, underscores, hyphens
+            if (trimmed.length > 0 && trimmed.length <= 12 && /^[a-zA-Z0-9\s_-]+$/.test(trimmed)) {
+                console.log('[LEAVE] ✅ Using description as single RSN:', trimmed);
+                rsns.push(trimmed);
             }
         }
 
