@@ -38,7 +38,7 @@ module.exports = {
             } else {
                 embed.addFields({
                     name: 'How Sabotage Works',
-                    value: '• 70% chance: Add +1 to target\'s item requirement\n• 30% chance: Remove -1 from target\'s item requirement\n• Can only target teams ahead of you\n• Use `/usesabotage` to sabotage a team',
+                    value: '• 70% chance: Add +1 to target\'s item requirement\n• 30% chance: Remove -1 from target\'s item requirement\n• Can only target teams ahead of you\n• Cannot sabotage keystone tiles\n• Use `/sabotage` to sabotage a team',
                     inline: false
                 });
             }

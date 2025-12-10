@@ -120,8 +120,8 @@ module.exports = {
 
             if (tileData.is_mandatory) {
                 embed.addFields({
-                    name: '🚧 Mandatory Tile',
-                    value: 'This tile cannot be rolled past.',
+                    name: '🚧 Keystone Tile',
+                    value: 'This tile cannot be rolled past and cannot be sabotaged.',
                     inline: false
                 });
             }

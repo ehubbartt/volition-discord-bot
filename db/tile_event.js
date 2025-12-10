@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const MANDATORY_TILES = [1, 10, 20, 30, 36, 37, 38, 39, 40];
+const KEYSTONE_TILES = [1, 10, 20, 30, 36, 37, 38, 39, 40];
 const RAID_TILES = [10, 20, 30];
 
 async function getTeamByName(teamName) {
@@ -394,12 +394,12 @@ function calculateNewTile(currentTile, rollValue) {
     let newTile = currentTile + rollValue;
     let wasCapped = false;
 
-    const passedMandatory = MANDATORY_TILES.find(
+    const passedKeystone = KEYSTONE_TILES.find(
         t => t > currentTile && t <= newTile
     );
 
-    if (passedMandatory) {
-        newTile = passedMandatory;
+    if (passedKeystone) {
+        newTile = passedKeystone;
         wasCapped = true;
     }
 
@@ -466,6 +466,6 @@ module.exports = {
     calculateNewTile,
     getTeamsAheadOf,
     findItemInTileOptions,
-    MANDATORY_TILES,
+    KEYSTONE_TILES,
     RAID_TILES
 };

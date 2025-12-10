@@ -10,6 +10,7 @@ module.exports = {
             option.setName('item')
                 .setDescription('Item name being submitted')
                 .setRequired(true)
+                .setAutocomplete(true)
         )
         .addIntegerOption(option =>
             option.setName('quantity')
@@ -22,6 +23,40 @@ module.exports = {
                 .setDescription('Discord message link to image proof')
                 .setRequired(true)
         ),
+
+    async autocomplete(interaction) {
+        const focusedOption = interaction.options.getFocused(true);
+
+        if (focusedOption.name === 'item') {
+            try {
+                const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+                if (!team) {
+                    return interaction.respond([]);
+                }
+
+                const tileData = await tileEventDb.getTileData(team.current_tile);
+                if (!tileData || !tileData.requirement_json) {
+                    return interaction.respond([]);
+                }
+
+                const allItems = tileData.requirement_json.flatMap(option =>
+                    option.items.map(item => item.name)
+                );
+
+                const uniqueItems = [...new Set(allItems)];
+                const filtered = uniqueItems
+                    .filter(item => item.toLowerCase().includes(focusedOption.value.toLowerCase()))
+                    .slice(0, 25);
+
+                await interaction.respond(
+                    filtered.map(item => ({ name: item, value: item }))
+                );
+            } catch (error) {
+                console.error('Error in submit autocomplete:', error);
+                await interaction.respond([]);
+            }
+        }
+    },
 
     async execute(interaction) {
         await interaction.deferReply();

@@ -53,8 +53,8 @@ module.exports = {
 
             if (wasCapped) {
                 embed.addFields({
-                    name: '🚧 Stopped by Mandatory Tile',
-                    value: `You rolled a ${rollValue} but landed on mandatory tile ${newTile}.`,
+                    name: '🚧 Stopped by Keystone Tile',
+                    value: `You rolled a ${rollValue} but landed on keystone tile ${newTile}.`,
                     inline: false
                 });
             } else {

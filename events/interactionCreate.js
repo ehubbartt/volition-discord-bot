@@ -10,6 +10,20 @@ module.exports = {
 
   async execute (interaction) {
 
+    if (interaction.isAutocomplete()) {
+      const command = interaction.client.commands.get(interaction.commandName);
+      if (!command) return;
+
+      try {
+        if (command.autocomplete) {
+          await command.autocomplete(interaction);
+        }
+      } catch (error) {
+        console.error('Error handling autocomplete:', error);
+      }
+      return;
+    }
+
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
       if (!command) return console.error(`No command matching ${interaction.commandName} was found.`);
