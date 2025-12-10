@@ -38,7 +38,7 @@ module.exports = {
                     .filter(team => team.team_name.toLowerCase().includes(focusedOption.value.toLowerCase()))
                     .slice(0, 25);
 
-                await interaction.respond(
+                return interaction.respond(
                     filtered.map(team => ({
                         name: `${team.team_name} (Tile ${team.current_tile})`,
                         value: team.team_name
@@ -71,13 +71,13 @@ module.exports = {
                     .filter(item => item.toLowerCase().includes(focusedOption.value.toLowerCase()))
                     .slice(0, 25);
 
-                await interaction.respond(
+                return interaction.respond(
                     filtered.map(item => ({ name: item, value: item }))
                 );
             }
         } catch (error) {
             console.error('Error in sabotage autocomplete:', error);
-            await interaction.respond([]);
+            return interaction.respond([]);
         }
     },
 
