@@ -4,20 +4,36 @@ const tileEventDb = require('../../db/tile_event');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('checkprogress')
-        .setDescription('Check your team\'s current tile progress'),
+        .setDescription('Check your team\'s current tile progress')
+        .addStringOption(option =>
+            option.setName('team')
+                .setDescription('Team name to check (optional, defaults to your team)')
+                .setRequired(false)
+        ),
 
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
-            if (!playerData) {
-                return interaction.editReply({
-                    content: 'You are not on a tile event team. Ask your team leader to add you with `/addplayer`.'
-                });
-            }
+            const teamInput = interaction.options.getString('team');
+            let team;
 
-            const team = playerData.team;
+            if (teamInput) {
+                team = await tileEventDb.getTeamByName(teamInput);
+                if (!team) {
+                    return interaction.editReply({
+                        content: `Team **${teamInput}** not found.`
+                    });
+                }
+            } else {
+                const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
+                if (!playerData) {
+                    return interaction.editReply({
+                        content: 'You are not on a tile event team. Ask your team leader to add you with `/addplayer` or specify a team name.'
+                    });
+                }
+                team = playerData.team;
+            }
             const currentTile = team.current_tile;
 
             const tileData = await tileEventDb.getTileData(currentTile);

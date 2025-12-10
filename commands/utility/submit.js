@@ -88,17 +88,24 @@ module.exports = {
 
             const tileComplete = await tileEventDb.checkTileCompletion(team.id, currentTile);
 
+            const allProgress = await tileEventDb.getTeamProgress(team.id, currentTile);
+            const activeOptionId = allProgress[0]?.option_id;
+            const optionProgress = allProgress.filter(p => p.option_id === activeOptionId);
+
+            const progressText = optionProgress.map(p => {
+                const status = p.is_completed ? '✅' : '🔄';
+                return `${status} ${p.current_quantity}/${p.required_quantity} ${p.item_name}`;
+            }).join('\n');
+
             const embed = new EmbedBuilder()
                 .setColor('Green')
                 .setTitle('Drop Submitted')
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .addFields(
                     { name: 'Team', value: team.team_name, inline: true },
-                    { name: 'Tile', value: `${currentTile}`, inline: true },
-                    { name: 'Item', value: itemMatch.item.name, inline: true },
-                    { name: 'Quantity Submitted', value: `${quantity}`, inline: true },
-                    { name: 'Progress', value: `${updated.current_quantity}/${updated.required_quantity}`, inline: true },
-                    { name: 'Status', value: updated.is_completed ? '✅ Complete' : '🔄 In Progress', inline: true }
+                    { name: 'Tile', value: `${currentTile}/40`, inline: true },
+                    { name: 'Item Submitted', value: `${quantity}x ${itemMatch.item.name}`, inline: true },
+                    { name: `Tile ${currentTile} Progress`, value: progressText, inline: false }
                 )
                 .setTimestamp();
 
