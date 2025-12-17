@@ -19,6 +19,17 @@ module.exports = {
 
             const teamsAhead = await tileEventDb.getTeamsAheadOf(team.id);
 
+            // Filter eligible teams: not on keystone tiles and not already sabotaged
+            const eligibleTeamsPromises = teamsAhead
+                .filter(t => !tileEventDb.KEYSTONE_TILES.includes(t.current_tile))
+                .map(async t => {
+                    const alreadySabotaged = await tileEventDb.hasBeenSabotagedOnCurrentTile(t.id, t.current_tile);
+                    return alreadySabotaged ? null : t;
+                });
+
+            const eligibleTeamsResults = await Promise.all(eligibleTeamsPromises);
+            const eligibleTeams = eligibleTeamsResults.filter(t => t !== null);
+
             const embed = new EmbedBuilder()
                 .setColor('Red')
                 .setTitle('🎯 Sabotage Tokens')
@@ -38,19 +49,25 @@ module.exports = {
             } else {
                 embed.addFields({
                     name: 'How Sabotage Works',
-                    value: '• 70% chance: Add +1 to target\'s item requirement\n• 30% chance: Remove -1 from target\'s item requirement\n• Can only target teams ahead of you\n• Cannot sabotage keystone tiles\n• Use `/sabotage` to sabotage a team',
+                    value: '• 70% chance: Add +1 to target\'s item requirement\n• 30% chance: Remove -1 from target\'s item requirement\n• Can only target teams ahead of you\n• Cannot sabotage keystone tiles\n• Each team can only be sabotaged once per tile\n• Use `/sabotage` to sabotage a team',
                     inline: false
                 });
             }
 
-            if (teamsAhead.length > 0) {
-                const targetsList = teamsAhead.map(t =>
+            if (eligibleTeams.length > 0) {
+                const targetsList = eligibleTeams.map(t =>
                     `**${t.team_name}** - Tile ${t.current_tile}`
                 ).join('\n');
 
                 embed.addFields({
-                    name: `Teams Ahead (${teamsAhead.length})`,
+                    name: `Eligible Targets (${eligibleTeams.length})`,
                     value: targetsList,
+                    inline: false
+                });
+            } else if (teamsAhead.length > 0) {
+                embed.addFields({
+                    name: 'No Eligible Targets',
+                    value: 'All teams ahead are either on keystone tiles or have already been sabotaged on their current tile.',
                     inline: false
                 });
             } else {

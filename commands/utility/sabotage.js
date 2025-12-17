@@ -30,9 +30,17 @@ module.exports = {
 
             if (focusedOption.name === 'target_team') {
                 const teamsAhead = await tileEventDb.getTeamsAheadOf(attackerTeam.id);
-                const eligibleTeams = teamsAhead.filter(team =>
-                    !tileEventDb.KEYSTONE_TILES.includes(team.current_tile)
-                );
+
+                // Filter out teams on keystone tiles and teams already sabotaged on their current tile
+                const eligibleTeamsPromises = teamsAhead
+                    .filter(team => !tileEventDb.KEYSTONE_TILES.includes(team.current_tile))
+                    .map(async team => {
+                        const alreadySabotaged = await tileEventDb.hasBeenSabotagedOnCurrentTile(team.id, team.current_tile);
+                        return alreadySabotaged ? null : team;
+                    });
+
+                const eligibleTeamsResults = await Promise.all(eligibleTeamsPromises);
+                const eligibleTeams = eligibleTeamsResults.filter(team => team !== null);
 
                 const filtered = eligibleTeams
                     .filter(team => team.team_name.toLowerCase().includes(focusedOption.value.toLowerCase()))
@@ -123,6 +131,14 @@ module.exports = {
             if (tileEventDb.KEYSTONE_TILES.includes(targetTeam.current_tile)) {
                 return interaction.editReply({
                     content: `You cannot sabotage teams on keystone tiles! Team **${targetTeamName}** is on tile ${targetTeam.current_tile}, which is a keystone tile.`
+                });
+            }
+
+            // Check if target team has already been sabotaged on their current tile
+            const alreadySabotaged = await tileEventDb.hasBeenSabotagedOnCurrentTile(targetTeam.id, targetTeam.current_tile);
+            if (alreadySabotaged) {
+                return interaction.editReply({
+                    content: `Team **${targetTeamName}** has already been sabotaged on tile ${targetTeam.current_tile}. Each team can only be sabotaged once per tile!`
                 });
             }
 

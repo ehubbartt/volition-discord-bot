@@ -447,6 +447,18 @@ async function findItemInTileOptions(tileNumber, itemName) {
     return null;
 }
 
+async function hasBeenSabotagedOnCurrentTile(targetTeamId, currentTile) {
+    const { data, error } = await supabase
+        .from('tile_event_sabotage_log')
+        .select('id')
+        .eq('target_team_id', targetTeamId)
+        .eq('target_tile_number', currentTile)
+        .limit(1);
+
+    if (error) throw error;
+    return data && data.length > 0;
+}
+
 module.exports = {
     getTeamByName,
     getTeamByLeaderId,
@@ -472,6 +484,7 @@ module.exports = {
     calculateNewTile,
     getTeamsAheadOf,
     findItemInTileOptions,
+    hasBeenSabotagedOnCurrentTile,
     KEYSTONE_TILES,
     RAID_TILES
 };
