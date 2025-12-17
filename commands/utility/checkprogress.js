@@ -62,7 +62,8 @@ module.exports = {
                 .addFields(
                     { name: 'Current Tile', value: `${currentTile}/40`, inline: true },
                     { name: 'Sabotage Tokens', value: `${team.sabotage_tokens}/3`, inline: true },
-                    { name: 'Team Position', value: `#${teamRank} of ${allTeams.length}`, inline: true }
+                    { name: 'Team Position', value: `#${teamRank} of ${allTeams.length}`, inline: true },
+                    { name: 'Re-Roll Tokens', value: `${team.reroll_tokens || 0}/1`, inline: true }
                 );
 
             if (tileData.requirement_json && tileData.requirement_json.length > 0) {

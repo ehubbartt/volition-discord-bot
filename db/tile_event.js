@@ -459,6 +459,30 @@ async function hasBeenSabotagedOnCurrentTile(targetTeamId, currentTile) {
     return data && data.length > 0;
 }
 
+async function useRerollToken(teamId) {
+    const team = await supabase
+        .from('tile_event_teams')
+        .select('reroll_tokens')
+        .eq('id', teamId)
+        .single();
+
+    if (team.error) throw team.error;
+
+    if (team.data.reroll_tokens <= 0) {
+        throw new Error('No reroll tokens available');
+    }
+
+    const { data, error } = await supabase
+        .from('tile_event_teams')
+        .update({ reroll_tokens: 0 })
+        .eq('id', teamId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     getTeamByName,
     getTeamByLeaderId,
@@ -485,6 +509,7 @@ module.exports = {
     getTeamsAheadOf,
     findItemInTileOptions,
     hasBeenSabotagedOnCurrentTile,
+    useRerollToken,
     KEYSTONE_TILES,
     RAID_TILES
 };
