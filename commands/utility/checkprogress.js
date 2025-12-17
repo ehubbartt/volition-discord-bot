@@ -84,6 +84,14 @@ module.exports = {
                 });
             }
 
+            if (tileData.rules) {
+                embed.addFields({
+                    name: '📋 Special Rules',
+                    value: tileData.rules,
+                    inline: false
+                });
+            }
+
             if (progress.length > 0) {
                 const activeOptionId = progress[0].option_id;
                 const optionProgress = progress.filter(p => p.option_id === activeOptionId);

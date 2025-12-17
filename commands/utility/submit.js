@@ -172,6 +172,13 @@ module.exports = {
 
                     await tileEventDb.updateTeamTile(team.id, 40);
                 }
+            } else if (tileData.rules) {
+                // Show rules reminder if tile is not complete
+                embed.addFields({
+                    name: '📋 Reminder',
+                    value: tileData.rules,
+                    inline: false
+                });
             }
 
             await interaction.editReply({ embeds: [embed] });

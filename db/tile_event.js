@@ -358,11 +358,17 @@ async function applySabotage(targetTeamId, targetTile, itemName, isPositive) {
     const newRequired = Math.max(1, progress.required_quantity + modifier);
     const newSabotageModifier = progress.sabotage_modifier + modifier;
 
+    // Check if reducing the requirement auto-completes the item
+    const isNowCompleted = progress.current_quantity >= newRequired;
+    const completedAt = isNowCompleted && !progress.is_completed ? new Date().toISOString() : progress.completed_at;
+
     const { data, error } = await supabase
         .from('tile_event_progress')
         .update({
             required_quantity: newRequired,
-            sabotage_modifier: newSabotageModifier
+            sabotage_modifier: newSabotageModifier,
+            is_completed: isNowCompleted,
+            completed_at: completedAt
         })
         .eq('id', progress.id)
         .select()

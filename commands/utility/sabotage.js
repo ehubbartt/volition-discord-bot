@@ -169,6 +169,9 @@ module.exports = {
             const updatedProgress = await tileEventDb.getTeamProgress(targetTeam.id, targetTeam.current_tile);
             const updatedItem = updatedProgress.find(p => p.item_name === targetItem.item_name);
 
+            // Check if the sabotage backfire auto-completed the tile
+            const tileComplete = await tileEventDb.checkTileCompletion(targetTeam.id, targetTeam.current_tile);
+
             const embed = new EmbedBuilder()
                 .setColor(isPositive ? 'Green' : 'Red')
                 .setTitle('🎯 Sabotage Used!')
@@ -179,12 +182,18 @@ module.exports = {
                     { name: 'Outcome', value: isPositive ? '✅ Backfire!' : '💥 Success!', inline: true },
                     { name: 'Item Affected', value: targetItem.item_name, inline: true },
                     { name: 'Old Requirement', value: `${targetItem.required_quantity}`, inline: true },
-                    { name: 'New Requirement', value: `${updatedItem.required_quantity}`, inline: true }
+                    { name: 'New Requirement', value: `${updatedItem.required_quantity}`, inline: true },
+                    { name: 'Current Progress', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true },
+                    { name: 'Status', value: updatedItem.is_completed ? '✅ Complete' : '🔄 In Progress', inline: true }
                 )
                 .setTimestamp();
 
             if (isPositive) {
-                embed.setDescription('🍀 **30% chance activated!** The sabotage backfired and reduced their requirement by 1!');
+                let description = '🍀 **30% chance activated!** The sabotage backfired and reduced their requirement by 1!';
+                if (tileComplete) {
+                    description += '\n\n🎉 **The tile was auto-completed!** Their progress met the new requirement!';
+                }
+                embed.setDescription(description);
             } else {
                 embed.setDescription('💀 **70% chance activated!** Successfully increased their requirement by 1!');
             }
@@ -211,8 +220,16 @@ module.exports = {
                         )
                         .setTimestamp();
 
+                    if (isPositive && tileComplete) {
+                        announcementEmbed.setDescription('🎉 **Tile Auto-Completed!** The reduced requirement was already met!');
+                    }
+
+                    const messageContent = isPositive && tileComplete
+                        ? `${roleTag} - Your team has been sabotaged... but it backfired and completed your tile! 🎉`
+                        : `${roleTag} - Your team has been sabotaged!`;
+
                     await sabotageChannel.send({
-                        content: `${roleTag} - Your team has been sabotaged!`,
+                        content: messageContent,
                         embeds: [announcementEmbed]
                     });
                 }

@@ -78,6 +78,14 @@ module.exports = {
                 });
             }
 
+            if (newTileData && newTileData.rules) {
+                embed.addFields({
+                    name: '📋 Special Rules',
+                    value: newTileData.rules,
+                    inline: false
+                });
+            }
+
             if (newTileData && newTileData.is_raid_tile) {
                 embed.addFields({
                     name: '⚔️ Raid Tile',
