@@ -483,6 +483,20 @@ async function useRerollToken(teamId) {
     return data;
 }
 
+function getWeightedRoll() {
+    // Weighted roll: 50% chance of 2, 25% chance of 1, 25% chance of 3
+    // This gives an average of 2.0
+    const rand = Math.random();
+
+    if (rand < 0.25) {
+        return 1;
+    } else if (rand < 0.75) {
+        return 2;
+    } else {
+        return 3;
+    }
+}
+
 module.exports = {
     getTeamByName,
     getTeamByLeaderId,
@@ -510,6 +524,7 @@ module.exports = {
     findItemInTileOptions,
     hasBeenSabotagedOnCurrentTile,
     useRerollToken,
+    getWeightedRoll,
     KEYSTONE_TILES,
     RAID_TILES
 };

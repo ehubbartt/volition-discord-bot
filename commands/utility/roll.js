@@ -32,7 +32,7 @@ module.exports = {
                 });
             }
 
-            const rollValue = Math.floor(Math.random() * 3) + 1;
+            const rollValue = tileEventDb.getWeightedRoll();
             const { newTile, wasCapped } = tileEventDb.calculateNewTile(currentTile, rollValue);
 
             await tileEventDb.updateTeamTile(team.id, newTile);

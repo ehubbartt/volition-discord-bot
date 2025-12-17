@@ -3,7 +3,7 @@ const tileEventDb = require('../../db/tile_event');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('usereroll')
+        .setName('reroll')
         .setDescription('Use your team\'s re-roll token to skip the current tile (not valid on keystone tiles)'),
 
     async execute(interaction) {
@@ -44,7 +44,7 @@ module.exports = {
             await tileEventDb.useRerollToken(team.id);
 
             // Roll for the next tile (same logic as /roll command)
-            const rollValue = Math.floor(Math.random() * 3) + 1;
+            const rollValue = tileEventDb.getWeightedRoll();
             const { newTile, wasCapped } = tileEventDb.calculateNewTile(currentTile, rollValue);
 
             await tileEventDb.updateTeamTile(team.id, newTile);
