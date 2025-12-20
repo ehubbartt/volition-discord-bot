@@ -59,30 +59,37 @@ class TileBoardService {
 
     async generateBoardImage() {
         try {
-            // Load base image and coordinates
-            const baseImage = await this.getBaseImage();
             await this.loadCoordinates();
 
             // Get all teams and their positions
             const teams = await tileEventDb.getAllTeams();
             console.log('[TileBoard] Generating board for', teams.length, 'teams');
 
-            // Get base image metadata
-            const metadata = await sharp(baseImage).metadata();
+            // Process image from file path directly to save memory
+            console.log('[TileBoard] Loading base image metadata...');
+            const metadata = await sharp(BOARD_IMAGE_PATH).metadata();
 
-            // Create SVG overlay with team markers
-            const svgOverlay = this.createSVGOverlay(teams, metadata.width, metadata.height);
+            // With 512MB we can use full resolution with slight scaling for safety
+            const SCALE = 0.85; // 85% scale - good quality while staying safe on memory
+            const scaledWidth = Math.round(metadata.width * SCALE);
+            const scaledHeight = Math.round(metadata.height * SCALE);
+
+            // Create SVG overlay with team markers (using scaled dimensions)
+            const svgOverlay = this.createSVGOverlay(teams, scaledWidth, scaledHeight);
 
             // Composite the overlay onto the base image
-            // Write directly to file to reduce memory usage
             console.log('[TileBoard] Compositing SVG overlay onto base image...');
-            await sharp(baseImage)
+            await sharp(BOARD_IMAGE_PATH, { limitInputPixels: false })
+                .resize(scaledWidth, scaledHeight)
                 .composite([{
                     input: Buffer.from(svgOverlay),
                     top: 0,
                     left: 0
                 }])
-                .png({ quality: 90, compressionLevel: 9 }) // Compress to reduce file size
+                .png({
+                    quality: 95, // High quality
+                    compressionLevel: 6 // Balanced compression (faster, still good size)
+                })
                 .toFile(OUTPUT_PATH);
 
             console.log('[TileBoard] ✅ Board image generated at', OUTPUT_PATH);
@@ -96,6 +103,12 @@ class TileBoardService {
 
     createSVGOverlay(teams, width, height) {
         let markers = '';
+
+        // Calculate scale factor based on original coordinates (2246x2439)
+        const ORIGINAL_WIDTH = 2246;
+        const ORIGINAL_HEIGHT = 2439;
+        const scaleX = width / ORIGINAL_WIDTH;
+        const scaleY = height / ORIGINAL_HEIGHT;
 
         // Group teams by tile to handle multiple teams on same tile
         const teamsByTile = {};
@@ -121,7 +134,7 @@ class TileBoardService {
 
             // Calculate horizontal offset for multiple teams on same tile
             const teamCount = teamsOnTile.length;
-            const spacing = 70; // Horizontal spacing between markers
+            const spacing = 70 * scaleX; // Horizontal spacing between markers (scaled)
 
             teamsOnTile.forEach((team, index) => {
                 // Center the markers if multiple teams
@@ -129,8 +142,9 @@ class TileBoardService {
                     ? (index - (teamCount - 1) / 2) * spacing
                     : 0;
 
-                const x = coord.x + offsetX;
-                const y = coord.y;
+                // Scale coordinates to match resized image
+                const x = coord.x * scaleX + offsetX;
+                const y = coord.y * scaleY;
 
                 const color = this.getTeamColor(team.team_name);
                 const initial = this.getTeamInitial(team.team_name);
@@ -199,13 +213,6 @@ class TileBoardService {
             // Generate the board image
             const imagePath = await this.generateBoardImage();
             console.log('[TileBoard] Image generated successfully, fetching channel...');
-
-            // Clear base image buffer to free memory
-            this.baseImageBuffer = null;
-            if (global.gc) {
-                global.gc();
-                console.log('[TileBoard] Manual garbage collection triggered');
-            }
 
             // Get the channel
             const channel = await client.channels.fetch(channelId);
