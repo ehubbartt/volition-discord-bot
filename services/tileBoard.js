@@ -70,29 +70,20 @@ class TileBoardService {
             const teams = await tileEventDb.getAllTeams();
             console.log('[TileBoard] Generating board for', teams.length, 'teams');
 
-            // Process image from file path directly to save memory
+            // Process image at full resolution (1GB memory allows this)
             console.log('[TileBoard] Loading base image metadata...');
             const metadata = await sharp(BOARD_IMAGE_PATH).metadata();
+            console.log(`[TileBoard] Processing at full resolution: ${metadata.width}x${metadata.height}`);
 
-            // Aggressive scaling for 512MB with limited available memory
-            const SCALE = 0.5; // 50% scale - reduces memory by 75%
-            const scaledWidth = Math.round(metadata.width * SCALE);
-            const scaledHeight = Math.round(metadata.height * SCALE);
-
-            console.log(`[TileBoard] Scaling from ${metadata.width}x${metadata.height} to ${scaledWidth}x${scaledHeight}`);
-
-            // Create SVG overlay with team markers (using scaled dimensions)
-            const svgOverlay = this.createSVGOverlay(teams, scaledWidth, scaledHeight);
+            // Create SVG overlay with team markers (using full dimensions)
+            const svgOverlay = this.createSVGOverlay(teams, metadata.width, metadata.height);
 
             // Composite the overlay onto the base image
             console.log('[TileBoard] Compositing SVG overlay onto base image...');
             await sharp(BOARD_IMAGE_PATH, {
                 limitInputPixels: false,
-                sequentialRead: true // Memory optimization
+                sequentialRead: true
             })
-                .resize(scaledWidth, scaledHeight, {
-                    kernel: 'lanczos3' // Good quality downscaling
-                })
                 .composite([{
                     input: Buffer.from(svgOverlay),
                     top: 0,
@@ -116,12 +107,6 @@ class TileBoardService {
 
     createSVGOverlay(teams, width, height) {
         let markers = '';
-
-        // Calculate scale factor based on original coordinates (2246x2439)
-        const ORIGINAL_WIDTH = 2246;
-        const ORIGINAL_HEIGHT = 2439;
-        const scaleX = width / ORIGINAL_WIDTH;
-        const scaleY = height / ORIGINAL_HEIGHT;
 
         // Group teams by tile to handle multiple teams on same tile
         const teamsByTile = {};
@@ -147,7 +132,7 @@ class TileBoardService {
 
             // Calculate horizontal offset for multiple teams on same tile
             const teamCount = teamsOnTile.length;
-            const spacing = 70 * scaleX; // Horizontal spacing between markers (scaled)
+            const spacing = 70; // Horizontal spacing between markers
 
             teamsOnTile.forEach((team, index) => {
                 // Center the markers if multiple teams
@@ -155,9 +140,9 @@ class TileBoardService {
                     ? (index - (teamCount - 1) / 2) * spacing
                     : 0;
 
-                // Scale coordinates to match resized image
-                const x = coord.x * scaleX + offsetX;
-                const y = coord.y * scaleY;
+                // Use coordinates directly (no scaling)
+                const x = coord.x + offsetX;
+                const y = coord.y;
 
                 const color = this.getTeamColor(team.team_name);
                 const initial = this.getTeamInitial(team.team_name);
@@ -170,43 +155,42 @@ class TileBoardService {
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&apos;');
 
-                // Scale all marker elements proportionally
-                const markerRadius = 30 * scaleX;
-                const shadowOffset = 4 * scaleY;
-                const highlightOffset = 10 * scaleX;
-                const fontSize = 32 * scaleX;
-                const strokeWidth = 4 * scaleX;
-                const labelFontSize = 16 * scaleX;
-                const labelStrokeWidth = 1 * scaleX;
+                // Fixed marker sizes (no scaling)
+                const markerRadius = 30;
+                const shadowOffset = 4;
+                const highlightOffset = 10;
+                const fontSize = 32;
+                const strokeWidth = 4;
+                const labelFontSize = 16;
 
-                // Draw shadow for depth (scaled)
-                markers += `<circle cx="${x}" cy="${y + shadowOffset}" r="${markerRadius + 5 * scaleX}" fill="#000000" opacity="0.4"/>`;
+                // Draw shadow for depth
+                markers += `<circle cx="${x}" cy="${y + shadowOffset}" r="${markerRadius + 5}" fill="#000000" opacity="0.4"/>`;
 
-                // Draw outer glow (scaled)
-                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 8 * scaleX}" fill="${color}" opacity="0.5"/>`;
+                // Draw outer glow
+                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 8}" fill="${color}" opacity="0.5"/>`;
 
-                // Draw middle glow ring (scaled)
-                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 4 * scaleX}" fill="${color}" opacity="0.7"/>`;
+                // Draw middle glow ring
+                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 4}" fill="${color}" opacity="0.7"/>`;
 
-                // Draw main circle (scaled)
+                // Draw main circle
                 markers += `<circle cx="${x}" cy="${y}" r="${markerRadius}" fill="${color}" stroke="#FFFFFF" stroke-width="${strokeWidth}"/>`;
 
-                // Draw inner highlight (scaled)
-                markers += `<circle cx="${x - highlightOffset}" cy="${y - highlightOffset}" r="${8 * scaleX}" fill="#FFFFFF" opacity="0.6"/>`;
+                // Draw inner highlight
+                markers += `<circle cx="${x - highlightOffset}" cy="${y - highlightOffset}" r="8" fill="#FFFFFF" opacity="0.6"/>`;
 
-                // Draw team initial (scaled) - using dominant-baseline for better positioning
+                // Draw team initial - using dominant-baseline for better positioning
                 markers += `<text x="${x}" y="${y}" font-size="${fontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
 
-                // Draw team name label above (scaled)
-                const labelY = y - 55 * scaleY;
-                const teamNameWidth = Math.max(team.team_name.length * 10 * scaleX, 80 * scaleX);
-                const labelHeight = 28 * scaleY;
+                // Draw team name label above
+                const labelY = y - 55;
+                const teamNameWidth = Math.max(team.team_name.length * 10, 80);
+                const labelHeight = 28;
 
-                // Team name background (scaled)
-                markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="${6 * scaleX}" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="${strokeWidth * 0.5}"/>`;
+                // Team name background
+                markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="${strokeWidth * 0.5}"/>`;
 
-                // Team name text (scaled) - better baseline and no stroke issues
-                markers += `<text x="${x}" y="${labelY}" font-size="${labelFontSize}" font-weight="bold" font-family="Arial, Helvetica, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">${escapedTeamName}</text>`;
+                // Team name text - using Arial which should be universally available
+                markers += `<text x="${x}" y="${labelY}" font-size="${labelFontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">${escapedTeamName}</text>`;
             });
         }
 
