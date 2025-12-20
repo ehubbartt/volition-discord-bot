@@ -31,6 +31,11 @@ COPY . .
 # Final stage for app image
 FROM base
 
+# Install fonts for Sharp SVG text rendering
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y fonts-liberation fonts-dejavu-core && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy built application
 COPY --from=build /app /app
 

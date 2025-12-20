@@ -178,8 +178,8 @@ class TileBoardService {
                 // Draw inner highlight
                 markers += `<circle cx="${x - highlightOffset}" cy="${y - highlightOffset}" r="8" fill="#FFFFFF" opacity="0.6"/>`;
 
-                // Draw team initial - using dominant-baseline for better positioning
-                markers += `<text x="${x}" y="${y}" font-size="${fontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
+                // Draw team initial - using Liberation Sans (installed in Dockerfile)
+                markers += `<text x="${x}" y="${y + fontSize/3}" font-size="${fontSize}" font-weight="bold" font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
 
                 // Draw team name label above
                 const labelY = y - 55;
@@ -189,8 +189,8 @@ class TileBoardService {
                 // Team name background
                 markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="${strokeWidth * 0.5}"/>`;
 
-                // Team name text - using Arial which should be universally available
-                markers += `<text x="${x}" y="${labelY}" font-size="${labelFontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">${escapedTeamName}</text>`;
+                // Team name text - using Liberation Sans font (installed in Dockerfile)
+                markers += `<text x="${x}" y="${labelY + labelFontSize/3}" font-size="${labelFontSize}" font-weight="bold" font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF" text-anchor="middle">${escapedTeamName}</text>`;
             });
         }
 
