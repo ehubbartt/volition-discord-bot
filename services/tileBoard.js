@@ -89,11 +89,21 @@ class TileBoardService {
     createSVGOverlay(teams, width, height) {
         let markers = '';
 
-        // Sort teams by current_tile (descending) so leading teams are drawn last (on top)
-        const sortedTeams = [...teams].sort((a, b) => b.current_tile - a.current_tile);
-
-        for (const team of sortedTeams) {
+        // Group teams by tile to handle multiple teams on same tile
+        const teamsByTile = {};
+        for (const team of teams) {
             const tile = team.current_tile;
+            if (!teamsByTile[tile]) {
+                teamsByTile[tile] = [];
+            }
+            teamsByTile[tile].push(team);
+        }
+
+        // Sort tiles by descending order so leading teams are drawn last (on top)
+        const sortedTiles = Object.keys(teamsByTile).sort((a, b) => b - a);
+
+        for (const tile of sortedTiles) {
+            const teamsOnTile = teamsByTile[tile];
             const coord = this.coordinates[tile];
 
             if (!coord) {
@@ -101,42 +111,66 @@ class TileBoardService {
                 continue;
             }
 
-            const color = this.getTeamColor(team.team_name);
-            const initial = this.getTeamInitial(team.team_name);
+            // Calculate horizontal offset for multiple teams on same tile
+            const teamCount = teamsOnTile.length;
+            const spacing = 70; // Horizontal spacing between markers
 
-            // Draw shadow for depth
-            markers += `<circle cx="${coord.x}" cy="${coord.y + 3}" r="28" fill="#00000040" opacity="0.5"/>`;
+            teamsOnTile.forEach((team, index) => {
+                // Center the markers if multiple teams
+                const offsetX = teamCount > 1
+                    ? (index - (teamCount - 1) / 2) * spacing
+                    : 0;
 
-            // Draw outer ring (glow effect)
-            markers += `<circle cx="${coord.x}" cy="${coord.y}" r="32" fill="${color}" opacity="0.3"/>`;
+                const x = coord.x + offsetX;
+                const y = coord.y;
 
-            // Draw main circle
-            markers += `<circle cx="${coord.x}" cy="${coord.y}" r="26" fill="${color}" stroke="#FFFFFF" stroke-width="3"/>`;
+                const color = this.getTeamColor(team.team_name);
+                const initial = this.getTeamInitial(team.team_name);
 
-            // Draw inner highlight
-            markers += `<circle cx="${coord.x - 8}" cy="${coord.y - 8}" r="6" fill="#FFFFFF" opacity="0.4"/>`;
+                // Draw shadow for depth (larger and more visible)
+                markers += `<circle cx="${x}" cy="${y + 4}" r="35" fill="#000000" opacity="0.4"/>`;
 
-            // Draw team initial
-            markers += `<text x="${coord.x}" y="${coord.y + 10}" font-size="28" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="1" paint-order="stroke">${initial}</text>`;
+                // Draw outer glow (brighter and larger)
+                markers += `<circle cx="${x}" cy="${y}" r="38" fill="${color}" opacity="0.5"/>`;
 
-            // Draw tile number label above
-            const labelY = coord.y - 45;
-            const labelWidth = 60;
-            const labelHeight = 24;
+                // Draw middle glow ring
+                markers += `<circle cx="${x}" cy="${y}" r="34" fill="${color}" opacity="0.7"/>`;
 
-            // Label background
-            markers += `<rect x="${coord.x - labelWidth/2}" y="${labelY - labelHeight/2}" width="${labelWidth}" height="${labelHeight}" rx="4" fill="#000000" opacity="0.8"/>`;
+                // Draw main circle (brighter, larger)
+                markers += `<circle cx="${x}" cy="${y}" r="30" fill="${color}" stroke="#FFFFFF" stroke-width="4"/>`;
 
-            // Label text
-            markers += `<text x="${coord.x}" y="${labelY + 6}" font-size="14" font-weight="bold" font-family="Arial, sans-serif" fill="${color}" text-anchor="middle">Tile ${tile}</text>`;
+                // Draw inner highlight (more prominent)
+                markers += `<circle cx="${x - 10}" cy="${y - 10}" r="8" fill="#FFFFFF" opacity="0.6"/>`;
+
+                // Draw team initial (larger, bolder)
+                markers += `<text x="${x}" y="${y + 12}" font-size="32" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="2" paint-order="stroke">${initial}</text>`;
+
+                // Draw team name label above (instead of tile number)
+                const labelY = y - 55;
+                const teamNameWidth = Math.max(team.team_name.length * 10, 80);
+                const labelHeight = 28;
+
+                // Team name background (brighter)
+                markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="2"/>`;
+
+                // Team name text (white for contrast)
+                markers += `<text x="${x}" y="${labelY + 8}" font-size="16" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="1" paint-order="stroke">${team.team_name}</text>`;
+            });
         }
 
         return `
             <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
                 <defs>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
                     <filter id="shadow">
-                        <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-                        <feOffset dx="0" dy="2" result="offsetblur"/>
+                        <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+                        <feOffset dx="0" dy="3" result="offsetblur"/>
                         <feMerge>
                             <feMergeNode/>
                             <feMergeNode in="SourceGraphic"/>
@@ -162,7 +196,7 @@ class TileBoardService {
                 return null;
             }
 
-            // Create attachment and embed
+            // Create attachment for the large board image
             const attachment = new AttachmentBuilder(imagePath, { name: 'tile-board.png' });
 
             // Get team standings for embed
@@ -179,28 +213,26 @@ class TileBoardService {
             sortedTeams.forEach((team, index) => {
                 const position = index + 1;
                 const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : `${position}.`;
-                const color = this.getTeamColor(team.team_name);
                 standingsText += `${medal} **${team.team_name}** - Tile ${team.current_tile}/40\n`;
             });
 
-            const embed = new EmbedBuilder()
-                .setTitle('🏁 Tile Event - Live Board')
-                .setDescription('Team positions update automatically when teams move')
-                .setImage('attachment://tile-board.png')
-                .addFields({
-                    name: '📊 Current Standings',
-                    value: standingsText || 'No teams yet',
-                    inline: false
-                })
+            // Create leaderboard embed (separate from image)
+            const leaderboardEmbed = new EmbedBuilder()
+                .setTitle('📊 Current Standings')
+                .setDescription(standingsText || 'No teams yet')
                 .setColor('#7289da')
-                .setTimestamp()
-                .setFooter({ text: 'Last updated' });
+                .setTimestamp();
 
             if (messageId) {
                 // Update existing message
                 try {
                     const message = await channel.messages.fetch(messageId);
-                    await message.edit({ embeds: [embed], files: [attachment] });
+                    // Send image standalone (larger display), then embed below
+                    await message.edit({
+                        content: '🏁 **Tile Event - Live Board**',
+                        files: [attachment],
+                        embeds: [leaderboardEmbed]
+                    });
                     console.log('[TileBoard] Board updated successfully');
                     return messageId;
                 } catch (error) {
@@ -209,8 +241,12 @@ class TileBoardService {
                 }
             }
 
-            // Send new message
-            const message = await channel.send({ embeds: [embed], files: [attachment] });
+            // Send new message with image and leaderboard separate
+            const message = await channel.send({
+                content: '🏁 **Tile Event - Live Board**',
+                files: [attachment],
+                embeds: [leaderboardEmbed]
+            });
             console.log('[TileBoard] New board message created:', message.id);
             return message.id;
 
