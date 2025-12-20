@@ -132,11 +132,23 @@ module.exports = {
 
             // Update the board in the background (don't block the response)
             if (boardConfig.enabled && boardConfig.updateOnCommands && boardConfig.boardChannelId) {
+                console.log('[Reroll] Triggering board update...');
                 tileBoardService.updateDiscordBoard(
                     interaction.client,
-                    boardConfig.boardChannelId,
-                    boardConfig.boardMessageId
-                ).catch(err => console.error('[Reroll] Failed to update board:', err));
+                    boardConfig.boardChannelId.toString(),
+                    boardConfig.boardMessageId ? boardConfig.boardMessageId.toString() : null
+                ).then(() => {
+                    console.log('[Reroll] Board update completed successfully');
+                }).catch(err => {
+                    console.error('[Reroll] Failed to update board:', err);
+                    console.error('[Reroll] Error stack:', err.stack);
+                });
+            } else {
+                console.log('[Reroll] Board update skipped:', {
+                    enabled: boardConfig.enabled,
+                    updateOnCommands: boardConfig.updateOnCommands,
+                    hasChannelId: !!boardConfig.boardChannelId
+                });
             }
 
         } catch (error) {
