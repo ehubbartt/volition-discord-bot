@@ -74,19 +74,17 @@ class TileBoardService {
             const svgOverlay = this.createSVGOverlay(teams, metadata.width, metadata.height);
 
             // Composite the overlay onto the base image
+            // Write directly to file to reduce memory usage
             console.log('[TileBoard] Compositing SVG overlay onto base image...');
-            const outputBuffer = await sharp(baseImage)
+            await sharp(baseImage)
                 .composite([{
                     input: Buffer.from(svgOverlay),
                     top: 0,
                     left: 0
                 }])
-                .png()
-                .toBuffer();
+                .png({ quality: 90, compressionLevel: 9 }) // Compress to reduce file size
+                .toFile(OUTPUT_PATH);
 
-            console.log('[TileBoard] Image composited, writing to file...');
-            // Save to temp file
-            await fs.writeFile(OUTPUT_PATH, outputBuffer);
             console.log('[TileBoard] ✅ Board image generated at', OUTPUT_PATH);
 
             return OUTPUT_PATH;
@@ -202,6 +200,13 @@ class TileBoardService {
             const imagePath = await this.generateBoardImage();
             console.log('[TileBoard] Image generated successfully, fetching channel...');
 
+            // Clear base image buffer to free memory
+            this.baseImageBuffer = null;
+            if (global.gc) {
+                global.gc();
+                console.log('[TileBoard] Manual garbage collection triggered');
+            }
+
             // Get the channel
             const channel = await client.channels.fetch(channelId);
             console.log('[TileBoard] Channel fetched:', channel?.name);
@@ -250,6 +255,15 @@ class TileBoardService {
                         embeds: [leaderboardEmbed]
                     });
                     console.log('[TileBoard] ✅ Board updated successfully');
+
+                    // Clean up temp file after successful upload
+                    try {
+                        await fs.unlink(imagePath);
+                        console.log('[TileBoard] Temp file cleaned up');
+                    } catch (cleanupError) {
+                        console.warn('[TileBoard] Failed to cleanup temp file:', cleanupError.message);
+                    }
+
                     return messageId;
                 } catch (error) {
                     console.error('[TileBoard] Failed to fetch/edit message:', error.message);
@@ -266,6 +280,15 @@ class TileBoardService {
                 embeds: [leaderboardEmbed]
             });
             console.log('[TileBoard] New board message created:', message.id);
+
+            // Clean up temp file after successful upload
+            try {
+                await fs.unlink(imagePath);
+                console.log('[TileBoard] Temp file cleaned up');
+            } catch (cleanupError) {
+                console.warn('[TileBoard] Failed to cleanup temp file:', cleanupError.message);
+            }
+
             return message.id;
 
         } catch (error) {
