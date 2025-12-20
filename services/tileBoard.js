@@ -5,6 +5,11 @@ const path = require('path');
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../db/tile_event');
 
+// Configure sharp for low memory usage
+sharp.cache(false); // Disable caching to save memory
+sharp.concurrency(1); // Process one image at a time
+sharp.simd(false); // Disable SIMD to reduce memory overhead
+
 const BOARD_IMAGE_PATH = path.join(__dirname, '../tile-board.png');
 const COORDINATES_PATH = path.join(__dirname, '../tile-board-coordinates.json');
 const TEMP_DIR = path.join(__dirname, '../temp');
@@ -69,26 +74,34 @@ class TileBoardService {
             console.log('[TileBoard] Loading base image metadata...');
             const metadata = await sharp(BOARD_IMAGE_PATH).metadata();
 
-            // With 512MB we can use full resolution with slight scaling for safety
-            const SCALE = 0.85; // 85% scale - good quality while staying safe on memory
+            // Aggressive scaling for 512MB with limited available memory
+            const SCALE = 0.5; // 50% scale - reduces memory by 75%
             const scaledWidth = Math.round(metadata.width * SCALE);
             const scaledHeight = Math.round(metadata.height * SCALE);
+
+            console.log(`[TileBoard] Scaling from ${metadata.width}x${metadata.height} to ${scaledWidth}x${scaledHeight}`);
 
             // Create SVG overlay with team markers (using scaled dimensions)
             const svgOverlay = this.createSVGOverlay(teams, scaledWidth, scaledHeight);
 
             // Composite the overlay onto the base image
             console.log('[TileBoard] Compositing SVG overlay onto base image...');
-            await sharp(BOARD_IMAGE_PATH, { limitInputPixels: false })
-                .resize(scaledWidth, scaledHeight)
+            await sharp(BOARD_IMAGE_PATH, {
+                limitInputPixels: false,
+                sequentialRead: true // Memory optimization
+            })
+                .resize(scaledWidth, scaledHeight, {
+                    kernel: 'lanczos3' // Good quality downscaling
+                })
                 .composite([{
                     input: Buffer.from(svgOverlay),
                     top: 0,
                     left: 0
                 }])
                 .png({
-                    quality: 95, // High quality
-                    compressionLevel: 6 // Balanced compression (faster, still good size)
+                    quality: 90,
+                    compressionLevel: 9,
+                    adaptiveFiltering: true
                 })
                 .toFile(OUTPUT_PATH);
 
