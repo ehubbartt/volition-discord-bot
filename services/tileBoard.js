@@ -162,6 +162,14 @@ class TileBoardService {
                 const color = this.getTeamColor(team.team_name);
                 const initial = this.getTeamInitial(team.team_name);
 
+                // Escape special characters in team name for SVG
+                const escapedTeamName = team.team_name
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+
                 // Scale all marker elements proportionally
                 const markerRadius = 30 * scaleX;
                 const shadowOffset = 4 * scaleY;
@@ -186,8 +194,8 @@ class TileBoardService {
                 // Draw inner highlight (scaled)
                 markers += `<circle cx="${x - highlightOffset}" cy="${y - highlightOffset}" r="${8 * scaleX}" fill="#FFFFFF" opacity="0.6"/>`;
 
-                // Draw team initial (scaled)
-                markers += `<text x="${x}" y="${y + fontSize * 0.375}" font-size="${fontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
+                // Draw team initial (scaled) - using dominant-baseline for better positioning
+                markers += `<text x="${x}" y="${y}" font-size="${fontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
 
                 // Draw team name label above (scaled)
                 const labelY = y - 55 * scaleY;
@@ -197,8 +205,8 @@ class TileBoardService {
                 // Team name background (scaled)
                 markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="${6 * scaleX}" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="${strokeWidth * 0.5}"/>`;
 
-                // Team name text (scaled)
-                markers += `<text x="${x}" y="${labelY + labelFontSize * 0.5}" font-size="${labelFontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="${labelStrokeWidth}" paint-order="stroke">${team.team_name}</text>`;
+                // Team name text (scaled) - better baseline and no stroke issues
+                markers += `<text x="${x}" y="${labelY}" font-size="${labelFontSize}" font-weight="bold" font-family="Arial, Helvetica, sans-serif" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">${escapedTeamName}</text>`;
             });
         }
 
