@@ -168,10 +168,22 @@ module.exports = {
                 targetItem = newProgress.find(p => p.item_name.toLowerCase() === itemName.toLowerCase());
             }
 
-            const isPositive = Math.random() < 0.3;
-            const outcome = isPositive ? 'reduce_requirement' : 'add_requirement';
+            // Determine help/hinder chance based on tile section
+            let helpChance;
+            if (targetTeam.current_tile <= 10) {
+                helpChance = 0.30; // 30% help, 70% hinder
+            } else if (targetTeam.current_tile <= 20) {
+                helpChance = 0.40; // 40% help, 60% hinder
+            } else {
+                helpChance = 0.50; // 50% help, 50% hinder
+            }
 
-            await tileEventDb.applySabotage(targetTeam.id, targetTeam.current_tile, targetItem.item_name, isPositive);
+            const isHelp = Math.random() < helpChance;
+            const outcome = isHelp ? 'give_progress' : 'take_progress';
+
+            // Apply sabotage (give or take 1 drop)
+            const progressChange = isHelp ? 1 : -1;
+            await tileEventDb.applySabotageProgress(targetTeam.id, targetTeam.current_tile, targetItem.item_name, progressChange);
             await tileEventDb.useSabotageToken(attackerTeam.id);
             await tileEventDb.logSabotageUsage(
                 attackerTeam.id,
@@ -185,33 +197,37 @@ module.exports = {
             const updatedProgress = await tileEventDb.getTeamProgress(targetTeam.id, targetTeam.current_tile);
             const updatedItem = updatedProgress.find(p => p.item_name === targetItem.item_name);
 
-            // Check if the sabotage backfire auto-completed the tile
+            // Check if the sabotage helped them complete the tile
             const tileComplete = await tileEventDb.checkTileCompletion(targetTeam.id, targetTeam.current_tile);
 
+            // Calculate percentage for display
+            const helpPercentage = Math.round(helpChance * 100);
+            const hinderPercentage = 100 - helpPercentage;
+
             const embed = new EmbedBuilder()
-                .setColor(isPositive ? 'Green' : 'Red')
+                .setColor(isHelp ? 'Green' : 'Red')
                 .setTitle('🎯 Sabotage Used!')
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .addFields(
                     { name: 'Attacker', value: attackerTeam.team_name, inline: true },
                     { name: 'Target', value: targetTeam.team_name, inline: true },
-                    { name: 'Outcome', value: isPositive ? '✅ Backfire!' : '💥 Success!', inline: true },
+                    { name: 'Outcome', value: isHelp ? '✅ Helped!' : '💥 Hindered!', inline: true },
                     { name: 'Item Affected', value: targetItem.item_name, inline: true },
-                    { name: 'Old Requirement', value: `${targetItem.required_quantity}`, inline: true },
-                    { name: 'New Requirement', value: `${updatedItem.required_quantity}`, inline: true },
-                    { name: 'Current Progress', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true },
+                    { name: 'Old Progress', value: `${targetItem.current_quantity}/${targetItem.required_quantity}`, inline: true },
+                    { name: 'New Progress', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true },
+                    { name: 'Change', value: isHelp ? '+1 Drop' : '-1 Drop', inline: true },
                     { name: 'Status', value: updatedItem.is_completed ? '✅ Complete' : '🔄 In Progress', inline: true }
                 )
                 .setTimestamp();
 
-            if (isPositive) {
-                let description = '🍀 **30% chance activated!** The sabotage backfired and reduced their requirement by 1!';
+            if (isHelp) {
+                let description = `🍀 **${helpPercentage}% chance activated!** You helped them by giving +1 drop!`;
                 if (tileComplete) {
-                    description += '\n\n🎉 **The tile was auto-completed!** Their progress met the new requirement!';
+                    description += '\n\n🎉 **This completed their tile!** They can now roll to the next tile!';
                 }
                 embed.setDescription(description);
             } else {
-                embed.setDescription('💀 **70% chance activated!** Successfully increased their requirement by 1!');
+                embed.setDescription(`💀 **${hinderPercentage}% chance activated!** You hindered them by taking away 1 drop!`);
             }
 
             await interaction.editReply({ embeds: [embed] });
@@ -224,25 +240,25 @@ module.exports = {
                     const roleTag = targetRole ? `${targetRole}` : `**${targetTeam.team_name}**`;
 
                     const announcementEmbed = new EmbedBuilder()
-                        .setColor(isPositive ? 'Green' : 'Red')
+                        .setColor(isHelp ? 'Green' : 'Red')
                         .setTitle('🎯 Sabotage Token Used!')
                         .addFields(
                             { name: 'Attacker', value: attackerTeam.team_name, inline: true },
                             { name: 'Target', value: targetTeam.team_name, inline: true },
                             { name: 'Tile', value: `${targetTeam.current_tile}`, inline: true },
                             { name: 'Item', value: targetItem.item_name, inline: true },
-                            { name: 'Effect', value: isPositive ? '✅ -1 Requirement' : '💥 +1 Requirement', inline: true },
-                            { name: 'New Requirement', value: `${updatedItem.required_quantity}`, inline: true }
+                            { name: 'Effect', value: isHelp ? '✅ +1 Drop' : '💥 -1 Drop', inline: true },
+                            { name: 'New Progress', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true }
                         )
                         .setTimestamp();
 
-                    if (isPositive && tileComplete) {
-                        announcementEmbed.setDescription('🎉 **Tile Auto-Completed!** The reduced requirement was already met!');
+                    if (isHelp && tileComplete) {
+                        announcementEmbed.setDescription('🎉 **Tile Completed!** The extra drop completed their tile!');
                     }
 
-                    const messageContent = isPositive && tileComplete
-                        ? `${roleTag} - Your team has been sabotaged... but it backfired and completed your tile! 🎉`
-                        : `${roleTag} - Your team has been sabotaged!`;
+                    const messageContent = isHelp && tileComplete
+                        ? `${roleTag} - Your team has been sabotaged... but it helped and completed your tile! 🎉`
+                        : `${roleTag} - Your team has been ${isHelp ? 'helped' : 'hindered'} by sabotage!`;
 
                     await sabotageChannel.send({
                         content: messageContent,

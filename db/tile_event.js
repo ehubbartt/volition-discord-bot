@@ -378,6 +378,39 @@ async function applySabotage(targetTeamId, targetTile, itemName, isPositive) {
     return data;
 }
 
+async function applySabotageProgress(targetTeamId, targetTile, itemName, progressChange) {
+    const { data: progress, error: fetchError } = await supabase
+        .from('tile_event_progress')
+        .select('*')
+        .eq('team_id', targetTeamId)
+        .eq('tile_number', targetTile)
+        .eq('item_name', itemName)
+        .single();
+
+    if (fetchError) throw fetchError;
+
+    // Add or subtract progress (min 0)
+    const newQuantity = Math.max(0, progress.current_quantity + progressChange);
+
+    // Check if this completes the item
+    const isNowCompleted = newQuantity >= progress.required_quantity;
+    const completedAt = isNowCompleted && !progress.is_completed ? new Date().toISOString() : progress.completed_at;
+
+    const { data, error } = await supabase
+        .from('tile_event_progress')
+        .update({
+            current_quantity: newQuantity,
+            is_completed: isNowCompleted,
+            completed_at: completedAt
+        })
+        .eq('id', progress.id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
 async function logRoll(teamId, fromTile, rollValue, toTile, wasCapped, rolledByDiscordId) {
     const { data, error } = await supabase
         .from('tile_event_roll_log')
@@ -518,6 +551,7 @@ module.exports = {
     logSubmission,
     logSabotageUsage,
     applySabotage,
+    applySabotageProgress,
     logRoll,
     calculateNewTile,
     getTeamsAheadOf,
