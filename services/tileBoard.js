@@ -226,17 +226,21 @@ class TileBoardService {
             if (messageId) {
                 // Update existing message
                 try {
+                    console.log('[TileBoard] Fetching existing message:', messageId);
                     const message = await channel.messages.fetch(messageId);
+                    console.log('[TileBoard] Message fetched, editing...');
                     // Send image standalone (larger display), then embed below
                     await message.edit({
                         content: '🏁 **Tile Event - Live Board**',
                         files: [attachment],
                         embeds: [leaderboardEmbed]
                     });
-                    console.log('[TileBoard] Board updated successfully');
+                    console.log('[TileBoard] ✅ Board updated successfully');
                     return messageId;
                 } catch (error) {
-                    console.error('[TileBoard] Failed to fetch/edit message, creating new one:', error.message);
+                    console.error('[TileBoard] Failed to fetch/edit message:', error.message);
+                    console.error('[TileBoard] Error details:', error);
+                    console.error('[TileBoard] Creating new message instead...');
                     // Fall through to create new message
                 }
             }

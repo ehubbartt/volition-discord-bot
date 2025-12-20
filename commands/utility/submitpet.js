@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
-const config = require('../../config.json');
+const config = require('../../utils/config');
 
 // Mapping of tile numbers to their related pets
 const TILE_PETS = {

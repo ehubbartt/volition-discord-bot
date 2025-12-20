@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
-const config = require('../../config.json');
+const config = require('../../utils/config');
 
 module.exports = {
     data: new SlashCommandBuilder()
