@@ -1,12 +1,20 @@
 const sharp = require('sharp');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../db/tile_event');
 
 const BOARD_IMAGE_PATH = path.join(__dirname, '../tile-board.png');
 const COORDINATES_PATH = path.join(__dirname, '../tile-board-coordinates.json');
-const OUTPUT_PATH = path.join(__dirname, '../temp/board-output.png');
+const TEMP_DIR = path.join(__dirname, '../temp');
+const OUTPUT_PATH = path.join(TEMP_DIR, 'board-output.png');
+
+// Ensure temp directory exists
+if (!fsSync.existsSync(TEMP_DIR)) {
+    fsSync.mkdirSync(TEMP_DIR, { recursive: true });
+    console.log('[TileBoard] Created temp directory at', TEMP_DIR);
+}
 
 class TileBoardService {
     constructor() {
@@ -66,6 +74,7 @@ class TileBoardService {
             const svgOverlay = this.createSVGOverlay(teams, metadata.width, metadata.height);
 
             // Composite the overlay onto the base image
+            console.log('[TileBoard] Compositing SVG overlay onto base image...');
             const outputBuffer = await sharp(baseImage)
                 .composite([{
                     input: Buffer.from(svgOverlay),
@@ -75,9 +84,10 @@ class TileBoardService {
                 .png()
                 .toBuffer();
 
+            console.log('[TileBoard] Image composited, writing to file...');
             // Save to temp file
             await fs.writeFile(OUTPUT_PATH, outputBuffer);
-            console.log('[TileBoard] Board image generated at', OUTPUT_PATH);
+            console.log('[TileBoard] ✅ Board image generated at', OUTPUT_PATH);
 
             return OUTPUT_PATH;
         } catch (error) {
@@ -185,12 +195,16 @@ class TileBoardService {
     async updateDiscordBoard(client, channelId, messageId = null) {
         try {
             console.log('[TileBoard] Updating Discord board...');
+            console.log('[TileBoard] Channel ID:', channelId);
+            console.log('[TileBoard] Message ID:', messageId);
 
             // Generate the board image
             const imagePath = await this.generateBoardImage();
+            console.log('[TileBoard] Image generated successfully, fetching channel...');
 
             // Get the channel
             const channel = await client.channels.fetch(channelId);
+            console.log('[TileBoard] Channel fetched:', channel?.name);
             if (!channel) {
                 console.error('[TileBoard] Board channel not found:', channelId);
                 return null;
