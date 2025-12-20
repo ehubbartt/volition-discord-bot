@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
+const tileBoardService = require('../../services/tileBoard');
+const boardConfig = require('../../config/boardConfig.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -127,6 +129,15 @@ module.exports = {
             embed.setTimestamp();
 
             await interaction.editReply({ embeds: [embed] });
+
+            // Update the board in the background (don't block the response)
+            if (boardConfig.enabled && boardConfig.updateOnCommands && boardConfig.boardChannelId) {
+                tileBoardService.updateDiscordBoard(
+                    interaction.client,
+                    boardConfig.boardChannelId,
+                    boardConfig.boardMessageId
+                ).catch(err => console.error('[Reroll] Failed to update board:', err));
+            }
 
         } catch (error) {
             console.error('Error using re-roll token:', error);
