@@ -162,34 +162,43 @@ class TileBoardService {
                 const color = this.getTeamColor(team.team_name);
                 const initial = this.getTeamInitial(team.team_name);
 
-                // Draw shadow for depth (larger and more visible)
-                markers += `<circle cx="${x}" cy="${y + 4}" r="35" fill="#000000" opacity="0.4"/>`;
+                // Scale all marker elements proportionally
+                const markerRadius = 30 * scaleX;
+                const shadowOffset = 4 * scaleY;
+                const highlightOffset = 10 * scaleX;
+                const fontSize = 32 * scaleX;
+                const strokeWidth = 4 * scaleX;
+                const labelFontSize = 16 * scaleX;
+                const labelStrokeWidth = 1 * scaleX;
 
-                // Draw outer glow (brighter and larger)
-                markers += `<circle cx="${x}" cy="${y}" r="38" fill="${color}" opacity="0.5"/>`;
+                // Draw shadow for depth (scaled)
+                markers += `<circle cx="${x}" cy="${y + shadowOffset}" r="${markerRadius + 5 * scaleX}" fill="#000000" opacity="0.4"/>`;
 
-                // Draw middle glow ring
-                markers += `<circle cx="${x}" cy="${y}" r="34" fill="${color}" opacity="0.7"/>`;
+                // Draw outer glow (scaled)
+                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 8 * scaleX}" fill="${color}" opacity="0.5"/>`;
 
-                // Draw main circle (brighter, larger)
-                markers += `<circle cx="${x}" cy="${y}" r="30" fill="${color}" stroke="#FFFFFF" stroke-width="4"/>`;
+                // Draw middle glow ring (scaled)
+                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 4 * scaleX}" fill="${color}" opacity="0.7"/>`;
 
-                // Draw inner highlight (more prominent)
-                markers += `<circle cx="${x - 10}" cy="${y - 10}" r="8" fill="#FFFFFF" opacity="0.6"/>`;
+                // Draw main circle (scaled)
+                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius}" fill="${color}" stroke="#FFFFFF" stroke-width="${strokeWidth}"/>`;
 
-                // Draw team initial (larger, bolder)
-                markers += `<text x="${x}" y="${y + 12}" font-size="32" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="2" paint-order="stroke">${initial}</text>`;
+                // Draw inner highlight (scaled)
+                markers += `<circle cx="${x - highlightOffset}" cy="${y - highlightOffset}" r="${8 * scaleX}" fill="#FFFFFF" opacity="0.6"/>`;
 
-                // Draw team name label above (instead of tile number)
-                const labelY = y - 55;
-                const teamNameWidth = Math.max(team.team_name.length * 10, 80);
-                const labelHeight = 28;
+                // Draw team initial (scaled)
+                markers += `<text x="${x}" y="${y + fontSize * 0.375}" font-size="${fontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
 
-                // Team name background (brighter)
-                markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="2"/>`;
+                // Draw team name label above (scaled)
+                const labelY = y - 55 * scaleY;
+                const teamNameWidth = Math.max(team.team_name.length * 10 * scaleX, 80 * scaleX);
+                const labelHeight = 28 * scaleY;
 
-                // Team name text (white for contrast)
-                markers += `<text x="${x}" y="${labelY + 8}" font-size="16" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="1" paint-order="stroke">${team.team_name}</text>`;
+                // Team name background (scaled)
+                markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="${6 * scaleX}" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="${strokeWidth * 0.5}"/>`;
+
+                // Team name text (scaled)
+                markers += `<text x="${x}" y="${labelY + labelFontSize * 0.5}" font-size="${labelFontSize}" font-weight="bold" font-family="Arial, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="${labelStrokeWidth}" paint-order="stroke">${team.team_name}</text>`;
             });
         }
 
