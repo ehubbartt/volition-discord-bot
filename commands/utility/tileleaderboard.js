@@ -38,6 +38,7 @@ module.exports = {
 
             const teamsWithProgress = await Promise.all(allTeams.map(async (team) => {
                 const progress = await tileEventDb.getTeamProgress(team.id, team.current_tile);
+                const tileReachedAt = await tileEventDb.getTeamTileReachedAt(team.id, team.current_tile);
 
                 let progressPercent = 0;
                 if (progress.length > 0) {
@@ -49,15 +50,24 @@ module.exports = {
 
                 return {
                     ...team,
-                    progressPercent
+                    progressPercent,
+                    tileReachedAt
                 };
             }));
 
             teamsWithProgress.sort((a, b) => {
+                // First: sort by tile number (higher is better)
                 if (a.current_tile !== b.current_tile) {
                     return b.current_tile - a.current_tile;
                 }
-                return b.progressPercent - a.progressPercent;
+                // Second: sort by progress percent (higher is better)
+                if (a.progressPercent !== b.progressPercent) {
+                    return b.progressPercent - a.progressPercent;
+                }
+                // Third: sort by who reached the tile first (earlier is better)
+                const aTime = a.tileReachedAt ? new Date(a.tileReachedAt).getTime() : Infinity;
+                const bTime = b.tileReachedAt ? new Date(b.tileReachedAt).getTime() : Infinity;
+                return aTime - bTime;
             });
 
             const embed = new EmbedBuilder()

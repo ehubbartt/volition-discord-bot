@@ -548,6 +548,24 @@ async function setProgressQuantity(progressId, newQuantity, requiredQuantity, wa
     return data;
 }
 
+async function getTeamTileReachedAt(teamId, tileNumber) {
+    // Get when a team first reached a specific tile from the roll log
+    const { data, error } = await supabase
+        .from('tile_event_roll_log')
+        .select('created_at')
+        .eq('team_id', teamId)
+        .eq('to_tile', tileNumber)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null; // No roll found (could be starting tile)
+        throw error;
+    }
+    return data?.created_at || null;
+}
+
 module.exports = {
     getTeamByName,
     getTeamByLeaderId,
@@ -578,6 +596,7 @@ module.exports = {
     useRerollToken,
     getWeightedRoll,
     setProgressQuantity,
+    getTeamTileReachedAt,
     KEYSTONE_TILES,
     RAID_TILES
 };
