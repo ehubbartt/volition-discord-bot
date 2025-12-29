@@ -3,6 +3,7 @@ const tileEventDb = require('../../db/tile_event');
 const { isAdmin } = require('../../utils/permissions');
 const tileBoardService = require('../../services/tileBoard');
 const boardConfig = require('../../config/boardConfig.json');
+const boardConfigManager = require('../../utils/boardConfigManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -97,6 +98,21 @@ module.exports = {
             subcommand
                 .setName('refresh')
                 .setDescription('Force refresh the tile board display (admin only)')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('open')
+                .setDescription('Open the tile event for players (admin only)')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('close')
+                .setDescription('Close the tile event (admin only)')
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('status')
+                .setDescription('Check if the tile event is open or closed (admin only)')
         ),
 
     async autocomplete(interaction) {
@@ -175,6 +191,12 @@ module.exports = {
             await this.handleSetProgress(interaction);
         } else if (subcommand === 'refresh') {
             await this.handleRefresh(interaction);
+        } else if (subcommand === 'open') {
+            await this.handleOpen(interaction);
+        } else if (subcommand === 'close') {
+            await this.handleClose(interaction);
+        } else if (subcommand === 'status') {
+            await this.handleStatus(interaction);
         }
     },
 
@@ -659,6 +681,136 @@ module.exports = {
             console.error('Error refreshing board:', error);
             await interaction.editReply({
                 content: `Error refreshing board: ${error.message}`
+            });
+        }
+    },
+
+    async handleOpen(interaction) {
+        try {
+            const isActive = await boardConfigManager.isEventActive();
+            const staticConfig = boardConfigManager.getStaticConfig();
+
+            if (isActive) {
+                return interaction.reply({
+                    content: 'The tile event is already open!',
+                    ephemeral: true
+                });
+            }
+
+            await boardConfigManager.setEventActive(true);
+
+            const embed = new EmbedBuilder()
+                .setColor('Green')
+                .setTitle('🎉 Tile Event Opened!')
+                .setDescription(`Event opened by ${interaction.user}`)
+                .addFields(
+                    { name: 'Status', value: '✅ Event is now OPEN', inline: true },
+                    { name: 'Channel', value: `<#${staticConfig.tileEventChannelId}>`, inline: true }
+                )
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed] });
+
+            // Optionally announce in the event channel
+            if (staticConfig.tileEventChannelId) {
+                try {
+                    const eventChannel = await interaction.client.channels.fetch(staticConfig.tileEventChannelId);
+                    if (eventChannel) {
+                        const announcementEmbed = new EmbedBuilder()
+                            .setColor('Green')
+                            .setTitle('🎉 The Tile Event is Now OPEN!')
+                            .setDescription('Teams can now use commands to participate. Good luck!')
+                            .setTimestamp();
+                        await eventChannel.send({ embeds: [announcementEmbed] });
+                    }
+                } catch (err) {
+                    console.error('Failed to send announcement:', err);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error opening event:', error);
+            await interaction.reply({
+                content: `Error opening event: ${error.message}`,
+                ephemeral: true
+            });
+        }
+    },
+
+    async handleClose(interaction) {
+        try {
+            const isActive = await boardConfigManager.isEventActive();
+            const staticConfig = boardConfigManager.getStaticConfig();
+
+            if (!isActive) {
+                return interaction.reply({
+                    content: 'The tile event is already closed!',
+                    ephemeral: true
+                });
+            }
+
+            await boardConfigManager.setEventActive(false);
+
+            const embed = new EmbedBuilder()
+                .setColor('Red')
+                .setTitle('🔒 Tile Event Closed')
+                .setDescription(`Event closed by ${interaction.user}`)
+                .addFields(
+                    { name: 'Status', value: '❌ Event is now CLOSED', inline: true }
+                )
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed] });
+
+            // Optionally announce in the event channel
+            if (staticConfig.tileEventChannelId) {
+                try {
+                    const eventChannel = await interaction.client.channels.fetch(staticConfig.tileEventChannelId);
+                    if (eventChannel) {
+                        const announcementEmbed = new EmbedBuilder()
+                            .setColor('Red')
+                            .setTitle('🔒 The Tile Event is Now CLOSED')
+                            .setDescription('Commands are temporarily disabled. Stay tuned for updates!')
+                            .setTimestamp();
+                        await eventChannel.send({ embeds: [announcementEmbed] });
+                    }
+                } catch (err) {
+                    console.error('Failed to send announcement:', err);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error closing event:', error);
+            await interaction.reply({
+                content: `Error closing event: ${error.message}`,
+                ephemeral: true
+            });
+        }
+    },
+
+    async handleStatus(interaction) {
+        try {
+            const isActive = await boardConfigManager.isEventActive();
+            const staticConfig = boardConfigManager.getStaticConfig();
+
+            const embed = new EmbedBuilder()
+                .setColor(isActive ? 'Green' : 'Red')
+                .setTitle('📊 Tile Event Status')
+                .addFields(
+                    { name: 'Status', value: isActive ? '✅ OPEN' : '❌ CLOSED', inline: true },
+                    { name: 'Event Channel', value: staticConfig.tileEventChannelId ? `<#${staticConfig.tileEventChannelId}>` : 'Not set', inline: true },
+                    { name: 'Board Channel', value: staticConfig.boardChannelId ? `<#${staticConfig.boardChannelId}>` : 'Not set', inline: true },
+                    { name: 'Board Updates', value: staticConfig.updateOnCommands ? 'Enabled' : 'Disabled', inline: true }
+                )
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+
+        } catch (error) {
+            console.error('Error getting status:', error);
+            await interaction.reply({
+                content: `Error getting status: ${error.message}`,
+                ephemeral: true
             });
         }
     },

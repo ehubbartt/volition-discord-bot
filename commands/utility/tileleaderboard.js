@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
 const boardConfig = require('../../config/boardConfig.json');
+const boardConfigManager = require('../../utils/boardConfigManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -8,6 +9,14 @@ module.exports = {
         .setDescription('View the tile event leaderboard'),
 
     async execute(interaction) {
+        // Check if event is active
+        if (!(await boardConfigManager.isEventActive())) {
+            return interaction.reply({
+                content: 'The tile event is currently closed. Please wait for an admin to open it.',
+                ephemeral: true
+            });
+        }
+
         // Check if command is used in the correct channel
         if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
             return interaction.reply({
