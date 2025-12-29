@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
+const boardConfig = require('../../config/boardConfig.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,6 +13,14 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        // Check if command is used in the correct channel
+        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+            return interaction.reply({
+                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                ephemeral: true
+            });
+        }
+
         await interaction.deferReply({ ephemeral: true });
 
         try {

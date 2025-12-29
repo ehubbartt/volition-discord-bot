@@ -9,6 +9,14 @@ module.exports = {
         .setDescription('Roll to advance to the next tile (team leader only)'),
 
     async execute(interaction) {
+        // Check if command is used in the correct channel
+        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+            return interaction.reply({
+                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                ephemeral: true
+            });
+        }
+
         await interaction.deferReply();
 
         try {
