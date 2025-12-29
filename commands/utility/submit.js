@@ -30,7 +30,11 @@ module.exports = {
 
         if (focusedOption.name === 'item') {
             try {
-                const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+                // Check if user is on a team (as member or leader)
+                const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
+                const leaderTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+                const team = leaderTeam || (playerData ? playerData.team : null);
+
                 if (!team) {
                     return interaction.respond([]);
                 }
@@ -75,10 +79,14 @@ module.exports = {
             const quantity = interaction.options.getInteger('quantity');
             const messageLink = interaction.options.getString('proof');
 
-            const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+            // Check if user is on a team (as member or leader)
+            const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
+            const leaderTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+            const team = leaderTeam || (playerData ? playerData.team : null);
+
             if (!team) {
                 return interaction.editReply({
-                    content: 'You must be a team leader to submit drops.'
+                    content: 'You must be on a tile event team to submit drops. Ask your team leader to add you with `/addplayer`.'
                 });
             }
 

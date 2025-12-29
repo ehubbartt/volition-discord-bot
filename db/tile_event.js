@@ -530,6 +530,24 @@ function getWeightedRoll() {
     }
 }
 
+async function setProgressQuantity(progressId, newQuantity, requiredQuantity, wasCompleted) {
+    const isNowCompleted = newQuantity >= requiredQuantity;
+
+    const { data, error } = await supabase
+        .from('tile_event_progress')
+        .update({
+            current_quantity: newQuantity,
+            is_completed: isNowCompleted,
+            completed_at: isNowCompleted && !wasCompleted ? new Date().toISOString() : null
+        })
+        .eq('id', progressId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
 module.exports = {
     getTeamByName,
     getTeamByLeaderId,
@@ -559,6 +577,7 @@ module.exports = {
     hasBeenSabotagedOnCurrentTile,
     useRerollToken,
     getWeightedRoll,
+    setProgressQuantity,
     KEYSTONE_TILES,
     RAID_TILES
 };
