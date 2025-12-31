@@ -6,46 +6,46 @@ const boardConfigManager = require('../../utils/boardConfigManager');
 
 // Mapping of tile numbers to their related pets
 const TILE_PETS = {
-    1: ['Snakeling'],  // Zulrah
-    2: ['Chompy chick'],  // Barrows (using Chompy as generic pet example)
+    1: ['Pet Snakeling'],  // Zulrah
+    // Barrows - no specific pet
     3: ['Phoenix'],  // Wintertodt
-    4: ['Tzrek-jad', 'Jal-nib-rek'],  // Tzhaar
-    5: ['Bryophyta\'s essence'],  // Giants (essence can count)
+    //tzard - no specific pet
+    5: ['Bran'],
     6: ['Pet dagannoth prime', 'Pet dagannoth rex', 'Pet dagannoth supreme'],  // DKs
     7: ['Scurry'],  // Scurrius
     8: ['Prince black dragon'],  // KBD
     // 9: Misc 1 - no specific pet
-    10: ['Olmlet'],  // CoX - KEYSTONE
+    // CoX - KEYSTONE
     11: ['Sraracha'],  // Sarachnis
     12: ['Pet general graardor', 'Pet kree\'arra'],  // GWD1
-    // 13: Clues - no specific pet
+    13: ["Bloodhound"],
     14: ['Kalphite princess'],  // KQ
-    15: ['Baby yaga'],  // Moons of Peril
-    16: ['Huey Jr.'],  // Hueycoatl
-    17: ['Abyssal orphan', 'Ikkle hydra', 'Hellpuppy', 'Pet kraken', 'Pet smoke devil', 'Youngllef', 'Araxyte', 'Nexling'],  // Slayer bosses
+    // nothing from moons
+    16: ['Huberte'],  // Hueycoatl
+    17: ['Abyssal orphan', 'Ikkle hydra', 'Hellpuppy', 'Pet kraken', 'Pet smoke devil', 'Nid', 'Gull', 'noon'],  // Slayer bosses
     18: ['Smolcano'],  // Zalcano
     // 19: Misc 2 - no specific pet
-    20: ['Tumeken\'s guardian'],  // ToA - KEYSTONE
+    // ToA - KEYSTONE
     21: ['Vorki'],  // Vorkath
-    22: ['Any jar'],  // Boss Jars - jars themselves count
+    // Boss Jars - jars themselves count no pets for this tile
     23: ['Youngllef'],  // Gauntlet
     24: ['Pet zilyana', 'Pet k\'ril tsutsaroth'],  // GWD2
-    25: ['Dizana\'s quiver'],  // Fortis Colosseum (quiver as pet-equivalent)
-    26: ['Baby gorilla'],  // Demonic Gorillas (placeholder, adjust as needed)
+    25: ['Smol Heradit'],  // Fortis Colosseum (quiver as pet-equivalent)
+    // Demonic Gorillas (placeholder, adjust as needed) - no specific pet
     27: ['Pet dark core'],  // Corp
-    28: ['Tormented baby'],  // Tormented Demons
+    // Tormented Demons 
     29: ['Muphin'],  // Phantom Muspah
-    30: ['Lil\' zik'],  // ToB - KEYSTONE
-    // 31: Fishing - no specific pet
+    // ToB - KEYSTONE
+    31: ['Heron', 'Soup'],
     // 32: Superior Slayer - various, covered in 17
     33: ['Nexling'],  // Nex
     // 34: Misc 3 - no specific pet
     35: ['Pet general graardor', 'Pet kree\'arra', 'Pet zilyana', 'Pet k\'ril tsutsaroth'],  // GWD3 godsword
-    36: ['Chompy chick'],  // DWH - KEYSTONE (placeholder)
-    37: ['Ayak'],  // Yama - KEYSTONE
-    38: ['Wisp', 'Scorplings', 'Lilith', 'Shadow'],  // DT2 - KEYSTONE
-    39: ['Ayak'],  // Doom - KEYSTONE (pet doesn't insta-clear per rules)
-    40: ['Little nightmare', 'Parasitic egg']  // Nightmare - KEYSTONE
+    // DWH - KEYSTONE (placeholder)
+    // Yama - KEYSTONE
+    // DT2 - KEYSTONE
+    // Doom - KEYSTONE (pet doesn't insta-clear per rules)
+    // Nightmare - KEYSTONE
 };
 
 module.exports = {
@@ -63,7 +63,7 @@ module.exports = {
                 .setRequired(true)
         ),
 
-    async execute(interaction) {
+    async execute (interaction) {
         // Check if event is active
         if (!(await boardConfigManager.isEventActive())) {
             return interaction.reply({

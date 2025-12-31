@@ -197,7 +197,7 @@ module.exports = {
             }
 
             const isHelp = Math.random() < helpChance;
-            const outcome = isHelp ? 'give_progress' : 'take_progress';
+            const outcome = isHelp ? 'add_requirement' : 'reduce_requirement';
 
             // Apply sabotage (give or take 1 drop)
             const progressChange = isHelp ? 1 : -1;

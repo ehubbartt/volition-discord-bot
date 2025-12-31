@@ -62,13 +62,27 @@ module.exports = {
             // Use the reroll token
             await tileEventDb.useRerollToken(team.id);
 
-            // Roll for the next tile (same logic as /roll command)
-            const rollValue = tileEventDb.getWeightedRoll();
-            const { newTile, wasCapped } = tileEventDb.calculateNewTile(currentTile, rollValue);
+            // Get the previous tile (the one they completed before reaching current tile)
+            // This is the tile they rolled FROM to get to their current tile
+            const previousTile = await tileEventDb.getPreviousTile(team.id, currentTile);
+            const rollFromTile = previousTile !== null ? previousTile : 0;
+
+            // Keep rolling until we get a tile that's NOT the current tile
+            let rollValue, newTile, wasCapped;
+            let attempts = 0;
+            const maxAttempts = 100; // Safety limit
+
+            do {
+                rollValue = tileEventDb.getWeightedRoll();
+                const result = tileEventDb.calculateNewTile(rollFromTile, rollValue);
+                newTile = result.newTile;
+                wasCapped = result.wasCapped;
+                attempts++;
+            } while (newTile === currentTile && attempts < maxAttempts);
 
             await tileEventDb.updateTeamTile(team.id, newTile);
             await tileEventDb.incrementTotalRolls(team.id);
-            await tileEventDb.logRoll(team.id, currentTile, rollValue, newTile, wasCapped, interaction.user.id);
+            await tileEventDb.logRoll(team.id, rollFromTile, rollValue, newTile, wasCapped, interaction.user.id);
 
             const newTileData = await tileEventDb.getTileData(newTile);
 
@@ -76,10 +90,11 @@ module.exports = {
                 .setColor('Purple')
                 .setTitle('🎲 Re-Roll Token Used!')
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
-                .setDescription(`Your team used their re-roll token to skip tile ${currentTile}!`)
+                .setDescription(`Your team used their re-roll token to skip tile ${currentTile}!\nRe-rolling from tile ${rollFromTile} (where you last completed).`)
                 .addFields(
                     { name: 'Team', value: team.team_name, inline: true },
                     { name: 'Skipped Tile', value: `${currentTile}`, inline: true },
+                    { name: 'Rolled From', value: `${rollFromTile}`, inline: true },
                     { name: 'Roll', value: `🎲 ${rollValue}`, inline: true },
                     { name: 'New Tile', value: `${newTile}/40`, inline: true },
                     { name: 'Re-Rolls Remaining', value: '0/1', inline: true }
@@ -88,13 +103,13 @@ module.exports = {
             if (wasCapped) {
                 embed.addFields({
                     name: '🚧 Stopped by Keystone Tile',
-                    value: `You rolled a ${rollValue} but landed on keystone tile ${newTile}.`,
+                    value: `You rolled a ${rollValue} from tile ${rollFromTile} but landed on keystone tile ${newTile}.`,
                     inline: false
                 });
             } else {
                 embed.addFields({
                     name: 'Movement',
-                    value: `Skipped from tile ${currentTile} to tile ${newTile}.`,
+                    value: `Re-rolled from tile ${rollFromTile} → landed on tile ${newTile} (skipped tile ${currentTile}).`,
                     inline: false
                 });
             }
