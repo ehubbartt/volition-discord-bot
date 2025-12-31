@@ -88,8 +88,8 @@ class TileBoardService {
 
             // Build composite operations for team images
             const compositeOps = [];
-            const markerSize = 80; // Size of team marker images
-            const spacing = 90; // Horizontal spacing between markers on same tile
+            const markerSize = 60; // Size of team marker images (smaller to fit more)
+            const spacing = 35; // Horizontal spacing - teams will overlap slightly
 
             // Sort tiles by ascending order so leading teams are drawn last (on top)
             const sortedTiles = Object.keys(teamsByTile).sort((a, b) => a - b);
@@ -109,6 +109,7 @@ class TileBoardService {
                     const team = teamsOnTile[index];
 
                     // Calculate horizontal offset for multiple teams on same tile
+                    // Teams will overlap slightly with smaller spacing
                     const offsetX = teamCount > 1
                         ? (index - (teamCount - 1) / 2) * spacing
                         : 0;
@@ -117,9 +118,11 @@ class TileBoardService {
                     const y = Math.round(coord.y - markerSize / 2);
 
                     // Check if team has a custom image
-                    console.log(`[TileBoard] Team ${team.team_name} team_image value: "${team.team_image}"`);
-                    if (team.team_image) {
-                        const imagePath = path.join(IMG_DIR, team.team_image);
+                    // Convert to lowercase since Linux is case-sensitive and DB might have mixed case
+                    const teamImage = team.team_image ? team.team_image.toLowerCase() : null;
+                    console.log(`[TileBoard] Team ${team.team_name} team_image value: "${teamImage}"`);
+                    if (teamImage) {
+                        const imagePath = path.join(IMG_DIR, teamImage);
                         console.log(`[TileBoard] Looking for image at: ${imagePath}`);
                         if (fsSync.existsSync(imagePath)) {
                             // Resize team image to marker size
@@ -143,8 +146,8 @@ class TileBoardService {
                         compositeOps.push(this.createFallbackMarker(team, coord.x + offsetX, coord.y, markerSize));
                     }
 
-                    // Add team name label
-                    const labelOp = this.createTeamLabel(team, coord.x + offsetX, coord.y - markerSize / 2 - 20);
+                    // Add team name label (positioned above the marker)
+                    const labelOp = this.createTeamLabel(team, coord.x + offsetX, coord.y - markerSize / 2 - 15);
                     compositeOps.push(labelOp);
                 }
             }
