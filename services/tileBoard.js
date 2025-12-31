@@ -142,12 +142,8 @@ class TileBoardService {
                     }
 
                     // Add team name label
-                    const labelSvg = this.createTeamLabel(team, coord.x + offsetX, coord.y - markerSize / 2 - 20);
-                    compositeOps.push({
-                        input: Buffer.from(labelSvg),
-                        left: 0,
-                        top: 0
-                    });
+                    const labelOp = this.createTeamLabel(team, coord.x + offsetX, coord.y - markerSize / 2 - 20);
+                    compositeOps.push(labelOp);
                 }
             }
 
@@ -205,16 +201,20 @@ class TileBoardService {
 
         const labelWidth = Math.max(displayName.length * 12, 80);
         const labelHeight = 28;
-        const labelX = x - labelWidth / 2;
-        const labelY = y - labelHeight / 2;
 
-        // Return a full-size SVG that positions the label correctly
-        return `
-            <svg width="5000" height="5000" xmlns="http://www.w3.org/2000/svg">
-                <rect x="${labelX}" y="${labelY}" width="${labelWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="2"/>
-                <text x="${x}" y="${y + 6}" font-size="16" font-weight="bold" font-family="Liberation Sans, sans-serif" fill="#FFFFFF" text-anchor="middle">${escapedName}</text>
+        // Create a compact SVG with the label centered in its own coordinate space
+        const svg = `
+            <svg width="${labelWidth}" height="${labelHeight}" xmlns="http://www.w3.org/2000/svg">
+                <rect x="0" y="0" width="${labelWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="2"/>
+                <text x="${labelWidth / 2}" y="${labelHeight / 2 + 6}" font-size="16" font-weight="bold" font-family="Liberation Sans, sans-serif" fill="#FFFFFF" text-anchor="middle">${escapedName}</text>
             </svg>
         `;
+
+        return {
+            input: Buffer.from(svg),
+            left: Math.round(x - labelWidth / 2),
+            top: Math.round(y - labelHeight / 2)
+        };
     }
 
     async updateDiscordBoard(client, channelId, messageId = null) {
