@@ -21,7 +21,7 @@ module.exports = {
                 .setAutocomplete(true)
         ),
 
-    async autocomplete(interaction) {
+    async autocomplete (interaction) {
         const focusedOption = interaction.options.getFocused(true);
 
         try {
@@ -91,7 +91,7 @@ module.exports = {
         }
     },
 
-    async execute(interaction) {
+    async execute (interaction) {
         // Check if event is active
         if (!(await boardConfigManager.isEventActive())) {
             return interaction.reply({
@@ -188,9 +188,9 @@ module.exports = {
 
             // Determine help/hinder chance based on tile section
             let helpChance;
-            if (targetTeam.current_tile <= 10) {
+            if (targetTeam.current_tile <= 20) {
                 helpChance = 0.30; // 30% help, 70% hinder
-            } else if (targetTeam.current_tile <= 20) {
+            } else if (targetTeam.current_tile <= 30) {
                 helpChance = 0.40; // 40% help, 60% hinder
             } else {
                 helpChance = 0.50; // 50% help, 50% hinder
