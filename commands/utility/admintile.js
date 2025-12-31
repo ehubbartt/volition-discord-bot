@@ -603,15 +603,18 @@ module.exports = {
                 itemProgress.is_completed
             );
 
-            // Log the change
-            await tileEventDb.logSubmission(
-                team.id,
-                interaction.user.id,
-                currentTile,
-                `[ADMIN SET] ${itemMatch.item.name}`,
-                newQuantity - oldQuantity,
-                '[Admin progress override]'
-            );
+            // Log the change only if quantity increased (can't log negative quantities)
+            const quantityDiff = newQuantity - oldQuantity;
+            if (quantityDiff > 0) {
+                await tileEventDb.logSubmission(
+                    team.id,
+                    interaction.user.id,
+                    currentTile,
+                    `[ADMIN SET] ${itemMatch.item.name}`,
+                    quantityDiff,
+                    '[Admin progress override]'
+                );
+            }
 
             // Check if tile is now complete
             const tileComplete = await tileEventDb.checkTileCompletion(team.id, currentTile);
