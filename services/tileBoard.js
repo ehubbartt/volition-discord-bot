@@ -117,8 +117,10 @@ class TileBoardService {
                     const y = Math.round(coord.y - markerSize / 2);
 
                     // Check if team has a custom image
+                    console.log(`[TileBoard] Team ${team.team_name} team_image value: "${team.team_image}"`);
                     if (team.team_image) {
                         const imagePath = path.join(IMG_DIR, team.team_image);
+                        console.log(`[TileBoard] Looking for image at: ${imagePath}`);
                         if (fsSync.existsSync(imagePath)) {
                             // Resize team image to marker size
                             const resizedImage = await sharp(imagePath)
