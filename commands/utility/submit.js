@@ -163,12 +163,23 @@ module.exports = {
             const tileComplete = await tileEventDb.checkTileCompletion(team.id, currentTile);
 
             const allProgress = await tileEventDb.getTeamProgress(team.id, currentTile);
-            const activeOptionId = allProgress[0]?.option_id;
+            const activeOptionId = allProgress[0]?.option_id || itemMatch.optionId;
             const optionProgress = allProgress.filter(p => p.option_id === activeOptionId);
 
-            const progressText = optionProgress.map(p => {
-                const status = p.is_completed ? '✅' : '🔄';
-                return `${status} ${p.current_quantity}/${p.required_quantity} ${p.item_name}`;
+            // Get the full list of required items from tile data for this option
+            const tileOption = tileData.requirement_json.find(opt => opt.option_id === activeOptionId);
+            const allRequiredItems = tileOption ? tileOption.items : [];
+
+            // Build progress text including any missing items from tile data
+            const progressText = allRequiredItems.map(reqItem => {
+                const existingProgress = optionProgress.find(p => p.item_name.toLowerCase() === reqItem.name.toLowerCase());
+                if (existingProgress) {
+                    const status = existingProgress.is_completed ? '✅' : '🔄';
+                    return `${status} ${existingProgress.current_quantity}/${existingProgress.required_quantity} ${existingProgress.item_name}`;
+                } else {
+                    // Item exists in tile but not in progress - show as not started
+                    return `🔄 0/${reqItem.quantity} ${reqItem.name}`;
+                }
             }).join('\n');
 
             const embed = new EmbedBuilder()
