@@ -197,11 +197,12 @@ module.exports = {
             }
 
             const isHelp = Math.random() < helpChance;
-            const outcome = isHelp ? 'add_requirement' : 'reduce_requirement';
+            // Help = reduce requirement (easier), Hinder = add requirement (harder)
+            const outcome = isHelp ? 'reduce_requirement' : 'add_requirement';
 
-            // Apply sabotage (give or take 1 drop)
-            const progressChange = isHelp ? 1 : -1;
-            await tileEventDb.applySabotageProgress(targetTeam.id, targetTeam.current_tile, targetItem.item_name, progressChange);
+            // Apply sabotage to requirement (help = -1 requirement, hinder = +1 requirement)
+            const requirementChange = isHelp ? -1 : 1;
+            await tileEventDb.applySabotageRequirement(targetTeam.id, targetTeam.current_tile, targetItem.item_name, requirementChange);
             await tileEventDb.useSabotageToken(attackerTeam.id);
             await tileEventDb.logSabotageUsage(
                 attackerTeam.id,
@@ -231,21 +232,21 @@ module.exports = {
                     { name: 'Target', value: targetTeam.team_name, inline: true },
                     { name: 'Outcome', value: isHelp ? '✅ Helped!' : '💥 Hindered!', inline: true },
                     { name: 'Item Affected', value: targetItem.item_name, inline: true },
-                    { name: 'Old Progress', value: `${targetItem.current_quantity}/${targetItem.required_quantity}`, inline: true },
-                    { name: 'New Progress', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true },
-                    { name: 'Change', value: isHelp ? '+1 Drop' : '-1 Drop', inline: true },
+                    { name: 'Old Requirement', value: `${targetItem.current_quantity}/${targetItem.required_quantity}`, inline: true },
+                    { name: 'New Requirement', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true },
+                    { name: 'Change', value: isHelp ? '-1 Required' : '+1 Required', inline: true },
                     { name: 'Status', value: updatedItem.is_completed ? '✅ Complete' : '🔄 In Progress', inline: true }
                 )
                 .setTimestamp();
 
             if (isHelp) {
-                let description = `🍀 **${helpPercentage}% chance activated!** You helped them by giving +1 drop!`;
+                let description = `🍀 **${helpPercentage}% chance activated!** You helped them by reducing their requirement by 1!`;
                 if (tileComplete) {
                     description += '\n\n🎉 **This completed their tile!** They can now roll to the next tile!';
                 }
                 embed.setDescription(description);
             } else {
-                embed.setDescription(`💀 **${hinderPercentage}% chance activated!** You hindered them by taking away 1 drop!`);
+                embed.setDescription(`💀 **${hinderPercentage}% chance activated!** You hindered them by increasing their requirement by 1!`);
             }
 
             await interaction.editReply({ embeds: [embed] });
@@ -265,18 +266,18 @@ module.exports = {
                             { name: 'Target', value: targetTeam.team_name, inline: true },
                             { name: 'Tile', value: `${targetTeam.current_tile}`, inline: true },
                             { name: 'Item', value: targetItem.item_name, inline: true },
-                            { name: 'Effect', value: isHelp ? '✅ +1 Drop' : '💥 -1 Drop', inline: true },
-                            { name: 'New Progress', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true }
+                            { name: 'Effect', value: isHelp ? '✅ -1 Required' : '💥 +1 Required', inline: true },
+                            { name: 'New Requirement', value: `${updatedItem.current_quantity}/${updatedItem.required_quantity}`, inline: true }
                         )
                         .setTimestamp();
 
                     if (isHelp && tileComplete) {
-                        announcementEmbed.setDescription('🎉 **Tile Completed!** The extra drop completed their tile!');
+                        announcementEmbed.setDescription('🎉 **Tile Completed!** The reduced requirement completed their tile!');
                     }
 
                     const messageContent = isHelp && tileComplete
                         ? `${roleTag} - Your team has been sabotaged... but it helped and completed your tile! 🎉`
-                        : `${roleTag} - Your team has been ${isHelp ? 'helped' : 'hindered'} by sabotage!`;
+                        : `${roleTag} - Your team's requirement has been ${isHelp ? 'reduced' : 'increased'} by sabotage!`;
 
                     await sabotageChannel.send({
                         content: messageContent,
