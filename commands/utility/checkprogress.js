@@ -121,18 +121,29 @@ module.exports = {
                 const activeOptionId = progress[0].option_id;
                 const optionProgress = progress.filter(p => p.option_id === activeOptionId);
 
-                const progressText = optionProgress.map(p => {
-                    const status = p.is_completed ? '✅' : '🔄';
-                    return `${status} ${p.current_quantity}/${p.required_quantity} ${p.item_name}`;
+                // Get the full list of required items from tile data for this option
+                const tileOption = tileData.requirement_json.find(opt => opt.option_id === activeOptionId);
+                const allRequiredItems = tileOption ? tileOption.items : [];
+
+                // Build progress text including any missing items from tile data
+                const progressText = allRequiredItems.map(reqItem => {
+                    const existingProgress = optionProgress.find(p => p.item_name.toLowerCase() === reqItem.name.toLowerCase());
+                    if (existingProgress) {
+                        const status = existingProgress.is_completed ? '✅' : '🔄';
+                        return `${status} ${existingProgress.current_quantity}/${existingProgress.required_quantity} ${existingProgress.item_name}`;
+                    } else {
+                        // Item exists in tile but not in progress - show as not started
+                        return `🔄 0/${reqItem.quantity} ${reqItem.name}`;
+                    }
                 }).join('\n');
 
-                const totalCurrent = optionProgress.reduce((sum, p) => sum + (p.is_completed ? 1 : 0), 0);
-                const totalRequired = optionProgress.length;
+                const totalCurrent = optionProgress.filter(p => p.is_completed).length;
+                const totalRequired = allRequiredItems.length;
                 const progressPercent = Math.round((totalCurrent / totalRequired) * 100);
 
                 embed.addFields({
                     name: `Active Progress (Option ${activeOptionId}) - ${progressPercent}%`,
-                    value: progressText,
+                    value: progressText || 'No items configured',
                     inline: false
                 });
             } else {

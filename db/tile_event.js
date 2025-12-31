@@ -235,6 +235,37 @@ async function initializeTileProgress(teamId, tileNumber, optionId) {
     return data;
 }
 
+async function ensureProgressItemExists(teamId, tileNumber, optionId, itemName, requiredQuantity) {
+    // Check if the item already exists in progress
+    const { data: existing, error: checkError } = await supabase
+        .from('tile_event_progress')
+        .select('*')
+        .eq('team_id', teamId)
+        .eq('tile_number', tileNumber)
+        .eq('item_name', itemName)
+        .single();
+
+    if (existing) return existing; // Already exists
+    if (checkError && checkError.code !== 'PGRST116') throw checkError;
+
+    // Item doesn't exist, insert it
+    const { data, error } = await supabase
+        .from('tile_event_progress')
+        .insert({
+            team_id: teamId,
+            tile_number: tileNumber,
+            option_id: optionId,
+            item_name: itemName,
+            current_quantity: 0,
+            required_quantity: requiredQuantity
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
 async function incrementProgress(teamId, tileNumber, itemName, quantity) {
     const { data: existing, error: fetchError } = await supabase
         .from('tile_event_progress')
@@ -641,6 +672,7 @@ module.exports = {
     getTileData,
     getAllTiles,
     initializeTileProgress,
+    ensureProgressItemExists,
     incrementProgress,
     getTeamProgress,
     checkTileCompletion,

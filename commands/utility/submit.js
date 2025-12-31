@@ -137,12 +137,25 @@ module.exports = {
                 }
             }
 
-            const updated = await tileEventDb.incrementProgress(team.id, currentTile, itemMatch.item.name, quantity);
+            let updated = await tileEventDb.incrementProgress(team.id, currentTile, itemMatch.item.name, quantity);
 
             if (!updated) {
-                return interaction.editReply({
-                    content: `Could not find progress for **${itemMatch.item.name}**. Please try again.`
-                });
+                // Item might not exist in progress table yet (e.g., tile was updated after progress was initialized)
+                // Ensure it exists and try again
+                await tileEventDb.ensureProgressItemExists(
+                    team.id,
+                    currentTile,
+                    itemMatch.optionId,
+                    itemMatch.item.name,
+                    itemMatch.item.quantity
+                );
+                updated = await tileEventDb.incrementProgress(team.id, currentTile, itemMatch.item.name, quantity);
+
+                if (!updated) {
+                    return interaction.editReply({
+                        content: `Could not find progress for **${itemMatch.item.name}**. Please try again.`
+                    });
+                }
             }
 
             await tileEventDb.logSubmission(team.id, interaction.user.id, currentTile, itemMatch.item.name, quantity, messageLink);
