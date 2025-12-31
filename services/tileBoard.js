@@ -88,8 +88,8 @@ class TileBoardService {
 
             // Build composite operations for team images
             const compositeOps = [];
-            const markerSize = 60; // Size of team marker images (smaller to fit more)
-            const spacing = 35; // Horizontal spacing - teams will overlap slightly
+            const markerSize = 70; // Size of team marker images
+            const spacing = 40; // Horizontal spacing - teams will overlap slightly
 
             // Sort tiles by ascending order so leading teams are drawn last (on top)
             const sortedTiles = Object.keys(teamsByTile).sort((a, b) => a - b);
