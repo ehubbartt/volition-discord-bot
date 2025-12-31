@@ -411,6 +411,40 @@ async function applySabotageProgress(targetTeamId, targetTile, itemName, progres
     return data;
 }
 
+// Modify the required quantity for a sabotage (add or reduce requirement)
+async function applySabotageRequirement(targetTeamId, targetTile, itemName, requirementChange) {
+    const { data: progress, error: fetchError } = await supabase
+        .from('tile_event_progress')
+        .select('*')
+        .eq('team_id', targetTeamId)
+        .eq('tile_number', targetTile)
+        .eq('item_name', itemName)
+        .single();
+
+    if (fetchError) throw fetchError;
+
+    // Add or subtract from required quantity (min 1 to prevent 0 or negative requirements)
+    const newRequirement = Math.max(1, progress.required_quantity + requirementChange);
+
+    // Check if current progress now completes the item (in case requirement was reduced)
+    const isNowCompleted = progress.current_quantity >= newRequirement;
+    const completedAt = isNowCompleted && !progress.is_completed ? new Date().toISOString() : progress.completed_at;
+
+    const { data, error } = await supabase
+        .from('tile_event_progress')
+        .update({
+            required_quantity: newRequirement,
+            is_completed: isNowCompleted,
+            completed_at: completedAt
+        })
+        .eq('id', progress.id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
 async function logRoll(teamId, fromTile, rollValue, toTile, wasCapped, rolledByDiscordId) {
     const { data, error } = await supabase
         .from('tile_event_roll_log')
@@ -566,6 +600,24 @@ async function getTeamTileReachedAt(teamId, tileNumber) {
     return data?.created_at || null;
 }
 
+// Get the tile the team rolled FROM to reach their current tile
+async function getPreviousTile(teamId, currentTile) {
+    const { data, error } = await supabase
+        .from('tile_event_roll_log')
+        .select('from_tile')
+        .eq('team_id', teamId)
+        .eq('to_tile', currentTile)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') return null; // No roll found (team started here or tile 0)
+        throw error;
+    }
+    return data?.from_tile ?? null;
+}
+
 module.exports = {
     getTeamByName,
     getTeamByLeaderId,
@@ -588,6 +640,7 @@ module.exports = {
     logSabotageUsage,
     applySabotage,
     applySabotageProgress,
+    applySabotageRequirement,
     logRoll,
     calculateNewTile,
     getTeamsAheadOf,
@@ -597,6 +650,7 @@ module.exports = {
     getWeightedRoll,
     setProgressQuantity,
     getTeamTileReachedAt,
+    getPreviousTile,
     KEYSTONE_TILES,
     RAID_TILES
 };
