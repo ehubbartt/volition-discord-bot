@@ -14,6 +14,7 @@ const BOARD_IMAGE_PATH = path.join(__dirname, '../tile-board.png');
 const COORDINATES_PATH = path.join(__dirname, '../tile-board-coordinates.json');
 const TEMP_DIR = path.join(__dirname, '../temp');
 const OUTPUT_PATH = path.join(TEMP_DIR, 'board-output.png');
+const IMG_DIR = path.join(__dirname, '../img');
 
 // Ensure temp directory exists
 if (!fsSync.existsSync(TEMP_DIR)) {
@@ -75,20 +76,88 @@ class TileBoardService {
             const metadata = await sharp(BOARD_IMAGE_PATH).metadata();
             console.log(`[TileBoard] Processing at full resolution: ${metadata.width}x${metadata.height}`);
 
-            // Create SVG overlay with team markers (using full dimensions)
-            const svgOverlay = this.createSVGOverlay(teams, metadata.width, metadata.height);
+            // Group teams by tile to handle multiple teams on same tile
+            const teamsByTile = {};
+            for (const team of teams) {
+                const tile = team.current_tile;
+                if (!teamsByTile[tile]) {
+                    teamsByTile[tile] = [];
+                }
+                teamsByTile[tile].push(team);
+            }
 
-            // Composite the overlay onto the base image
-            console.log('[TileBoard] Compositing SVG overlay onto base image...');
+            // Build composite operations for team images
+            const compositeOps = [];
+            const markerSize = 80; // Size of team marker images
+            const spacing = 90; // Horizontal spacing between markers on same tile
+
+            // Sort tiles by ascending order so leading teams are drawn last (on top)
+            const sortedTiles = Object.keys(teamsByTile).sort((a, b) => a - b);
+
+            for (const tile of sortedTiles) {
+                const teamsOnTile = teamsByTile[tile];
+                const coord = this.coordinates[tile];
+
+                if (!coord) {
+                    console.warn(`[TileBoard] No coordinates found for tile ${tile}`);
+                    continue;
+                }
+
+                const teamCount = teamsOnTile.length;
+
+                for (let index = 0; index < teamsOnTile.length; index++) {
+                    const team = teamsOnTile[index];
+
+                    // Calculate horizontal offset for multiple teams on same tile
+                    const offsetX = teamCount > 1
+                        ? (index - (teamCount - 1) / 2) * spacing
+                        : 0;
+
+                    const x = Math.round(coord.x + offsetX - markerSize / 2);
+                    const y = Math.round(coord.y - markerSize / 2);
+
+                    // Check if team has a custom image
+                    if (team.team_image) {
+                        const imagePath = path.join(IMG_DIR, team.team_image);
+                        if (fsSync.existsSync(imagePath)) {
+                            // Resize team image to marker size
+                            const resizedImage = await sharp(imagePath)
+                                .resize(markerSize, markerSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+                                .toBuffer();
+
+                            compositeOps.push({
+                                input: resizedImage,
+                                left: x,
+                                top: y
+                            });
+                            console.log(`[TileBoard] Added image marker for ${team.team_name} at tile ${tile}`);
+                        } else {
+                            console.warn(`[TileBoard] Image not found for ${team.team_name}: ${imagePath}`);
+                            // Fall back to SVG marker
+                            compositeOps.push(this.createFallbackMarker(team, coord.x + offsetX, coord.y, markerSize));
+                        }
+                    } else {
+                        // Use SVG fallback marker if no image configured
+                        compositeOps.push(this.createFallbackMarker(team, coord.x + offsetX, coord.y, markerSize));
+                    }
+
+                    // Add team name label
+                    const labelSvg = this.createTeamLabel(team, coord.x + offsetX, coord.y - markerSize / 2 - 20);
+                    compositeOps.push({
+                        input: Buffer.from(labelSvg),
+                        left: 0,
+                        top: 0
+                    });
+                }
+            }
+
+            // Composite all team markers onto the base image
+            console.log('[TileBoard] Compositing', compositeOps.length, 'elements onto base image...');
             await sharp(BOARD_IMAGE_PATH, {
                 limitInputPixels: false,
                 sequentialRead: true
             })
-                .composite([{
-                    input: Buffer.from(svgOverlay),
-                    top: 0,
-                    left: 0
-                }])
+                .composite(compositeOps)
                 .png({
                     quality: 90,
                     compressionLevel: 9,
@@ -105,115 +174,45 @@ class TileBoardService {
         }
     }
 
-    createSVGOverlay(teams, width, height) {
-        let markers = '';
+    createFallbackMarker(team, x, y, size) {
+        const color = this.getTeamColor(team.team_name);
+        const initial = this.getTeamInitial(team.short_name || team.team_name);
+        const radius = size / 2;
 
-        // Group teams by tile to handle multiple teams on same tile
-        const teamsByTile = {};
-        for (const team of teams) {
-            const tile = team.current_tile;
-            if (!teamsByTile[tile]) {
-                teamsByTile[tile] = [];
-            }
-            teamsByTile[tile].push(team);
-        }
+        const svg = `
+            <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="${radius}" cy="${radius}" r="${radius - 2}" fill="${color}" stroke="#FFFFFF" stroke-width="3"/>
+                <text x="${radius}" y="${radius + 10}" font-size="32" font-weight="bold" font-family="Liberation Sans, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="1.5" paint-order="stroke">${initial}</text>
+            </svg>
+        `;
 
-        // Sort tiles by descending order so leading teams are drawn last (on top)
-        const sortedTiles = Object.keys(teamsByTile).sort((a, b) => b - a);
+        return {
+            input: Buffer.from(svg),
+            left: Math.round(x - radius),
+            top: Math.round(y - radius)
+        };
+    }
 
-        for (const tile of sortedTiles) {
-            const teamsOnTile = teamsByTile[tile];
-            const coord = this.coordinates[tile];
+    createTeamLabel(team, x, y) {
+        const displayName = team.short_name || team.team_name;
+        const color = this.getTeamColor(team.team_name);
+        const escapedName = displayName
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
 
-            if (!coord) {
-                console.warn(`[TileBoard] No coordinates found for tile ${tile}`);
-                continue;
-            }
+        const labelWidth = Math.max(displayName.length * 12, 80);
+        const labelHeight = 28;
+        const labelX = x - labelWidth / 2;
+        const labelY = y - labelHeight / 2;
 
-            // Calculate horizontal offset for multiple teams on same tile
-            const teamCount = teamsOnTile.length;
-            const spacing = 70; // Horizontal spacing between markers
-
-            teamsOnTile.forEach((team, index) => {
-                // Center the markers if multiple teams
-                const offsetX = teamCount > 1
-                    ? (index - (teamCount - 1) / 2) * spacing
-                    : 0;
-
-                // Use coordinates directly (no scaling)
-                const x = coord.x + offsetX;
-                const y = coord.y;
-
-                const color = this.getTeamColor(team.team_name);
-                const initial = this.getTeamInitial(team.team_name);
-
-                // Escape special characters in team name for SVG
-                const escapedTeamName = team.team_name
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&apos;');
-
-                // Fixed marker sizes (no scaling)
-                const markerRadius = 30;
-                const shadowOffset = 4;
-                const highlightOffset = 10;
-                const fontSize = 32;
-                const strokeWidth = 4;
-                const labelFontSize = 16;
-
-                // Draw shadow for depth
-                markers += `<circle cx="${x}" cy="${y + shadowOffset}" r="${markerRadius + 5}" fill="#000000" opacity="0.4"/>`;
-
-                // Draw outer glow
-                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 8}" fill="${color}" opacity="0.5"/>`;
-
-                // Draw middle glow ring
-                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius + 4}" fill="${color}" opacity="0.7"/>`;
-
-                // Draw main circle
-                markers += `<circle cx="${x}" cy="${y}" r="${markerRadius}" fill="${color}" stroke="#FFFFFF" stroke-width="${strokeWidth}"/>`;
-
-                // Draw inner highlight
-                markers += `<circle cx="${x - highlightOffset}" cy="${y - highlightOffset}" r="8" fill="#FFFFFF" opacity="0.6"/>`;
-
-                // Draw team initial - using Liberation Sans (installed in Dockerfile)
-                markers += `<text x="${x}" y="${y + fontSize/3}" font-size="${fontSize}" font-weight="bold" font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="${strokeWidth * 0.5}" paint-order="stroke">${initial}</text>`;
-
-                // Draw team name label above
-                const labelY = y - 55;
-                const teamNameWidth = Math.max(team.team_name.length * 10, 80);
-                const labelHeight = 28;
-
-                // Team name background
-                markers += `<rect x="${x - teamNameWidth/2}" y="${labelY - labelHeight/2}" width="${teamNameWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="${strokeWidth * 0.5}"/>`;
-
-                // Team name text - using Liberation Sans font (installed in Dockerfile)
-                markers += `<text x="${x}" y="${labelY + labelFontSize/3}" font-size="${labelFontSize}" font-weight="bold" font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF" text-anchor="middle">${escapedTeamName}</text>`;
-            });
-        }
-
+        // Return a full-size SVG that positions the label correctly
         return `
-            <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <filter id="glow">
-                        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                        <feMerge>
-                            <feMergeNode in="coloredBlur"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                    <filter id="shadow">
-                        <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
-                        <feOffset dx="0" dy="3" result="offsetblur"/>
-                        <feMerge>
-                            <feMergeNode/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                </defs>
-                ${markers}
+            <svg width="5000" height="5000" xmlns="http://www.w3.org/2000/svg">
+                <rect x="${labelX}" y="${labelY}" width="${labelWidth}" height="${labelHeight}" rx="6" fill="${color}" opacity="0.95" stroke="#FFFFFF" stroke-width="2"/>
+                <text x="${x}" y="${y + 6}" font-size="16" font-weight="bold" font-family="Liberation Sans, sans-serif" fill="#FFFFFF" text-anchor="middle">${escapedName}</text>
             </svg>
         `;
     }
@@ -248,12 +247,13 @@ class TileBoardService {
                 return 0;
             });
 
-            // Create standings text
+            // Create standings text (use long_name for display, fallback to team_name)
             let standingsText = '';
             sortedTeams.forEach((team, index) => {
                 const position = index + 1;
                 const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : `${position}.`;
-                standingsText += `${medal} **${team.team_name}** - Tile ${team.current_tile}/40\n`;
+                const displayName = team.long_name || team.team_name;
+                standingsText += `${medal} **${displayName}** - Tile ${team.current_tile}/40\n`;
             });
 
             // Create leaderboard embed (separate from image)

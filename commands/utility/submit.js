@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
 const config = require('../../utils/config');
-const boardConfig = require('../../config/boardConfig.json');
 const boardConfigManager = require('../../utils/boardConfigManager');
 
 module.exports = {
@@ -73,10 +72,22 @@ module.exports = {
             });
         }
 
-        // Check if command is used in the correct channel
-        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+        // Check if user is on a team (as member or leader) - need this first for channel check
+        const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
+        const leaderTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+        const team = leaderTeam || (playerData ? playerData.team : null);
+
+        if (!team) {
             return interaction.reply({
-                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                content: 'You must be on a tile event team to submit drops. Ask your team leader to add you with `/addplayer`.',
+                ephemeral: true
+            });
+        }
+
+        // Check if command is used in the team's channel
+        if (team.team_channel_id && interaction.channelId !== team.team_channel_id) {
+            return interaction.reply({
+                content: `This command can only be used in your team's channel: <#${team.team_channel_id}>.`,
                 ephemeral: true
             });
         }
@@ -87,17 +98,6 @@ module.exports = {
             const itemName = interaction.options.getString('item');
             const quantity = interaction.options.getInteger('quantity');
             const messageLink = interaction.options.getString('proof');
-
-            // Check if user is on a team (as member or leader)
-            const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
-            const leaderTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
-            const team = leaderTeam || (playerData ? playerData.team : null);
-
-            if (!team) {
-                return interaction.editReply({
-                    content: 'You must be on a tile event team to submit drops. Ask your team leader to add you with `/addplayer`.'
-                });
-            }
 
             if (!messageLink.includes('discord.com/channels/')) {
                 return interaction.editReply({
@@ -163,7 +163,7 @@ module.exports = {
                 .setTitle('Drop Submitted')
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .addFields(
-                    { name: 'Team', value: team.team_name, inline: true },
+                    { name: 'Team', value: team.long_name || team.team_name, inline: true },
                     { name: 'Tile', value: `${currentTile}/40`, inline: true },
                     { name: 'Item Submitted', value: `${quantity}x ${itemMatch.item.name}`, inline: true },
                     { name: `Tile ${currentTile} Progress`, value: progressText, inline: false }

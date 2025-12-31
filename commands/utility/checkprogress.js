@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
-const boardConfig = require('../../config/boardConfig.json');
 const boardConfigManager = require('../../utils/boardConfigManager');
 
 module.exports = {
@@ -22,36 +21,43 @@ module.exports = {
             });
         }
 
-        // Check if command is used in the correct channel
-        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
-            return interaction.reply({
-                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
-                ephemeral: true
-            });
+        const teamInput = interaction.options.getString('team');
+        let team;
+
+        if (teamInput) {
+            // Checking another team - no channel restriction
+            team = await tileEventDb.getTeamByName(teamInput);
+            if (!team) {
+                return interaction.reply({
+                    content: `Team **${teamInput}** not found.`,
+                    ephemeral: true
+                });
+            }
+        } else {
+            // Checking own team - must be in team channel
+            const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
+            const leaderTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+            team = leaderTeam || (playerData ? playerData.team : null);
+
+            if (!team) {
+                return interaction.reply({
+                    content: 'You are not on a tile event team. Ask your team leader to add you with `/addplayer` or specify a team name.',
+                    ephemeral: true
+                });
+            }
+
+            // Check if command is used in the team's channel
+            if (team.team_channel_id && interaction.channelId !== team.team_channel_id) {
+                return interaction.reply({
+                    content: `This command can only be used in your team's channel: <#${team.team_channel_id}>.`,
+                    ephemeral: true
+                });
+            }
         }
 
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            const teamInput = interaction.options.getString('team');
-            let team;
-
-            if (teamInput) {
-                team = await tileEventDb.getTeamByName(teamInput);
-                if (!team) {
-                    return interaction.editReply({
-                        content: `Team **${teamInput}** not found.`
-                    });
-                }
-            } else {
-                const playerData = await tileEventDb.getPlayerTeam(interaction.user.id);
-                if (!playerData) {
-                    return interaction.editReply({
-                        content: 'You are not on a tile event team. Ask your team leader to add you with `/addplayer` or specify a team name.'
-                    });
-                }
-                team = playerData.team;
-            }
             const currentTile = team.current_tile;
 
             const tileData = await tileEventDb.getTileData(currentTile);
@@ -75,7 +81,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor('Blue')
-                .setTitle(`${team.team_name} - Tile Progress`)
+                .setTitle(`${team.long_name || team.team_name} - Tile Progress`)
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .addFields(
                     { name: 'Current Tile', value: `${currentTile}/40`, inline: true },

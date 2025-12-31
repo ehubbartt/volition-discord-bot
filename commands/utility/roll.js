@@ -18,10 +18,19 @@ module.exports = {
             });
         }
 
-        // Check if command is used in the correct channel
-        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+        // Check if user is a team leader/co-leader
+        const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+        if (!team) {
             return interaction.reply({
-                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                content: 'You must be a team leader to roll for your team.',
+                ephemeral: true
+            });
+        }
+
+        // Check if command is used in the team's channel
+        if (team.team_channel_id && interaction.channelId !== team.team_channel_id) {
+            return interaction.reply({
+                content: `This command can only be used in your team's channel: <#${team.team_channel_id}>.`,
                 ephemeral: true
             });
         }
@@ -29,12 +38,6 @@ module.exports = {
         await interaction.deferReply();
 
         try {
-            const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
-            if (!team) {
-                return interaction.editReply({
-                    content: 'You must be a team leader to roll for your team.'
-                });
-            }
 
             const currentTile = team.current_tile;
 
@@ -65,7 +68,7 @@ module.exports = {
                 .setTitle('🎲 Tile Roll')
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .addFields(
-                    { name: 'Team', value: team.team_name, inline: true },
+                    { name: 'Team', value: team.long_name || team.team_name, inline: true },
                     { name: 'Roll', value: `🎲 ${rollValue}`, inline: true },
                     { name: 'New Tile', value: `${newTile}/40`, inline: true }
                 );

@@ -29,18 +29,27 @@ async function getTeamByName(teamName) {
 }
 
 async function getTeamByLeaderId(discordId) {
-    const { data, error } = await supabase
+    // Check if user is a leader
+    const { data: leaderData, error: leaderError } = await supabase
         .from('tile_event_teams')
         .select('*')
         .eq('leader_discord_id', discordId)
         .single();
 
-    if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw error;
-    }
+    if (leaderData) return leaderData;
+    if (leaderError && leaderError.code !== 'PGRST116') throw leaderError;
 
-    return data;
+    // Check if user is a co-leader
+    const { data: coleaderData, error: coleaderError } = await supabase
+        .from('tile_event_teams')
+        .select('*')
+        .eq('coleader_discord_id', discordId)
+        .single();
+
+    if (coleaderData) return coleaderData;
+    if (coleaderError && coleaderError.code !== 'PGRST116') throw coleaderError;
+
+    return null;
 }
 
 async function getAllTeams() {

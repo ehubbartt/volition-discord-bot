@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
 const config = require('../../utils/config');
-const boardConfig = require('../../config/boardConfig.json');
 const boardConfigManager = require('../../utils/boardConfigManager');
 
 module.exports = {
@@ -100,10 +99,19 @@ module.exports = {
             });
         }
 
-        // Check if command is used in the correct channel
-        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+        // Check if user is a team leader/co-leader
+        const attackerTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+        if (!attackerTeam) {
             return interaction.reply({
-                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                content: 'You must be a team leader to use sabotage tokens.',
+                ephemeral: true
+            });
+        }
+
+        // Check if command is used in the attacker's team channel
+        if (attackerTeam.team_channel_id && interaction.channelId !== attackerTeam.team_channel_id) {
+            return interaction.reply({
+                content: `This command can only be used in your team's channel: <#${attackerTeam.team_channel_id}>.`,
                 ephemeral: true
             });
         }
@@ -113,13 +121,6 @@ module.exports = {
         try {
             const targetTeamName = interaction.options.getString('target_team');
             const itemName = interaction.options.getString('item');
-
-            const attackerTeam = await tileEventDb.getTeamByLeaderId(interaction.user.id);
-            if (!attackerTeam) {
-                return interaction.editReply({
-                    content: 'You must be a team leader to use sabotage tokens.'
-                });
-            }
 
             if (attackerTeam.sabotage_tokens <= 0) {
                 return interaction.editReply({
@@ -223,13 +224,16 @@ module.exports = {
             const helpPercentage = Math.round(helpChance * 100);
             const hinderPercentage = 100 - helpPercentage;
 
+            const attackerDisplayName = attackerTeam.long_name || attackerTeam.team_name;
+            const targetDisplayName = targetTeam.long_name || targetTeam.team_name;
+
             const embed = new EmbedBuilder()
                 .setColor(isHelp ? 'Green' : 'Red')
                 .setTitle('🎯 Sabotage Used!')
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .addFields(
-                    { name: 'Attacker', value: attackerTeam.team_name, inline: true },
-                    { name: 'Target', value: targetTeam.team_name, inline: true },
+                    { name: 'Attacker', value: attackerDisplayName, inline: true },
+                    { name: 'Target', value: targetDisplayName, inline: true },
                     { name: 'Outcome', value: isHelp ? '✅ Helped!' : '💥 Hindered!', inline: true },
                     { name: 'Item Affected', value: targetItem.item_name, inline: true },
                     { name: 'Old Requirement', value: `${targetItem.current_quantity}/${targetItem.required_quantity}`, inline: true },
@@ -262,8 +266,8 @@ module.exports = {
                         .setColor(isHelp ? 'Green' : 'Red')
                         .setTitle('🎯 Sabotage Token Used!')
                         .addFields(
-                            { name: 'Attacker', value: attackerTeam.team_name, inline: true },
-                            { name: 'Target', value: targetTeam.team_name, inline: true },
+                            { name: 'Attacker', value: attackerDisplayName, inline: true },
+                            { name: 'Target', value: targetDisplayName, inline: true },
                             { name: 'Tile', value: `${targetTeam.current_tile}`, inline: true },
                             { name: 'Item', value: targetItem.item_name, inline: true },
                             { name: 'Effect', value: isHelp ? '✅ -1 Required' : '💥 +1 Required', inline: true },

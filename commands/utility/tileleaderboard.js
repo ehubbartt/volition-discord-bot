@@ -89,7 +89,8 @@ module.exports = {
                 const progressInfo = team.progressPercent > 0 ? ` (${team.progressPercent}% complete)` : '';
                 const tokenInfo = team.sabotage_tokens > 0 ? ` | 🎯 ${team.sabotage_tokens}` : '';
 
-                return `${medal} **${team.team_name}**\n${tileInfo}${progressInfo}${tokenInfo}`;
+                const displayName = team.long_name || team.team_name;
+                return `${medal} **${displayName}**\n${tileInfo}${progressInfo}${tokenInfo}`;
             }).join('\n\n');
 
             embed.setDescription(leaderboardText);

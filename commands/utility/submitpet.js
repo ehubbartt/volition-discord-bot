@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const tileEventDb = require('../../db/tile_event');
 const config = require('../../utils/config');
-const boardConfig = require('../../config/boardConfig.json');
 const boardConfigManager = require('../../utils/boardConfigManager');
 
 // Mapping of tile numbers to their related pets
@@ -72,10 +71,19 @@ module.exports = {
             });
         }
 
-        // Check if command is used in the correct channel
-        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+        // Check if user is a team leader/co-leader
+        const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+        if (!team) {
             return interaction.reply({
-                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                content: 'You must be a team leader to submit pets.',
+                ephemeral: true
+            });
+        }
+
+        // Check if command is used in the team's channel
+        if (team.team_channel_id && interaction.channelId !== team.team_channel_id) {
+            return interaction.reply({
+                content: `This command can only be used in your team's channel: <#${team.team_channel_id}>.`,
                 ephemeral: true
             });
         }
@@ -85,13 +93,6 @@ module.exports = {
         try {
             const petName = interaction.options.getString('pet_name');
             const messageLink = interaction.options.getString('proof');
-
-            const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
-            if (!team) {
-                return interaction.editReply({
-                    content: 'You must be a team leader to submit pets.'
-                });
-            }
 
             if (!messageLink.includes('discord.com/channels/')) {
                 return interaction.editReply({
@@ -194,7 +195,7 @@ module.exports = {
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .setDescription(`**${petMatch}** has instantly cleared tile ${currentTile}!`)
                 .addFields(
-                    { name: 'Team', value: team.team_name, inline: true },
+                    { name: 'Team', value: team.long_name || team.team_name, inline: true },
                     { name: 'Tile Cleared', value: `${currentTile}/40`, inline: true },
                     { name: 'Pet Submitted', value: petMatch, inline: true }
                 )

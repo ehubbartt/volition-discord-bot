@@ -18,10 +18,19 @@ module.exports = {
             });
         }
 
-        // Check if command is used in the correct channel
-        if (boardConfig.tileEventChannelId && interaction.channelId !== boardConfig.tileEventChannelId) {
+        // Check if user is a team leader/co-leader
+        const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
+        if (!team) {
             return interaction.reply({
-                content: `This command can only be used in <#${boardConfig.tileEventChannelId}>.`,
+                content: 'You must be a team leader to use re-roll tokens.',
+                ephemeral: true
+            });
+        }
+
+        // Check if command is used in the team's channel
+        if (team.team_channel_id && interaction.channelId !== team.team_channel_id) {
+            return interaction.reply({
+                content: `This command can only be used in your team's channel: <#${team.team_channel_id}>.`,
                 ephemeral: true
             });
         }
@@ -29,12 +38,6 @@ module.exports = {
         await interaction.deferReply();
 
         try {
-            const team = await tileEventDb.getTeamByLeaderId(interaction.user.id);
-            if (!team) {
-                return interaction.editReply({
-                    content: 'You must be a team leader to use re-roll tokens.'
-                });
-            }
 
             // Check if team has reroll tokens
             if (team.reroll_tokens <= 0) {
@@ -92,7 +95,7 @@ module.exports = {
                 .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
                 .setDescription(`Your team used their re-roll token to skip tile ${currentTile}!\nRe-rolling from tile ${rollFromTile} (where you last completed).`)
                 .addFields(
-                    { name: 'Team', value: team.team_name, inline: true },
+                    { name: 'Team', value: team.long_name || team.team_name, inline: true },
                     { name: 'Skipped Tile', value: `${currentTile}`, inline: true },
                     { name: 'Rolled From', value: `${rollFromTile}`, inline: true },
                     { name: 'Roll', value: `🎲 ${rollValue}`, inline: true },
