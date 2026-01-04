@@ -626,10 +626,10 @@ async function getTeamTileReachedAt(teamId, tileNumber) {
     // Get when a team first reached a specific tile from the roll log
     const { data, error } = await supabase
         .from('tile_event_roll_log')
-        .select('created_at')
+        .select('rolled_at')
         .eq('team_id', teamId)
         .eq('to_tile', tileNumber)
-        .order('created_at', { ascending: true })
+        .order('rolled_at', { ascending: true })
         .limit(1)
         .single();
 
@@ -637,7 +637,7 @@ async function getTeamTileReachedAt(teamId, tileNumber) {
         if (error.code === 'PGRST116') return null; // No roll found (could be starting tile)
         throw error;
     }
-    return data?.created_at || null;
+    return data?.rolled_at || null;
 }
 
 // Get the tile the team rolled FROM to reach their current tile
@@ -647,7 +647,7 @@ async function getPreviousTile(teamId, currentTile) {
         .select('from_tile')
         .eq('team_id', teamId)
         .eq('to_tile', currentTile)
-        .order('created_at', { ascending: false })
+        .order('rolled_at', { ascending: false })
         .limit(1)
         .single();
 
