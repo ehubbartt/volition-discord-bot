@@ -361,13 +361,14 @@ module.exports = {
             const existingProgress = await tileEventDb.getTeamProgress(team.id, currentTile);
 
             if (existingProgress.length === 0) {
+                // No progress yet - initialize with this item's option
                 await tileEventDb.initializeTileProgress(team.id, currentTile, itemMatch.optionId);
             } else {
+                // Check if this option is already initialized, if not, initialize it
                 const progressOptionIds = [...new Set(existingProgress.map(p => p.option_id))];
-                if (progressOptionIds.length > 0 && !progressOptionIds.includes(itemMatch.optionId)) {
-                    return interaction.editReply({
-                        content: `Team has already started working on a different option for this tile. Cannot switch options mid-tile.`
-                    });
+                if (!progressOptionIds.includes(itemMatch.optionId)) {
+                    // Initialize this option so they can work on it
+                    await tileEventDb.initializeTileProgress(team.id, currentTile, itemMatch.optionId);
                 }
             }
 
