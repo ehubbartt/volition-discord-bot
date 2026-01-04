@@ -118,34 +118,39 @@ module.exports = {
             }
 
             if (progress.length > 0) {
-                const activeOptionId = progress[0].option_id;
-                const optionProgress = progress.filter(p => p.option_id === activeOptionId);
+                // Get all unique option IDs that have progress
+                const optionIds = [...new Set(progress.map(p => p.option_id))];
 
-                // Get the full list of required items from tile data for this option
-                const tileOption = tileData.requirement_json.find(opt => opt.option_id === activeOptionId);
-                const allRequiredItems = tileOption ? tileOption.items : [];
+                // Display progress for each option
+                for (const optionId of optionIds) {
+                    const optionProgress = progress.filter(p => p.option_id === optionId);
 
-                // Build progress text including any missing items from tile data
-                const progressText = allRequiredItems.map(reqItem => {
-                    const existingProgress = optionProgress.find(p => p.item_name.toLowerCase() === reqItem.name.toLowerCase());
-                    if (existingProgress) {
-                        const status = existingProgress.is_completed ? '✅' : '🔄';
-                        return `${status} ${existingProgress.current_quantity}/${existingProgress.required_quantity} ${existingProgress.item_name}`;
-                    } else {
-                        // Item exists in tile but not in progress - show as not started
-                        return `🔄 0/${reqItem.quantity} ${reqItem.name}`;
-                    }
-                }).join('\n');
+                    // Get the full list of required items from tile data for this option
+                    const tileOption = tileData.requirement_json.find(opt => opt.option_id === optionId);
+                    const allRequiredItems = tileOption ? tileOption.items : [];
 
-                const totalCurrent = optionProgress.filter(p => p.is_completed).length;
-                const totalRequired = allRequiredItems.length;
-                const progressPercent = Math.round((totalCurrent / totalRequired) * 100);
+                    // Build progress text including any missing items from tile data
+                    const progressText = allRequiredItems.map(reqItem => {
+                        const existingProgress = optionProgress.find(p => p.item_name.toLowerCase() === reqItem.name.toLowerCase());
+                        if (existingProgress) {
+                            const status = existingProgress.is_completed ? '✅' : '🔄';
+                            return `${status} ${existingProgress.current_quantity}/${existingProgress.required_quantity} ${existingProgress.item_name}`;
+                        } else {
+                            // Item exists in tile but not in progress - show as not started
+                            return `🔄 0/${reqItem.quantity} ${reqItem.name}`;
+                        }
+                    }).join('\n');
 
-                embed.addFields({
-                    name: `Active Progress (Option ${activeOptionId}) - ${progressPercent}%`,
-                    value: progressText || 'No items configured',
-                    inline: false
-                });
+                    const totalCurrent = optionProgress.filter(p => p.is_completed).length;
+                    const totalRequired = allRequiredItems.length;
+                    const progressPercent = Math.round((totalCurrent / totalRequired) * 100);
+
+                    embed.addFields({
+                        name: `Progress (Option ${optionId}) - ${progressPercent}%`,
+                        value: progressText || 'No items configured',
+                        inline: false
+                    });
+                }
             } else {
                 embed.addFields({
                     name: 'Current Progress',
