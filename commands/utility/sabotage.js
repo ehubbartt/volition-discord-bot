@@ -194,7 +194,7 @@ module.exports = {
             } else if (targetTeam.current_tile <= 30) {
                 helpChance = 0.40; // 40% help, 60% hinder
             } else {
-                helpChance = 0.20; // 50% help, 50% hinder
+                helpChance = 0.50; // 50% help, 50% hinder
             }
 
             const isHelp = Math.random() < helpChance;

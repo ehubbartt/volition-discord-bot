@@ -72,7 +72,7 @@ module.exports = {
             } else {
                 embed.addFields({
                     name: 'How Sabotage Works',
-                    value: '• **Tiles 1-10:** 30% help, 70% hinder\n• **Tiles 11-20:** 40% help, 60% hinder\n• **Tiles 21+:** 50% help, 50% hinder\n• **Help:** Give target +1 drop towards current item\n• **Hinder:** Take -1 drop from target\'s current item\n• Can only target teams at least 1 tile ahead\n• Cannot sabotage keystone tiles\n• Each team can only be sabotaged once per tile\n• Use `/sabotage` to sabotage a team',
+                    value: '• **Tiles 1-20:** 30% help, 70% hinder\n• **Tiles 21-30:** 40% help, 60% hinder\n• **Tiles 31+:** 50% help, 50% hinder\n• **Help:** Reduce target\'s requirement by 1\n• **Hinder:** Increase target\'s requirement by 1\n• Can only target teams at least 1 tile ahead\n• Cannot sabotage keystone tiles\n• Each team can only be sabotaged once per tile\n• Use `/sabotage` to sabotage a team',
                     inline: false
                 });
             }
