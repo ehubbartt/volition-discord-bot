@@ -245,11 +245,30 @@ class TileBoardService {
 
             // Get team standings for embed
             const teams = await tileEventDb.getAllTeams();
-            const sortedTeams = [...teams].sort((a, b) => {
+
+            // Get tile reached times for tiebreaker
+            const teamsWithTimes = await Promise.all(teams.map(async (team) => {
+                const tileReachedAt = await tileEventDb.getTeamTileReachedAt(team.id, team.current_tile);
+                return { ...team, tileReachedAt };
+            }));
+
+            const sortedTeams = teamsWithTimes.sort((a, b) => {
+                // First: sort by tile number (higher is better)
                 if (a.current_tile !== b.current_tile) {
                     return b.current_tile - a.current_tile;
                 }
-                return 0;
+
+                // For completed teams (tile 40), sort by completion time
+                if (a.current_tile === 40 && b.current_tile === 40) {
+                    const aCompleted = a.completed_at ? new Date(a.completed_at).getTime() : Infinity;
+                    const bCompleted = b.completed_at ? new Date(b.completed_at).getTime() : Infinity;
+                    return aCompleted - bCompleted;
+                }
+
+                // For teams on same tile, sort by who reached it first
+                const aTime = a.tileReachedAt ? new Date(a.tileReachedAt).getTime() : Infinity;
+                const bTime = b.tileReachedAt ? new Date(b.tileReachedAt).getTime() : Infinity;
+                return aTime - bTime;
             });
 
             // Create standings text (use long_name for display, fallback to team_name)
