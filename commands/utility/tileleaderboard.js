@@ -60,6 +60,14 @@ module.exports = {
                 if (a.current_tile !== b.current_tile) {
                     return b.current_tile - a.current_tile;
                 }
+
+                // For completed teams (tile 40), sort by completion time
+                if (a.current_tile === 40 && b.current_tile === 40) {
+                    const aCompleted = a.completed_at ? new Date(a.completed_at).getTime() : Infinity;
+                    const bCompleted = b.completed_at ? new Date(b.completed_at).getTime() : Infinity;
+                    return aCompleted - bCompleted;
+                }
+
                 // Second: sort by progress percent (higher is better)
                 if (a.progressPercent !== b.progressPercent) {
                     return b.progressPercent - a.progressPercent;
