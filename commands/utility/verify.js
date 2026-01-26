@@ -108,9 +108,9 @@ async function handleVerifySubmit(interaction) {
         }
 
         // Check requirements
-        const MIN_TOTAL_LEVEL = 1750;
-        const MIN_EHB = 50;
-        const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL || ehb >= MIN_EHB;
+        const MIN_TOTAL_LEVEL = 2000;
+        const MIN_EHB = 150;
+        const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
         // Determine rank
         const rank = determineRank(ehb, null);

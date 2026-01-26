@@ -77,24 +77,6 @@ module.exports = {
         return interaction.reply({ content: '⚠️ Join tickets are currently disabled.', ephemeral: true });
       }
 
-      // TEMPORARY: Hiatus message for join tickets
-      if (ticketType === 'join') {
-        const hiatusEmbed = new EmbedBuilder()
-          .setColor('Orange')
-          .setTitle('📢 Applications Temporarily Closed')
-          .setDescription(
-            "Hey, we appreciate that you're interested in our clan; for the time being, we are taking a hiatus from new applicants due to some restructuring, and will reopen for application within the next couple weeks.\n\n" +
-            "Feel free to check in and join if you're still interested, and you're more than welcome to guest in the clan chat for the time being, in order to get a sense of how the community is.\n\n" +
-            "Either way, we won't hold your decision against you, and wish you all the best. Should you still be interested when applications reopen, we'll catch you on the other side!\n\n" +
-            "*-Volition Admin Team*"
-          )
-          .setTimestamp();
-
-        return interaction.reply({
-          embeds: [hiatusEmbed],
-          ephemeral: true
-        });
-      }
       if (ticketType === 'general' && !await features.isEnabled('ticketSystem.allowGeneralTickets')) {
         return interaction.reply({ content: '⚠️ General tickets are currently disabled.', ephemeral: true });
       }

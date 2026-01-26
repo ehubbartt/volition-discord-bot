@@ -32,7 +32,7 @@ module.exports = {
             .setDescription(
                 'Click the button below to verify your RuneScape account and check if you meet clan requirements!\n\n' +
                 '**Requirements:**\n' +
-                '• 1750+ Total Level OR 50+ EHB\n\n' +
+                '• 2000+ Total Level AND 150+ EHB\n\n' +
                 'Your stats will be checked via Wise Old Man.'
             )
             .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
@@ -180,9 +180,9 @@ async function handleVerifySubmit (interaction) {
         }
 
         // Check requirements
-        const MIN_TOTAL_LEVEL = 1750;
-        const MIN_EHB = 50;
-        const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL || ehb >= MIN_EHB;
+        const MIN_TOTAL_LEVEL = 2000;
+        const MIN_EHB = 150;
+        const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
         // Determine rank
         const rank = determineRank(ehb, null);
@@ -270,7 +270,7 @@ async function handleVerifySubmit (interaction) {
                 `**Requirements:**\n` +
                 `• ${totalLevel >= MIN_TOTAL_LEVEL ? '✅' : '❌'} Total Level: ${totalLevel} / ${MIN_TOTAL_LEVEL}\n` +
                 `• ${ehb >= MIN_EHB ? '✅' : '❌'} EHB: ${ehb} / ${MIN_EHB}\n\n` +
-                `You need either 1750+ total level or 50+ EHB to join. An admin will be there soon to assist you.`;
+                `You need 2000+ total level AND 150+ EHB to join. An admin will be there soon to assist you.`;
         }
 
         const statsEmbed = new EmbedBuilder()

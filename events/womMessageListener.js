@@ -320,9 +320,9 @@ async function processMemberJoin (rsn, originalMessage) {
         console.log(`[JOIN] Stats: Total=${totalLevel}, EHB=${ehb}`);
 
         // Check requirements
-        const MIN_TOTAL_LEVEL = 1750;
-        const MIN_EHB = 50;
-        const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL || ehb >= MIN_EHB;
+        const MIN_TOTAL_LEVEL = 2000;
+        const MIN_EHB = 150;
+        const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
         console.log(`[JOIN] Requirements check: ${meetsRequirements ? 'PASSED' : 'FAILED'}`);
 
@@ -688,8 +688,8 @@ async function sendAdminNotification (rsn, totalLevel, ehb, originalMessage) {
                 `**${rsn}** joined but does NOT meet requirements.`
             )
             .addFields(
-                { name: 'Total Level', value: `${totalLevel} / 1750`, inline: true },
-                { name: 'EHB', value: `${ehb} / 50`, inline: true },
+                { name: 'Total Level', value: `${totalLevel} / 2000`, inline: true },
+                { name: 'EHB', value: `${ehb} / 150`, inline: true },
                 { name: 'Status', value: '❌ Does not meet requirements', inline: false }
             )
             .setTimestamp();

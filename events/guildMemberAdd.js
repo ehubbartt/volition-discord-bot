@@ -76,43 +76,6 @@ module.exports = {
 
             console.log(`[GuildMemberAdd] Created ticket channel: ${ticketChannel.name}`);
 
-            // TEMPORARY: Hiatus message instead of normal verify flow
-            const hiatusEmbed = new EmbedBuilder()
-                .setColor('Orange')
-                .setTitle('📢 Welcome to Volition - Applications Temporarily Closed')
-                .setDescription(
-                    "Hey, we appreciate that you're interested in our clan; for the time being, we are taking a hiatus from new applicants due to some restructuring, and will reopen for application within the next couple weeks.\n\n" +
-                    "Feel free to check in and join if you're still interested, and you're more than welcome to guest in the clan chat for the time being, in order to get a sense of how the community is.\n\n" +
-                    "Either way, we won't hold your decision against you, and wish you all the best. Should you still be interested when applications reopen, we'll catch you on the other side!\n\n" +
-                    "*-Volition Admin Team*"
-                )
-                .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
-                .setTimestamp();
-
-            // Send admin control panel
-            const closeButton = new ButtonBuilder()
-                .setCustomId('ticket_close')
-                .setLabel('Close Ticket')
-                .setStyle(ButtonStyle.Danger)
-                .setEmoji('🔒');
-
-            const adminRow = new ActionRowBuilder().addComponents(closeButton);
-
-            await ticketChannel.send({
-                content: '**Admin Controls** (Admin only)',
-                components: [adminRow]
-            });
-
-            // Send hiatus message to user
-            await ticketChannel.send({
-                content: `${member}`,
-                embeds: [hiatusEmbed]
-            });
-
-            console.log(`[GuildMemberAdd] ✅ Sent hiatus message to ${ticketChannel.name}`);
-            // END TEMPORARY HIATUS CODE
-
-            /* NORMAL FLOW - Uncomment when hiatus is over
             // Create welcome message with verify button
             const welcomeEmbed = new EmbedBuilder()
                 .setColor('Blue')
@@ -126,7 +89,7 @@ module.exports = {
                     `3. We'll check if you meet our requirements\n` +
                     `4. If approved, join our clan in-game!\n\n` +
                     `**Requirements:**\n` +
-                    `• 1750+ Total Level OR 50+ EHB\n\n` +
+                    `• 2000+ Total Level AND 150+ EHB\n\n` +
                     `**Joining as Guest?**\n` +
                     `If you have a friend or main account in the clan, click **Join as Guest** instead!\n\n` +
                     `An admin will be with you shortly if you have any questions!`
@@ -185,7 +148,6 @@ module.exports = {
             });
 
             console.log(`[GuildMemberAdd] ✅ Sent welcome message to ${ticketChannel.name}`);
-            */
 
         } catch (error) {
             console.error('[GuildMemberAdd] Error creating join ticket:', error);
