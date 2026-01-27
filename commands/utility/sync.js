@@ -136,11 +136,11 @@ async function fullClanSync (interaction, clanId) {
                         const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
                         const expectedRankIndex = determineRankIndex(ehb, clanJoinTimestamp);
 
-                        // Only update if it's an upgrade or they have no rank
-                        if (currentRankIndex !== expectedRankIndex && isRankUpgrade(currentRankIndex, expectedRankIndex)) {
-                            // ACTIVE MODE - Only upgrade ranks, never downgrade
+                        // Update rank if it doesn't match expected (both upgrades and downgrades)
+                        if (currentRankIndex !== expectedRankIndex) {
                             const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
                             const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
+                            const isUpgrade = isRankUpgrade(currentRankIndex, expectedRankIndex);
 
                             try {
                                 const currentRankRoleObj = discordMember.roles.cache.find(role => allRankRoleIds.includes(role.id));
@@ -156,7 +156,9 @@ async function fullClanSync (interaction, clanId) {
                                 if (newRoleId) {
                                     await discordMember.roles.add(newRoleId);
                                     ranksUpdated++;
-                                    console.log(`[FullSync] ⬆️ Upgraded rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)} (${ehb} EHB, ${daysInClan} days)`);
+                                    const arrow = isUpgrade ? '⬆️' : '⬇️';
+                                    const action = isUpgrade ? 'Upgraded' : 'Downgraded';
+                                    console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)} (${ehb} EHB, ${daysInClan} days)`);
 
                                     rankMismatches.push({
                                         rsn,
@@ -164,7 +166,7 @@ async function fullClanSync (interaction, clanId) {
                                         expectedRankIndex,
                                         ehb,
                                         daysInClan,
-                                        issue: `Upgraded: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)}`
+                                        issue: `${action}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)}`
                                     });
                                 } else {
                                     console.warn(`[FullSync] Role ID not configured for rank index: ${expectedRankIndex}`);
@@ -174,11 +176,6 @@ async function fullClanSync (interaction, clanId) {
                                 rankMismatches.push({ rsn, currentRankIndex, expectedRankIndex, ehb, daysInClan, issue: `Failed: ${roleError.message}` });
                                 console.error(`[FullSync] Failed to update rank for ${rsn}:`, roleError.message);
                             }
-                        } else if (currentRankIndex !== expectedRankIndex) {
-                            // Rank would be a downgrade - skip it
-                            const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
-                            const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
-                            console.log(`[FullSync] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(interaction.guild, currentRankIndex)} (earned rank: ${getRankName(interaction.guild, expectedRankIndex)}, ${ehb} EHB, ${daysInClan} days)`);
                         }
                     } catch (error) {
                         // Check if error is "Unknown Member" (Discord user no longer in server)
