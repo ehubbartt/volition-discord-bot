@@ -1,5 +1,5 @@
 node_modules
 .env
-
+claude.md
 # Auto-generated config (created by utils/config.js based on environment mode)
 config.json
