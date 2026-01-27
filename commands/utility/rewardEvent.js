@@ -100,6 +100,7 @@ module.exports = {
                 // Log to payout channel
                 const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
                 if (logChannel) {
+                    const rankSuffix = i === 0 ? 'st' : i === 1 ? 'nd' : 'rd';
                     const logEmbed = new EmbedBuilder()
                         .setColor('Green')
                         .setTitle('Competition Points Awarded')
@@ -107,13 +108,14 @@ module.exports = {
                             `**Player:** ${rsn}\n` +
                             `**Change:** +${points} VP\n` +
                             `**New Total:** ${newTotalPoints} VP\n` +
-                            `**Competition:** ${competitionTitle}\n` +
-                            `**Rank:** ${i + 1}\n` +
+                            `**Reason:** ${i + 1}${rankSuffix} Place - ${competitionTitle}\n` +
                             `**Awarded by:** <@${interaction.user.id}>`
                         )
                         .setTimestamp();
 
-                    await logChannel.send({ embeds: [logEmbed] });
+                    // Ping the user if they have a Discord ID linked
+                    const userPing = player?.discord_id ? `<@${player.discord_id}>` : `**${rsn}**`;
+                    await logChannel.send({ content: userPing, embeds: [logEmbed] });
                 }
 
                 embed.addFields({

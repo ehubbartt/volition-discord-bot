@@ -16,6 +16,11 @@ module.exports = {
             option.setName('points')
                 .setDescription('Positive or negative integers only.')
                 .setRequired(true)
+        )
+        .addStringOption(option =>
+            option.setName('reason')
+                .setDescription('Reason for the adjustment (shown in payout log)')
+                .setRequired(false)
         ),
 
     async execute(interaction) {
@@ -27,6 +32,7 @@ module.exports = {
 
         const playerInput = interaction.options.getString('player');
         const pointsToAdd = interaction.options.getInteger('points');
+        const reason = interaction.options.getString('reason') || 'Manual adjustment';
 
         if (isNaN(pointsToAdd)) {
             return interaction.editReply({ content: 'Invalid points input. Please enter a valid number.' });
@@ -83,11 +89,14 @@ module.exports = {
                             `**Player:** ${displayName}\n` +
                             `**Change:** ${pointsToAdd > 0 ? '+' : ''}${pointsToAdd} VP\n` +
                             `**New Total:** ${newTotalPoints} VP\n` +
+                            `**Reason:** ${reason}\n` +
                             `**Adjusted by:** <@${interaction.user.id}>`
                         )
                         .setTimestamp();
 
-                    await logChannel.send({ embeds: [logEmbed] });
+                    // Ping the user if they have a Discord ID linked
+                    const userPing = player.discord_id ? `<@${player.discord_id}>` : `**${player.rsn}**`;
+                    await logChannel.send({ content: userPing, embeds: [logEmbed] });
                 }
 
                 results.push(pointsToAdd < 0

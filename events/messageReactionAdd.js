@@ -34,13 +34,16 @@ module.exports = {
 
 
 
-        // Determine points reward
+        // Determine points reward and reason
         let pointsAwarded = 0;
+        let reason = '';
 
         if (channelId === weeklyTaskChannelId && emojiMatch) {
             pointsAwarded = config.POINTS_FOR_CHALLENGE || 5;
+            reason = 'Weekly Challenge Completion';
         } else if (channelId === wordleChannelId && emojiMatch) {
             pointsAwarded = 1;
+            reason = 'Daily Challenge Completion';
         } else {
             return;
         }
@@ -76,13 +79,17 @@ module.exports = {
             const logChannel = guild.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
             if (logChannel) {
                 const embed = new EmbedBuilder()
-                    .setColor(0xFFFFFF)
+                    .setColor('Green')
                     .setTitle('Volition Points Awarded')
                     .setDescription(
-                        `Awarded **${pointsAwarded} points** to **${rsn}**.\n` +
-                        `New total: **${newTotalPoints}**.\nAwarded by: <@${user.id}>`
-                    );
-                logChannel.send({ embeds: [embed] });
+                        `**Player:** ${rsn}\n` +
+                        `**Change:** +${pointsAwarded} VP\n` +
+                        `**New Total:** ${newTotalPoints} VP\n` +
+                        `**Reason:** ${reason}\n` +
+                        `**Awarded by:** <@${user.id}>`
+                    )
+                    .setTimestamp();
+                logChannel.send({ content: `<@${discordId}>`, embeds: [embed] });
             }
         } catch (error) {
             console.error('Error awarding points:', error.message);
