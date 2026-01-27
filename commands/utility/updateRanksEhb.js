@@ -91,6 +91,7 @@ module.exports = {
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
       let mismatchOutput = [];
       let clanRankUpgradeNeeded = [];
+      let clanRankDowngradeNeeded = [];
       let rankUpAnnouncements = []; // For broadcasting to #rank-ups channel
       // Store user mentions for later use
       let userMentions = [];
@@ -169,7 +170,7 @@ module.exports = {
             }
           }
 
-          // Check if in-game clan rank needs to be upgraded to match Discord rank
+          // Check if in-game clan rank matches Discord rank
           if (clanMember && currentRankIndex >= 0) {
             const womRole = clanMember.role;
             const expectedWomRole = getWomRole(currentRankIndex);
@@ -178,17 +179,24 @@ module.exports = {
             // 1. Discord rank has a WOM equivalent
             // 2. Current WOM role is a standard role (not moderator, maxed, etc.)
             if (expectedWomRole && womRole !== expectedWomRole && standardWomRoles.includes(womRole)) {
-              // Discord rank is higher than clan rank - needs manual upgrade in WOM
               const reason = getRankReason(currentRankIndex, ehb, clanJoinedAt);
 
               // Get current and expected WOM rank indices
               const currentWomRankIndex = getRankIndexByWomRole(womRole);
-              const expectedWomRankIndex = getRankIndexByWomRole(expectedWomRole);
 
-              clanRankUpgradeNeeded.push(
-                `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM Clan Rank: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, currentRankIndex)}`
-              );
-              console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${getRankName(guild, currentRankIndex)}, ${reason})`);
+              if (currentWomRankIndex < currentRankIndex) {
+                // WOM rank is lower than Discord rank - needs upgrade in WOM
+                clanRankUpgradeNeeded.push(
+                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, currentRankIndex)}`
+                );
+                console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${getRankName(guild, currentRankIndex)}, ${reason})`);
+              } else if (currentWomRankIndex > currentRankIndex) {
+                // WOM rank is higher than Discord rank - needs downgrade in WOM
+                clanRankDowngradeNeeded.push(
+                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, currentRankIndex)}`
+                );
+                console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${getRankName(guild, currentRankIndex)}, ${reason})`);
+              }
             }
           }
         }
@@ -238,28 +246,48 @@ module.exports = {
         await interaction.followUp({ embeds: [embed] });
       }
 
-      // Send clan rank upgrade warnings if any
-      if (clanRankUpgradeNeeded.length > 0) {
+      // Send clan rank discrepancy warnings if any
+      if (clanRankUpgradeNeeded.length > 0 || clanRankDowngradeNeeded.length > 0) {
         try {
           const testChannel = await guild.channels.fetch(config.TEST_CHANNEL_ID);
 
           if (testChannel) {
-            const clanUpgradeChunks = chunkArray(clanRankUpgradeNeeded, 1000);
+            // Send upgrade warnings
+            if (clanRankUpgradeNeeded.length > 0) {
+              const clanUpgradeChunks = chunkArray(clanRankUpgradeNeeded, 1000);
 
-            for (let i = 0; i < clanUpgradeChunks.length; i++) {
-              const embed = new EmbedBuilder()
-                .setColor('Orange')
-                .setTitle(i === 0 ? '🔼 WOM Clan Rank Upgrade Needed' : `🔼 WOM Clan Rank Upgrade Needed (Part ${i + 1} of ${clanUpgradeChunks.length})`)
-                .setDescription('The following players have **higher Discord ranks** than their WOM clan rank. Their in-game clan rank needs to be manually upgraded on WiseOldMan:')
-                .addFields({ name: 'Players Needing Clan Rank Upgrade:', value: clanUpgradeChunks[i] })
-                .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
+              for (let i = 0; i < clanUpgradeChunks.length; i++) {
+                const embed = new EmbedBuilder()
+                  .setColor('Green')
+                  .setTitle(i === 0 ? '🔼 WOM Clan Rank Upgrade Needed' : `🔼 WOM Clan Rank Upgrade Needed (Part ${i + 1} of ${clanUpgradeChunks.length})`)
+                  .setDescription('The following players have **higher Discord ranks** than their WOM clan rank. Their in-game clan rank needs to be manually upgraded on WiseOldMan:')
+                  .addFields({ name: `Players Needing Upgrade (${clanRankUpgradeNeeded.length}):`, value: clanUpgradeChunks[i] })
+                  .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
 
-              await testChannel.send({ embeds: [embed] });
+                await testChannel.send({ embeds: [embed] });
+              }
+              console.log(`[UpdateRanks] 🔼 Sent ${clanUpgradeChunks.length} WOM clan rank upgrade warning(s) to #test`);
             }
-            console.log(`[UpdateRanks] 🔼 Sent ${clanUpgradeChunks.length} WOM clan rank upgrade warning(s) to #test`);
+
+            // Send downgrade warnings
+            if (clanRankDowngradeNeeded.length > 0) {
+              const clanDowngradeChunks = chunkArray(clanRankDowngradeNeeded, 1000);
+
+              for (let i = 0; i < clanDowngradeChunks.length; i++) {
+                const embed = new EmbedBuilder()
+                  .setColor('Red')
+                  .setTitle(i === 0 ? '🔽 WOM Clan Rank Downgrade Needed' : `🔽 WOM Clan Rank Downgrade Needed (Part ${i + 1} of ${clanDowngradeChunks.length})`)
+                  .setDescription('The following players have **lower Discord ranks** than their WOM clan rank. Their in-game clan rank needs to be manually downgraded on WiseOldMan:')
+                  .addFields({ name: `Players Needing Downgrade (${clanRankDowngradeNeeded.length}):`, value: clanDowngradeChunks[i] })
+                  .setFooter({ text: 'Update these ranks at wiseoldman.net/groups/4765/members' });
+
+                await testChannel.send({ embeds: [embed] });
+              }
+              console.log(`[UpdateRanks] 🔽 Sent ${clanDowngradeChunks.length} WOM clan rank downgrade warning(s) to #test`);
+            }
           }
         } catch (error) {
-          console.error('[UpdateRanks] Error sending clan rank upgrade warnings to test channel:', error);
+          console.error('[UpdateRanks] Error sending clan rank warnings to test channel:', error);
         }
       }
 
