@@ -170,32 +170,32 @@ module.exports = {
             }
           }
 
-          // Check if in-game clan rank matches Discord rank
-          if (clanMember && currentRankIndex >= 0) {
+          // Check if in-game clan rank matches what it should be based on EHB
+          if (clanMember) {
             const womRole = clanMember.role;
-            const expectedWomRole = getWomRole(currentRankIndex);
+            const expectedWomRole = getWomRole(calculatedRankIndex);
 
             // Only check if:
-            // 1. Discord rank has a WOM equivalent
+            // 1. Calculated rank has a WOM equivalent
             // 2. Current WOM role is a standard role (not moderator, maxed, etc.)
             if (expectedWomRole && womRole !== expectedWomRole && standardWomRoles.includes(womRole)) {
-              const reason = getRankReason(currentRankIndex, ehb, clanJoinedAt);
+              const reason = getRankReason(calculatedRankIndex, ehb, clanJoinedAt);
 
-              // Get current and expected WOM rank indices
+              // Get current WOM rank index
               const currentWomRankIndex = getRankIndexByWomRole(womRole);
 
-              if (currentWomRankIndex < currentRankIndex) {
-                // WOM rank is lower than Discord rank - needs upgrade in WOM
+              if (currentWomRankIndex < calculatedRankIndex) {
+                // WOM rank is lower than it should be - needs upgrade in WOM
                 clanRankUpgradeNeeded.push(
-                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, currentRankIndex)}`
+                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, calculatedRankIndex)}`
                 );
-                console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${getRankName(guild, currentRankIndex)}, ${reason})`);
-              } else if (currentWomRankIndex > currentRankIndex) {
-                // WOM rank is higher than Discord rank - needs downgrade in WOM
+                console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
+              } else if (currentWomRankIndex > calculatedRankIndex) {
+                // WOM rank is higher than it should be - needs downgrade in WOM
                 clanRankDowngradeNeeded.push(
-                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, currentRankIndex)}`
+                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
                 );
-                console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${getRankName(guild, currentRankIndex)}, ${reason})`);
+                console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               }
             }
           }
