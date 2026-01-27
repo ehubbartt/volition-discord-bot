@@ -310,8 +310,28 @@ module.exports = {
     }
 
     async function handleLootInteraction (interaction, free = false) {
-      // Allow items on both free and paid, but roles only on paid
-      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(true, !free);
+      // TEMP: Admin-only for testing
+      const isAdmin = config.ADMIN_ROLE_IDS.some(roleId =>
+        interaction.member.roles.cache.has(roleId)
+      );
+      if (!isAdmin) {
+        return interaction.reply({
+          content: '⚠️ Lootcrates are temporarily disabled for testing. Please try again later!',
+          ephemeral: true
+        });
+      }
+
+      // TEMP: Force item drop for testing - remove after testing!
+      const rollResult = rollLoot(true, !free);
+      const { kind, amount, chance, label, color, title, image, itemName, roleId } = {
+        ...rollResult,
+        kind: 'item',
+        itemName: 'Abyssal Whip',
+        label: 'Item Drop',
+        title: 'Rare Item Drop!',
+        image: 'https://i.imgur.com/tMM7G91.png',
+        color: 0x00FF00
+      };
       const today = new Date().toISOString().slice(0, 10);
       const PRICE = 5;
       const MAX_BUTTON_AGE_MS = 20 * 60 * 60 * 1000; // 20h
