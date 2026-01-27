@@ -175,6 +175,10 @@ module.exports = {
             const womRole = clanMember.role;
             const expectedWomRole = getWomRole(calculatedRankIndex);
 
+            // Debug logging
+            console.log(`[UpdateRanks] Checking ${rsn}: WOM role="${womRole}", expected="${expectedWomRole}", ehb=${ehb}, calcRankIdx=${calculatedRankIndex}`);
+            console.log(`[UpdateRanks]   - standardWomRoles includes "${womRole}": ${standardWomRoles.includes(womRole)}`);
+
             // Only check if:
             // 1. Calculated rank has a WOM equivalent
             // 2. Current WOM role is a standard role (not moderator, maxed, etc.)
@@ -197,7 +201,13 @@ module.exports = {
                 );
                 console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               }
+            } else if (womRole === expectedWomRole) {
+              console.log(`[UpdateRanks] ✅ ${rsn}: WOM role matches expected (${womRole})`);
+            } else {
+              console.log(`[UpdateRanks] ⏭️ ${rsn}: Skipped - expectedWomRole=${expectedWomRole}, womRole="${womRole}" not in standardWomRoles`);
             }
+          } else {
+            console.log(`[UpdateRanks] ⚠️ ${rsn}: Not found in WOM clan data`);
           }
         }
       }
