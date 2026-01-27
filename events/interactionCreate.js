@@ -72,7 +72,22 @@ module.exports = {
 
       const { PermissionFlagsBits, ChannelType } = require('discord.js');
       // Extract ticket type from button customId (e.g., 'ticket_create_join' -> 'join')
-      const ticketType = interaction.customId.replace('ticket_create_', '');
+      let ticketType = interaction.customId.replace('ticket_create_', '');
+
+      // Handle shop ticket cancel button
+      if (ticketType === 'shop_cancel') {
+        return interaction.update({
+          content: '❌ Payout ticket cancelled. Use `/wallet` to view your wallet status!',
+          embeds: [],
+          components: []
+        });
+      }
+
+      // Handle forced shop ticket creation (bypasses wallet check)
+      const forceShopTicket = ticketType === 'shop_force';
+      if (forceShopTicket) {
+        ticketType = 'shop'; // Treat as normal shop ticket from here on
+      }
 
       // Check if specific ticket type is enabled
       if (ticketType === 'join' && !await features.isEnabled('ticketSystem.allowJoinTickets')) {
@@ -84,6 +99,85 @@ module.exports = {
       }
       if (ticketType === 'shop' && !await features.isEnabled('ticketSystem.allowShopTickets')) {
         return interaction.reply({ content: '⚠️ Shop tickets are currently disabled.', ephemeral: true });
+      }
+
+      // For shop/payout tickets, check wallet status first (skip if force creating)
+      if (ticketType === 'shop' && !forceShopTicket) {
+        const items = await walletDb.getUnpaidItems(interaction.user.id);
+        const total = items.reduce((sum, item) => {
+          const price = walletPrices.items[item.item_name]?.price || 0;
+          return sum + price;
+        }, 0);
+        const threshold = walletPrices.CASHOUT_THRESHOLD;
+
+        // If no items, warn the user
+        if (items.length === 0) {
+          const noItemsEmbed = new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle('⚠️ Empty Wallet')
+            .setDescription(
+              `You don't have any items in your wallet to cash out.\n\n` +
+              `**How to get items:**\n` +
+              `Open lootcrates to win items that go into your wallet!\n\n` +
+              `You can still create a general payout ticket if you need help with something else.`
+            )
+            .setFooter({ text: 'Use /wallet to view your wallet' })
+            .setTimestamp();
+
+          const createAnywayButton = new ButtonBuilder()
+            .setCustomId('ticket_create_shop_force')
+            .setLabel('Create Ticket Anyway')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('📝');
+
+          const cancelButton = new ButtonBuilder()
+            .setCustomId('ticket_create_shop_cancel')
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌');
+
+          const row = new ActionRowBuilder().addComponents(createAnywayButton, cancelButton);
+
+          return interaction.reply({
+            embeds: [noItemsEmbed],
+            components: [row],
+            ephemeral: true
+          });
+        }
+
+        // If under threshold, show warning with options
+        if (total < threshold) {
+          const warningEmbed = new EmbedBuilder()
+            .setColor('Orange')
+            .setTitle('⚠️ Wallet Below Threshold')
+            .setDescription(
+              `Your wallet total is **${formatWalletGP(total)} GP**, which is below the **${formatWalletGP(threshold)} GP** minimum.\n\n` +
+              `You can still create a payout ticket, but we recommend waiting until you have at least ${formatWalletGP(threshold)} GP to make the trade worthwhile.\n\n` +
+              `**Do you want to create a payout ticket anyway?**`
+            )
+            .setFooter({ text: 'Tip: Keep opening lootcrates to fill your wallet!' })
+            .setTimestamp();
+
+          const createAnywayButton = new ButtonBuilder()
+            .setCustomId('ticket_create_shop_force')
+            .setLabel('Create Ticket Anyway')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('📝');
+
+          const cancelButton = new ButtonBuilder()
+            .setCustomId('ticket_create_shop_cancel')
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('❌');
+
+          const row = new ActionRowBuilder().addComponents(createAnywayButton, cancelButton);
+
+          return interaction.reply({
+            embeds: [warningEmbed],
+            components: [row],
+            ephemeral: true
+          });
+        }
       }
 
       try {
