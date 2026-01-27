@@ -190,15 +190,17 @@ module.exports = {
 
               if (currentWomRankIndex < calculatedRankIndex) {
                 // WOM rank is lower than it should be - needs upgrade in WOM
-                clanRankUpgradeNeeded.push(
-                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, calculatedRankIndex)}`
-                );
+                clanRankUpgradeNeeded.push({
+                  rsn,
+                  message: `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, calculatedRankIndex)}`
+                });
                 console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               } else if (currentWomRankIndex > calculatedRankIndex) {
                 // WOM rank is higher than it should be - needs downgrade in WOM
-                clanRankDowngradeNeeded.push(
-                  `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
-                );
+                clanRankDowngradeNeeded.push({
+                  rsn,
+                  message: `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
+                });
                 console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               }
             } else if (womRole === expectedWomRole) {
@@ -262,9 +264,12 @@ module.exports = {
           const testChannel = await guild.channels.fetch(config.TEST_CHANNEL_ID);
 
           if (testChannel) {
-            // Send upgrade warnings
+            // Send upgrade warnings (sorted alphabetically by RSN)
             if (clanRankUpgradeNeeded.length > 0) {
-              const clanUpgradeChunks = chunkArray(clanRankUpgradeNeeded, 1000);
+              const sortedUpgrades = clanRankUpgradeNeeded
+                .sort((a, b) => a.rsn.toLowerCase().localeCompare(b.rsn.toLowerCase()))
+                .map(item => item.message);
+              const clanUpgradeChunks = chunkArray(sortedUpgrades, 1000);
 
               for (let i = 0; i < clanUpgradeChunks.length; i++) {
                 const embed = new EmbedBuilder()
@@ -279,9 +284,12 @@ module.exports = {
               console.log(`[UpdateRanks] 🔼 Sent ${clanUpgradeChunks.length} WOM clan rank upgrade warning(s) to #test`);
             }
 
-            // Send downgrade warnings
+            // Send downgrade warnings (sorted alphabetically by RSN)
             if (clanRankDowngradeNeeded.length > 0) {
-              const clanDowngradeChunks = chunkArray(clanRankDowngradeNeeded, 1000);
+              const sortedDowngrades = clanRankDowngradeNeeded
+                .sort((a, b) => a.rsn.toLowerCase().localeCompare(b.rsn.toLowerCase()))
+                .map(item => item.message);
+              const clanDowngradeChunks = chunkArray(sortedDowngrades, 1000);
 
               for (let i = 0; i < clanDowngradeChunks.length; i++) {
                 const embed = new EmbedBuilder()
