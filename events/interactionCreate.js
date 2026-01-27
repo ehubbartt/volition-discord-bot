@@ -310,7 +310,8 @@ module.exports = {
     }
 
     async function handleLootInteraction (interaction, free = false) {
-      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(!free, !free);
+      // Allow items on both free and paid, but roles only on paid
+      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(true, !free);
       const today = new Date().toISOString().slice(0, 10);
       const PRICE = 5;
       const MAX_BUTTON_AGE_MS = 20 * 60 * 60 * 1000; // 20h
@@ -355,9 +356,22 @@ module.exports = {
             username: interaction.user.username
           }).catch(err => console.error('[Analytics] Failed to log free lootcrate:', err));
 
-          const description = amount === 0
-            ? `${interaction.user} opened their daily crate and found **nothing**.`
-            : `${interaction.user} opened their daily crate and found **${amount} VP**.`;
+          // Add item to wallet if it's an item drop
+          if (kind === 'item' && itemName) {
+            await walletDb.addWalletItem(interaction.user.id, itemName, interaction.user.username)
+              .catch(err => console.error('[Wallet] Failed to add item to wallet:', err));
+            console.log(`[Wallet] Added ${itemName} to ${interaction.user.tag}'s wallet (free claim)`);
+          }
+
+          // Build description based on what was won
+          let description;
+          if (kind === 'item') {
+            description = `${interaction.user} opened their daily crate and found **${itemName}**!`;
+          } else if (amount === 0) {
+            description = `${interaction.user} opened their daily crate and found **nothing**.`;
+          } else {
+            description = `${interaction.user} opened their daily crate and found **${amount} VP**.`;
+          }
 
           // Try to send Discord response - if this fails, player still got their reward
           try {
@@ -391,7 +405,7 @@ module.exports = {
 
         // Add item to wallet if it's an item drop
         if (kind === 'item' && itemName) {
-          await walletDb.addWalletItem(interaction.user.id, itemName)
+          await walletDb.addWalletItem(interaction.user.id, itemName, interaction.user.username)
             .catch(err => console.error('[Wallet] Failed to add item to wallet:', err));
           console.log(`[Wallet] Added ${itemName} to ${interaction.user.tag}'s wallet`);
         }

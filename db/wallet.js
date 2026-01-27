@@ -14,14 +14,16 @@ const supabase = createClient(supabaseUrl, supabaseKey);
  * Add an item to a user's wallet
  * @param {string} userId - Discord user ID
  * @param {string} itemName - Name of the item
+ * @param {string} username - Discord username
  * @returns {object} - The inserted wallet item
  */
-async function addWalletItem(userId, itemName) {
+async function addWalletItem(userId, itemName, username) {
     const { data, error } = await supabase
         .from('wallet_items')
         .insert({
             user_id: userId,
-            item_name: itemName
+            item_name: itemName,
+            username: username
         })
         .select()
         .single();

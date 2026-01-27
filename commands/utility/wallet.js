@@ -43,7 +43,9 @@ module.exports = {
 
         try {
             const userId = interaction.user.id;
+            console.log(`[Wallet] Fetching wallet for user ${userId}`);
             const items = await walletDb.getUnpaidItems(userId);
+            console.log(`[Wallet] Found ${items.length} items for user ${userId}`);
 
             // Calculate total using prices from config
             const total = items.reduce((sum, item) => {
