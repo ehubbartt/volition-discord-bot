@@ -118,9 +118,11 @@ module.exports = {
 
           const hasCorrectRank = memberRoles.some(role => role.id === calculatedRankId);
 
-          // Only upgrade ranks, never downgrade
-          if (!hasCorrectRank && isRankUpgrade(currentRankIndex, calculatedRankIndex)) {
-            // Only remove the current rank role if we're upgrading
+          // Update rank if it doesn't match (both upgrades and downgrades)
+          if (!hasCorrectRank) {
+            const isUpgrade = isRankUpgrade(currentRankIndex, calculatedRankIndex);
+
+            // Remove current rank role
             if (currentRankRoleObj) {
               await member.roles.remove(currentRankRoleObj, 'Removing old rank role');
             }
@@ -129,6 +131,9 @@ module.exports = {
               await member.roles.add(calculatedRankId, 'Adding correct EHB role');
 
               userMentions.push(`<@${member.id}>`);
+
+              const arrow = isUpgrade ? '⬆️' : '⬇️';
+              const action = isUpgrade ? 'Upgraded' : 'Downgraded';
 
               if (currentRankIndex === -1) {
                 mismatchOutput.push(
@@ -145,22 +150,23 @@ module.exports = {
                 });
               } else {
                 mismatchOutput.push(
-                  `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, currentRankIndex)} - Upgraded to: ${formatRank(guild, calculatedRankIndex)}`
+                  `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, currentRankIndex)} - ${action} to: ${formatRank(guild, calculatedRankIndex)}`
                 );
-                // Add to rank-up announcements (upgrade)
-                rankUpAnnouncements.push({
-                  member,
-                  rsn,
-                  ehb,
-                  oldRankIndex: currentRankIndex,
-                  newRankIndex: calculatedRankIndex,
-                  isInitial: false
-                });
+                // Add to rank announcements (upgrade or downgrade)
+                if (isUpgrade) {
+                  rankUpAnnouncements.push({
+                    member,
+                    rsn,
+                    ehb,
+                    oldRankIndex: currentRankIndex,
+                    newRankIndex: calculatedRankIndex,
+                    isInitial: false
+                  });
+                }
               }
+
+              console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(guild, currentRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (${ehb} EHB)`);
             }
-          } else if (!hasCorrectRank) {
-            // Rank would be a downgrade - skip automatic change
-            console.log(`[UpdateRanks] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(guild, currentRankIndex)} (earned rank: ${getRankName(guild, calculatedRankIndex)}, ${ehb} EHB)`);
           }
 
           // Check if in-game clan rank needs to be upgraded to match Discord rank

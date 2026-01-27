@@ -218,9 +218,11 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             const allRankRoleIds = getAllRoleIds();
             const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
-            // Only upgrade ranks, never downgrade
-            if (currentRankIndex === -1 || isRankUpgrade(currentRankIndex, rankIndex)) {
-                // Only remove the current rank role if we're upgrading
+            // Update rank if it doesn't match (both upgrades and downgrades)
+            if (currentRankIndex !== rankIndex) {
+                const isUpgrade = isRankUpgrade(currentRankIndex, rankIndex);
+
+                // Remove the current rank role
                 if (currentRankRoleObj) {
                     await member.roles.remove(currentRankRoleObj);
                     console.log(`[SyncUser] Removed old rank role: ${currentRankRoleObj.name}`);
@@ -231,15 +233,17 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 if (newRoleId) {
                     await member.roles.add(newRoleId);
                     rankAssigned = true;
-                    console.log(`[SyncUser] ⬆️ Upgraded rank for ${targetUser.tag}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, rankIndex)}`);
+                    const arrow = isUpgrade ? '⬆️' : '⬇️';
+                    const action = isUpgrade ? 'Upgraded' : 'Downgraded';
+                    console.log(`[SyncUser] ${arrow} ${action} rank for ${targetUser.tag}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, rankIndex)}`);
                 } else {
                     rankError = 'Role ID not configured in bot';
                     console.warn(`[SyncUser] Role ID not configured for rank index: ${rankIndex}`);
                 }
             } else {
-                // Rank would be a downgrade - skip it
-                rankAssigned = true; // Set to true so we don't show error
-                console.log(`[SyncUser] ⏭️ Skipped downgrade for ${targetUser.tag}: keeping ${getRankName(interaction.guild, currentRankIndex)} (earned rank: ${getRankName(interaction.guild, rankIndex)})`);
+                // Rank is already correct
+                rankAssigned = true;
+                console.log(`[SyncUser] ✅ Rank already correct for ${targetUser.tag}: ${getRankName(interaction.guild, rankIndex)}`);
             }
         } catch (error) {
             rankError = error.message;

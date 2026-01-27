@@ -400,9 +400,11 @@ async function processMemberJoin (rsn, originalMessage) {
                     const allRankRoleIds = getAllRoleIds();
                     const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
-                    // Only upgrade ranks, never downgrade
-                    if (currentRankIndex === -1 || isRankUpgrade(currentRankIndex, rankIndex)) {
-                        // Only remove the current rank role if we're upgrading
+                    // Update rank if it doesn't match (both upgrades and downgrades)
+                    if (currentRankIndex !== rankIndex) {
+                        const isUpgrade = isRankUpgrade(currentRankIndex, rankIndex);
+
+                        // Remove the current rank role
                         if (currentRankRoleObj) {
                             await member.roles.remove(currentRankRoleObj);
                             console.log(`[JOIN] Removed old rank role: ${currentRankRoleObj.name}`);
@@ -413,14 +415,15 @@ async function processMemberJoin (rsn, originalMessage) {
                         if (newRoleId) {
                             await member.roles.add(newRoleId);
                             rankAssigned = true;
-                            console.log(`[JOIN] ✅ Upgraded rank: ${currentRankIndex >= 0 ? getRankName(originalMessage.guild, currentRankIndex) : 'None'} -> ${getRankName(originalMessage.guild, rankIndex)}`);
+                            const action = isUpgrade ? '⬆️ Upgraded' : '⬇️ Downgraded';
+                            console.log(`[JOIN] ✅ ${action} rank: ${currentRankIndex >= 0 ? getRankName(originalMessage.guild, currentRankIndex) : 'None'} -> ${getRankName(originalMessage.guild, rankIndex)}`);
                         } else {
                             console.warn(`[JOIN] ⚠️ Role ID not configured for rank index: ${rankIndex}`);
                         }
                     } else {
-                        // Rank would be a downgrade - skip it
+                        // Rank is already correct
                         rankAssigned = true;
-                        console.log(`[JOIN] ⏭️ Skipped downgrade: keeping ${getRankName(originalMessage.guild, currentRankIndex)} (earned rank: ${getRankName(originalMessage.guild, rankIndex)})`);
+                        console.log(`[JOIN] ✅ Rank already correct: ${getRankName(originalMessage.guild, rankIndex)}`);
                     }
                 } catch (error) {
                     console.error(`[JOIN] ⚠️ Failed to assign rank:`, error.message);

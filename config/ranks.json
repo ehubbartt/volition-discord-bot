@@ -12,6 +12,6 @@
     { "roleId": "1238443298625159220", "ehbMin": 1750, "monthsMin": null, "yearsMin": null, "womRole": "Legend" },
     { "roleId": "1339599017813741652", "ehbMin": 2000, "monthsMin": null, "yearsMin": null, "womRole": "Myth" },
     { "roleId": "1339599293413068860", "ehbMin": 2500, "monthsMin": null, "yearsMin": null, "womRole": "TzTok" },
-    { "roleId": "1339599170394259517", "ehbMin": 3000, "monthsMin": null, "yearsMin": null, "womRole": "Tzkal" }
+    { "roleId": "1339599170394259517", "ehbMin": 3000, "monthsMin": null, "yearsMin": null, "womRole": "TzKal" }
   ]
 }
