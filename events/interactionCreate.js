@@ -375,7 +375,11 @@ module.exports = {
 
           // Try to send Discord response - if this fails, player still got their reward
           try {
-            return await sendLootEmbed(interaction, title, description, label, chance, color, image, newPoints);
+            await sendLootEmbed(interaction, title, description, label, chance, color, image, newPoints);
+            // Send wallet follow-up if item was won
+            if (kind === 'item' && itemName) {
+              await sendWalletFollowUp(interaction, itemName, walletDb, walletPrices);
+            }
           } catch (discordError) {
             console.error('Discord response failed, but reward was saved:', discordError.message);
             // Reward is already in database, so this is just cosmetic
@@ -426,6 +430,10 @@ module.exports = {
         // Try to send Discord response - if this fails, player still got their reward
         try {
           await sendLootEmbed(interaction, title, description, label, chance, color, image, newTotal);
+          // Send wallet follow-up if item was won
+          if (kind === 'item' && itemName) {
+            await sendWalletFollowUp(interaction, itemName, walletDb, walletPrices);
+          }
         } catch (discordError) {
           console.error('Discord response failed, but reward was saved:', discordError.message);
           // Reward is already in database, so this is just cosmetic
@@ -1384,5 +1392,88 @@ function formatWalletGP(value) {
     return `${(value / 1000).toFixed(1)}K`;
   }
   return value.toString();
+}
+
+function createWalletProgressBar(current, target, barLength = 20) {
+  const percentage = Math.min(current / target, 1);
+  const filledLength = Math.round(percentage * barLength);
+  const emptyLength = barLength - filledLength;
+  const bar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
+  const percentText = Math.round((current / target) * 100);
+  return `[${bar}] ${percentText}% of ${formatWalletGP(target)}`;
+}
+
+async function sendWalletFollowUp(interaction, itemName, walletDb, walletPrices) {
+  try {
+    const userId = interaction.user.id;
+    const items = await walletDb.getUnpaidItems(userId);
+
+    const total = items.reduce((sum, item) => {
+      const price = walletPrices.items[item.item_name]?.price || 0;
+      return sum + price;
+    }, 0);
+    const threshold = walletPrices.CASHOUT_THRESHOLD;
+    const canCashOut = total >= threshold;
+
+    // Group items by name
+    const itemCounts = {};
+    items.forEach(item => {
+      if (!itemCounts[item.item_name]) {
+        itemCounts[item.item_name] = { count: 0 };
+      }
+      itemCounts[item.item_name].count++;
+    });
+
+    // Build item list
+    let itemList = '';
+    for (const [name, data] of Object.entries(itemCounts)) {
+      const itemPrice = walletPrices.items[name]?.price || 0;
+      const emoji = walletPrices.items[name]?.emoji || '📦';
+      const totalItemValue = itemPrice * data.count;
+      if (data.count > 1) {
+        itemList += `${emoji} **${name}** x${data.count} - ${formatWalletGP(totalItemValue)}\n`;
+      } else {
+        itemList += `${emoji} **${name}** - ${formatWalletGP(itemPrice)}\n`;
+      }
+    }
+
+    const progressBar = createWalletProgressBar(total, threshold);
+    const embedColor = canCashOut ? 'Gold' : 'Blue';
+
+    const walletEmbed = new EmbedBuilder()
+      .setColor(embedColor)
+      .setTitle('💼 Item Added to Wallet!')
+      .setDescription(
+        `${interaction.user} your **${itemName}** has been added to your wallet!\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `${itemList}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `**Total:** ${formatWalletGP(total)} GP\n\n` +
+        `${progressBar}\n` +
+        `${canCashOut ? '🟡 **Ready to cash out!** Click below or use `/wallet`!' : `🔵 Collect **${formatWalletGP(threshold)}+ GP** to cash out your wallet!`}`
+      )
+      .setFooter({ text: 'You need at least 10M GP in your wallet to cash out' })
+      .setTimestamp();
+
+    // Add cash out button if eligible
+    const components = [];
+    if (canCashOut) {
+      const cashOutButton = new ButtonBuilder()
+        .setCustomId('wallet_cashout')
+        .setLabel('Cash Out Now')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('💰');
+
+      const row = new ActionRowBuilder().addComponents(cashOutButton);
+      components.push(row);
+    }
+
+    await interaction.followUp({
+      embeds: [walletEmbed],
+      components: components
+    });
+  } catch (err) {
+    console.error('[Wallet] Failed to send wallet follow-up:', err);
+  }
 }
 

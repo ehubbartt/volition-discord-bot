@@ -95,9 +95,9 @@ module.exports = {
                     `━━━━━━━━━━━━━━━━━━━━━━━\n` +
                     `**Total:** ${formatGP(total)} GP\n\n` +
                     `${progressBar}\n` +
-                    `${canCashOut ? '🟡 **Ready to cash out!**' : '🔵 Keep collecting items!'}`
+                    `${canCashOut ? '🟡 **Ready to cash out!**' : `🔵 Collect **${formatGP(threshold)}+ GP** to cash out!`}`
                 )
-                .setFooter({ text: 'Win items from lootcrates to fill your wallet!' })
+                .setFooter({ text: 'You need at least 10M GP in your wallet to cash out' })
                 .setTimestamp();
 
             // Add cash out button if eligible
