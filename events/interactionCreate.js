@@ -879,9 +879,10 @@ module.exports = {
       }
 
       // Handle wallet cashout button
-      if (interaction.customId === 'wallet_cashout') {
+      if (interaction.customId === 'wallet_cashout' || interaction.customId === 'wallet_cashout_force') {
         try {
           const { PermissionFlagsBits, ChannelType } = require('discord.js');
+          const forceCreate = interaction.customId === 'wallet_cashout_force';
 
           await interaction.deferReply({ ephemeral: true });
 
@@ -893,15 +894,42 @@ module.exports = {
           }, 0);
           const threshold = walletPrices.CASHOUT_THRESHOLD;
 
-          if (total < threshold) {
-            return await interaction.editReply({
-              content: `❌ You need at least ${formatWalletGP(threshold)} GP to cash out. Current total: ${formatWalletGP(total)} GP`
-            });
-          }
-
           if (items.length === 0) {
             return await interaction.editReply({
               content: '❌ You have no items in your wallet to cash out.'
+            });
+          }
+
+          // If under threshold and not forcing, show warning with options
+          if (total < threshold && !forceCreate) {
+            const warningEmbed = new EmbedBuilder()
+              .setColor('Orange')
+              .setTitle('⚠️ Wallet Below Threshold')
+              .setDescription(
+                `Your wallet total is **${formatWalletGP(total)} GP**, which is below the **${formatWalletGP(threshold)} GP** minimum.\n\n` +
+                `You can still create a payout ticket, but we recommend waiting until you have at least ${formatWalletGP(threshold)} GP to make the trade worthwhile.\n\n` +
+                `**Do you want to create a payout ticket anyway?**`
+              )
+              .setFooter({ text: 'Tip: Keep opening lootcrates to fill your wallet!' })
+              .setTimestamp();
+
+            const createAnywayButton = new ButtonBuilder()
+              .setCustomId('wallet_cashout_force')
+              .setLabel('Create Ticket Anyway')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('📝');
+
+            const cancelButton = new ButtonBuilder()
+              .setCustomId('wallet_cashout_cancel')
+              .setLabel('Cancel')
+              .setStyle(ButtonStyle.Secondary)
+              .setEmoji('❌');
+
+            const row = new ActionRowBuilder().addComponents(createAnywayButton, cancelButton);
+
+            return await interaction.editReply({
+              embeds: [warningEmbed],
+              components: [row]
             });
           }
 
@@ -1030,6 +1058,15 @@ module.exports = {
             await interaction.reply({ content: '❌ Failed to create payout ticket. Please contact an admin.', ephemeral: true });
           }
         }
+      }
+
+      // Handle wallet cashout cancel button
+      if (interaction.customId === 'wallet_cashout_cancel') {
+        await interaction.update({
+          content: '❌ Payout request cancelled. Keep collecting items and come back when you\'re ready!',
+          embeds: [],
+          components: []
+        });
       }
 
       // Handle wallet mark paid button (admin only)
