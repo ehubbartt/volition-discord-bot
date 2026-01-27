@@ -1,4 +1,4 @@
-﻿// ================================================================================
+// ================================================================================
 // Clean up asap
 
 const { SlashCommandBuilder } = require('@discordjs/builders');
@@ -6,8 +6,21 @@ const { EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
-const { RANK_ROLES, determineRank, isRankUpgrade, RANK_HIERARCHY } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
+const {
+    getAllRoleIds,
+    formatRank,
+    getRankName,
+    determineRankIndex,
+    isRankUpgrade,
+    getRankIndexByRoleId,
+    getRoleIdByIndex,
+    getMemberRankIndex,
+    getWomRole,
+    getRankIndexByWomRole,
+    standardWomRoles,
+    ranksConfig
+} = require('../../utils/ranks');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,7 +31,7 @@ module.exports = {
     if (!isAdmin(interaction.member)) {
       return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
     }
-    
+
     await interaction.deferReply({ ephemeral: false });
 
     try {
@@ -35,9 +48,8 @@ module.exports = {
 
       const clanMembers = clanData.memberships;
 
-      // Use centralized RANK_ROLES from sync.js
-      // Get all rank role IDs for checking
-      const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
+      // Get all rank role IDs
+      const allRankRoleIds = getAllRoleIds();
 
       const existingPlayers = await db.getAllPlayers();
 
@@ -53,96 +65,27 @@ module.exports = {
       await guild.members.fetch();
       const allMembers = guild.members.cache;
 
-      // Map of rank names to their respective emojis
-      const rankEmojiMap = {
-        'Sweat': '<:Sweat:1339598866818793505>',
-        'Master General': '<:MasterGeneral:1339598851304063077>',
-        'Touch Grass': '<:TouchGrass:1339598837110669354>',
-        'Wrath': '<:WR:1239257793199083580>',
-        'Top Dawgs': '<:TZ:1309544425298329681>',
-        'Mind Goblin': '<:GO:1213799278150164490>',
-        'Holy': '<:SA:1309547678694248488>',
-        'Skull': '<:S_:1239658968654282863>',
-        'SLAAAAAY': '<:SL:1309544667561459712>',
-        'Guthixian': '<:GU:1213799334773129236>',
-        'Black Hearts': '<:de:1341120690325028865>',
-        'Discord Kitten': '<:HE:1213787848088494100>',
-        'Brewaholic': '<:AP:1213784678419406858>',  
-      };
-
-      // Mapping from Discord rank names to WOM role names
-      const discordToWomRank = {
-        ':Sweat: Sweat': null, // No WOM equivalent
-        ':MasterGeneral: Master General': null, // No WOM equivalent
-        ':TouchGrass: Touch Grass': null, // No WOM equivalent
-        ':WR: Wrath': 'wrath',
-        ':TZ: Top Dawgs': 'tzkal',
-        ':GO: Mind Goblin': 'goblin',
-        ':SA: Holy': 'sage',
-        ':S_~1: Skull': 'skulled',
-        ':SL: SLAAAAAY': 'slayer',
-        ':GU: Guthixian': 'guthixian',
-        ':de: Black Hearts': 'defiler',
-        ':HE: Discord Kitten': 'hellcat',
-        ':AP: Brewaholic': 'apothecary',
-      };
-
-      // Standard WOM roles that are part of the progression system
-      // Special roles like 'moderator', 'maxed', 'deputy_owner', etc. are excluded
-      const standardWomRoles = [
-        'apothecary',
-        'hellcat',
-        'defiler',
-        'guthixian',
-        'slayer',
-        'skulled',
-        'sage',
-        'goblin',
-        'tzkal',
-        'wrath'
-      ];
-
-      // Mapping from WOM role names to Discord rank display names (for showing expected rank with emoji)
-      const womRoleToDiscordRank = {
-        'apothecary': 'Brewaholic',
-        'hellcat': 'Discord Kitten',
-        'defiler': 'Black Hearts',
-        'guthixian': 'Guthixian',
-        'slayer': 'SLAAAAAY',
-        'skulled': 'Skull',
-        'sage': 'Holy',
-        'goblin': 'Mind Goblin',
-        'tzkal': 'Top Dawgs',
-        'wrath': 'Wrath'
-      };
-
       // Helper function to determine why someone earned a rank
-      const getRankReason = (rank, ehb, joinedTimestamp) => {
+      const getRankReason = (rankIndex, ehb, joinedTimestamp) => {
         if (!joinedTimestamp) return `${ehb} EHB`;
+
+        const rank = ranksConfig.ranks[rankIndex];
+        if (!rank) return `${ehb} EHB`;
 
         const timeInClan = Date.now() - joinedTimestamp;
         const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
         const monthsInClan = daysInClan / 30;
         const yearsInClan = daysInClan / 365;
 
-        // Check time-based ranks (based on determineRank logic from sync.js)
-        switch (rank) {
-          case ':GU: Guthixian':
-            if (ehb >= 500) return `${ehb} EHB`;
-            if (yearsInClan >= 2) return `${Math.floor(yearsInClan * 10) / 10} years in clan`;
-            return `${ehb} EHB`;
-          case ':de: Black Hearts':
-            if (ehb >= 350) return `${ehb} EHB`;
-            if (yearsInClan >= 1) return `${Math.floor(yearsInClan * 10) / 10} years in clan`;
-            return `${ehb} EHB`;
-          case ':HE: Discord Kitten':
-            if (ehb >= 200) return `${ehb} EHB`;
-            if (monthsInClan >= 6) return `${Math.floor(monthsInClan)} months in clan`;
-            return `${ehb} EHB`;
-          default:
-            // All other ranks are purely EHB-based
-            return `${ehb} EHB`;
+        // Check if rank was earned by time instead of EHB
+        if (rank.yearsMin && yearsInClan >= rank.yearsMin && ehb < rank.ehbMin) {
+          return `${Math.floor(yearsInClan * 10) / 10} years in clan`;
         }
+        if (rank.monthsMin && monthsInClan >= rank.monthsMin && ehb < rank.ehbMin) {
+          return `${Math.floor(monthsInClan)} months in clan`;
+        }
+
+        return `${ehb} EHB`;
       };
 
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
@@ -164,96 +107,82 @@ module.exports = {
           const clanJoinedAt = clanMember?.createdAt ? new Date(clanMember.createdAt).getTime() : null;
 
           // Determine the rank using centralized function with CLAN join time, not Discord join time
-          const calculatedRank = determineRank(ehb, clanJoinedAt);
-          const calculatedRankId = RANK_ROLES[calculatedRank];
+          const calculatedRankIndex = determineRankIndex(ehb, clanJoinedAt);
+          const calculatedRankId = getRoleIdByIndex(calculatedRankIndex);
 
           const memberRoles = member.roles.cache;
 
           // Get current rank role (if any)
-          const currentRankRole = memberRoles.find(role => allRankRoleIds.includes(role.id));
-          const currentRank = currentRankRole
-            ? Object.keys(RANK_ROLES).find(key => RANK_ROLES[key] === currentRankRole.id)
-            : 'None';
-          const currentRankEmoji = rankEmojiMap[currentRank] || '';
+          const currentRankRoleObj = memberRoles.find(role => allRankRoleIds.includes(role.id));
+          const currentRankIndex = currentRankRoleObj ? getRankIndexByRoleId(currentRankRoleObj.id) : -1;
 
           const hasCorrectRank = memberRoles.some(role => role.id === calculatedRankId);
 
           // Only upgrade ranks, never downgrade
-          if (!hasCorrectRank && (!currentRank || currentRank === 'None' || isRankUpgrade(currentRank, calculatedRank))) {
+          if (!hasCorrectRank && isRankUpgrade(currentRankIndex, calculatedRankIndex)) {
             // Only remove the current rank role if we're upgrading
-            if (currentRankRole) {
-              await member.roles.remove(currentRankRole, 'Removing old rank role');
+            if (currentRankRoleObj) {
+              await member.roles.remove(currentRankRoleObj, 'Removing old rank role');
             }
 
             if (calculatedRankId) {
               await member.roles.add(calculatedRankId, 'Adding correct EHB role');
-              const calculatedRankEmoji = rankEmojiMap[calculatedRank] || '';
 
               userMentions.push(`<@${member.id}>`);
 
-              if (currentRank == "None") {
+              if (currentRankIndex === -1) {
                 mismatchOutput.push(
-                  `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **${currentRank}** - Updated to: ${calculatedRankEmoji} **${calculatedRank}**`
+                  `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, calculatedRankIndex)}`
                 );
                 // Add to rank-up announcements (initial rank assignment)
                 rankUpAnnouncements.push({
                   member,
                   rsn,
                   ehb,
-                  oldRank: currentRank,
-                  oldRankEmoji: currentRankEmoji,
-                  newRank: calculatedRank,
-                  newRankEmoji: calculatedRankEmoji,
+                  oldRankIndex: currentRankIndex,
+                  newRankIndex: calculatedRankIndex,
                   isInitial: true
                 });
               } else {
                 mismatchOutput.push(
-                  `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${currentRankEmoji} **${currentRank}** - Upgraded to: ${calculatedRankEmoji} **${calculatedRank}**`
+                  `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, currentRankIndex)} - Upgraded to: ${formatRank(guild, calculatedRankIndex)}`
                 );
                 // Add to rank-up announcements (upgrade)
                 rankUpAnnouncements.push({
                   member,
                   rsn,
                   ehb,
-                  oldRank: currentRank,
-                  oldRankEmoji: currentRankEmoji,
-                  newRank: calculatedRank,
-                  newRankEmoji: calculatedRankEmoji,
+                  oldRankIndex: currentRankIndex,
+                  newRankIndex: calculatedRankIndex,
                   isInitial: false
                 });
               }
             }
           } else if (!hasCorrectRank) {
             // Rank would be a downgrade - skip automatic change
-            console.log(`[UpdateRanks] ⏭️ Skipped downgrade for ${rsn}: keeping ${currentRank} (earned rank: ${calculatedRank}, ${ehb} EHB)`);
+            console.log(`[UpdateRanks] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(guild, currentRankIndex)} (earned rank: ${getRankName(guild, calculatedRankIndex)}, ${ehb} EHB)`);
           }
 
           // Check if in-game clan rank needs to be upgraded to match Discord rank
-          if (clanMember && currentRank && currentRank !== 'None') {
+          if (clanMember && currentRankIndex >= 0) {
             const womRole = clanMember.role;
-            const expectedWomRole = discordToWomRank[currentRank];
+            const expectedWomRole = getWomRole(currentRankIndex);
 
             // Only check if:
-            // 1. Discord rank is part of standard progression (RANK_HIERARCHY)
-            // 2. Discord rank has a WOM equivalent
-            // 3. Current WOM role is a standard role (not moderator, maxed, etc.)
-            if (expectedWomRole && womRole !== expectedWomRole && RANK_HIERARCHY.includes(currentRank) && standardWomRoles.includes(womRole)) {
+            // 1. Discord rank has a WOM equivalent
+            // 2. Current WOM role is a standard role (not moderator, maxed, etc.)
+            if (expectedWomRole && womRole !== expectedWomRole && standardWomRoles.includes(womRole)) {
               // Discord rank is higher than clan rank - needs manual upgrade in WOM
-              const currentRankEmoji = rankEmojiMap[currentRank] || '';
-              const reason = getRankReason(currentRank, ehb, clanJoinedAt);
+              const reason = getRankReason(currentRankIndex, ehb, clanJoinedAt);
 
-              // Get emoji and name for current WOM role
-              const currentWomRankName = womRoleToDiscordRank[womRole] || womRole;
-              const currentWomEmoji = rankEmojiMap[currentWomRankName] || '';
-
-              // Get emoji and name for expected WOM role
-              const expectedWomRankName = womRoleToDiscordRank[expectedWomRole] || expectedWomRole;
-              const expectedWomEmoji = rankEmojiMap[expectedWomRankName] || '';
+              // Get current and expected WOM rank indices
+              const currentWomRankIndex = getRankIndexByWomRole(womRole);
+              const expectedWomRankIndex = getRankIndexByWomRole(expectedWomRole);
 
               clanRankUpgradeNeeded.push(
-                `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM Clan Rank: ${currentWomEmoji} **${currentWomRankName}** → Should be: ${expectedWomEmoji} **${expectedWomRankName}**`
+                `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM Clan Rank: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, currentRankIndex)}`
               );
-              console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${currentRank}, ${reason})`);
+              console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (Discord: ${getRankName(guild, currentRankIndex)}, ${reason})`);
             }
           }
         }
@@ -335,7 +264,7 @@ module.exports = {
 
           if (rankUpsChannel) {
             for (const announcement of rankUpAnnouncements) {
-              const { member, rsn, ehb, oldRank, oldRankEmoji, newRank, newRankEmoji, isInitial } = announcement;
+              const { member, rsn, ehb, oldRankIndex, newRankIndex, isInitial } = announcement;
 
               const embed = new EmbedBuilder()
                 .setColor('Gold')
@@ -355,12 +284,12 @@ module.exports = {
 
               if (!isInitial) {
                 embed.addFields(
-                  { name: 'Previous Rank', value: `${oldRankEmoji} ${oldRank.replace(/^:[^:]+:\s*/, '')}`, inline: true },
-                  { name: 'New Rank', value: `${newRankEmoji} ${newRank.replace(/^:[^:]+:\s*/, '')}`, inline: true }
+                  { name: 'Previous Rank', value: formatRank(guild, oldRankIndex), inline: true },
+                  { name: 'New Rank', value: formatRank(guild, newRankIndex), inline: true }
                 );
               } else {
                 embed.addFields(
-                  { name: 'Rank', value: `${newRankEmoji} ${newRank.replace(/^:[^:]+:\s*/, '')}`, inline: false }
+                  { name: 'Rank', value: formatRank(guild, newRankIndex), inline: false }
                 );
               }
 

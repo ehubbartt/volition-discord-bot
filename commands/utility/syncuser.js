@@ -8,8 +8,17 @@ const {
 const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
-const { RANK_ROLES, determineRank, formatRankWithEmoji, isRankUpgrade } = require('./sync');
 const { isAdmin } = require('../../utils/permissions');
+const {
+    getAllRoleIds,
+    formatRank,
+    getRankName,
+    determineRankIndex,
+    isRankUpgrade,
+    getRankIndexByRoleId,
+    getRoleIdByIndex,
+    getMemberRankIndex
+} = require('../../utils/ranks');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -199,28 +208,18 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
 
         // Determine and assign rank using clan join timestamp from WOM
         const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-        const rank = determineRank(ehb, clanJoinTimestamp);
+        const rankIndex = determineRankIndex(ehb, clanJoinTimestamp);
         let rankAssigned = false;
         let rankError = null;
 
         try {
-            // Get current rank role (if any)
-            const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
+            // Get current rank index
+            const currentRankIndex = getMemberRankIndex(member);
+            const allRankRoleIds = getAllRoleIds();
             const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
-            // Get current rank name
-            let currentRankName = null;
-            if (currentRankRoleObj) {
-                for (const [rankName, roleId] of Object.entries(RANK_ROLES)) {
-                    if (roleId === currentRankRoleObj.id) {
-                        currentRankName = rankName;
-                        break;
-                    }
-                }
-            }
-
             // Only upgrade ranks, never downgrade
-            if (!currentRankName || isRankUpgrade(currentRankName, rank)) {
+            if (currentRankIndex === -1 || isRankUpgrade(currentRankIndex, rankIndex)) {
                 // Only remove the current rank role if we're upgrading
                 if (currentRankRoleObj) {
                     await member.roles.remove(currentRankRoleObj);
@@ -228,19 +227,19 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 }
 
                 // Add new rank role if it exists
-                const newRoleId = RANK_ROLES[rank];
+                const newRoleId = getRoleIdByIndex(rankIndex);
                 if (newRoleId) {
                     await member.roles.add(newRoleId);
                     rankAssigned = true;
-                    console.log(`[SyncUser] ⬆️ Upgraded rank for ${targetUser.tag}: ${currentRankName || 'None'} -> ${rank}`);
+                    console.log(`[SyncUser] ⬆️ Upgraded rank for ${targetUser.tag}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, rankIndex)}`);
                 } else {
                     rankError = 'Role ID not configured in bot';
-                    console.warn(`[SyncUser] Role ID not configured for rank: ${rank}`);
+                    console.warn(`[SyncUser] Role ID not configured for rank index: ${rankIndex}`);
                 }
             } else {
                 // Rank would be a downgrade - skip it
                 rankAssigned = true; // Set to true so we don't show error
-                console.log(`[SyncUser] ⏭️ Skipped downgrade for ${targetUser.tag}: keeping ${currentRankName} (earned rank: ${rank})`);
+                console.log(`[SyncUser] ⏭️ Skipped downgrade for ${targetUser.tag}: keeping ${getRankName(interaction.guild, currentRankIndex)} (earned rank: ${getRankName(interaction.guild, rankIndex)})`);
             }
         } catch (error) {
             rankError = error.message;
@@ -281,13 +280,13 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             .setTitle('✅ Sync Complete!')
             .setDescription(
                 `<@${targetUser.id}> has been successfully synced!\n\n` +
-                `**Assigned Rank:** ${formatRankWithEmoji(rank, interaction.guild)}\n\n` +
+                `**Assigned Rank:** ${formatRank(interaction.guild, rankIndex)}\n\n` +
                 `**Completed:**\n` +
                 `• ${rankAssigned ? '✅' : '⚠️'} Discord rank ${rankAssigned ? 'assigned' : 'failed'}\n` +
                 `• ✅ Database synced\n\n` +
                 `**Next Steps:**\n` +
                 `• ${rankAssigned ? '✅ Discord rank assigned' : '⚠️ Manually assign Discord rank'}\n` +
-                `• Verify in-game rank matches (${formatRankWithEmoji(rank, interaction.guild)})`
+                `• Verify in-game rank matches (${formatRank(interaction.guild, rankIndex)})`
             )
             .addFields(
                 { name: 'Discord User', value: `<@${targetUser.id}>`, inline: true },
@@ -296,7 +295,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Rank', value: formatRankWithEmoji(rank, interaction.guild), inline: true },
+                { name: 'Rank', value: formatRank(interaction.guild, rankIndex), inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }
             );

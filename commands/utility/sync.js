@@ -6,72 +6,16 @@ const axios = require('axios');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
-
-// Role name to role ID mapping
-const RANK_ROLES = {
-    ':Sweat: Sweat': '1339599170394259517',
-    ':MasterGeneral: Master General': '1339599293413068860',
-    ':TouchGrass: Touch Grass': '1339599017813741652',
-    ':WR: Wrath': '1238443298625159220',
-    ':TZ: Top Dawgs': '1309545563498352772',
-    ':GO: Mind Goblin': '1087162684602056775',
-    ':SA: Holy': '1309547277966377050',
-    ':S_~1: Skull': '1087485648832843796',
-    ':SL: SLAAAAAY': '1309545367880208405',
-    ':GU: Guthixian': '1087167843998650399',
-    ':de: Black Hearts': '1309548746844930058',
-    ':HE: Discord Kitten': '1087482275307978894',
-    ':AP: Brewaholic': '1213921453762809886',
-    ':OP: Unverified': null // Not provided
-};
-
-// Emoji name to emoji ID mapping (for displaying emojis in embeds)
-const RANK_EMOJIS = {
-    'Sweat': '1339599170394259517',
-    'MasterGeneral': '1339599293413068860',
-    'TouchGrass': '1339599017813741652',
-    'WR': '1238443298625159220',
-    'TZ': '1309545563498352772',
-    'GO': '1087162684602056775',
-    'SA': '1309547277966377050',
-    'S_~1': '1087485648832843796',
-    'SL': '1309545367880208405',
-    'GU': '1087167843998650399',
-    'de': '1309548746844930058',
-    'HE': '1087482275307978894',
-    'AP': '1213921453762809886',
-    'OP': null
-};
-
-/**
- * Convert a rank name with emoji shortcodes to Discord emoji format
- * @param {string} rankName - Rank name like ":TZ: Top Dawgs"
- * @param {Guild} guild - Optional guild to lookup emoji from
- * @returns {string} - Formatted rank like "<:TZ:1309545563498352772> Top Dawgs"
- */
-function formatRankWithEmoji(rankName, guild = null) {
-    if (!rankName) return 'None';
-
-    // Match pattern :EmojiName: RankName
-    const match = rankName.match(/^:([^:]+):\s*(.+)$/);
-    if (!match) return rankName;
-
-    const [, emojiName, displayName] = match;
-
-    // Try to find emoji in guild first (dynamic lookup)
-    if (guild) {
-        const emoji = guild.emojis.cache.find(e => e.name === emojiName);
-        if (emoji) {
-            return `${emoji} ${displayName}`;
-        }
-    }
-
-    // Fallback to static mapping
-    const emojiId = RANK_EMOJIS[emojiName];
-    if (!emojiId) return rankName; // If no emoji ID, return original
-
-    return `<:${emojiName}:${emojiId}> ${displayName}`;
-}
+const {
+    getAllRoleIds,
+    formatRank,
+    getRankName,
+    determineRankIndex,
+    isRankUpgrade,
+    getRankIndexByRoleId,
+    getRoleIdByIndex,
+    getMemberRankIndex
+} = require('../../utils/ranks');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -134,6 +78,9 @@ async function fullClanSync (interaction, clanId) {
         const removedMembers = [];
         const rankMismatches = [];
 
+        // Get all rank role IDs
+        const allRankRoleIds = getAllRoleIds();
+
         // Process each WOM clan member
         for (const member of clanMembers) {
             const womId = member.player.id.toString();
@@ -154,8 +101,8 @@ async function fullClanSync (interaction, clanId) {
                     }, 0);
                     newMembersAdded++;
                     const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-                    const expectedRank = determineRank(ehb, clanJoinTimestamp);
-                    newMembers.push({ rsn, womId, ehb, rank: expectedRank });
+                    const expectedRankIndex = determineRankIndex(ehb, clanJoinTimestamp);
+                    newMembers.push({ rsn, womId, ehb, rankIndex: expectedRankIndex });
                     console.log(`[FullSync] Added new member: ${rsn} (${womId})`);
                 } catch (error) {
                     console.error(`[FullSync] Failed to add ${rsn}:`, error.message);
@@ -183,21 +130,19 @@ async function fullClanSync (interaction, clanId) {
                 if (existingPlayer.discord_id) {
                     try {
                         const discordMember = await interaction.guild.members.fetch(existingPlayer.discord_id);
-                        const currentRankRole = getRankRole(discordMember);
+                        const currentRankIndex = getMemberRankIndex(discordMember);
 
                         // Use clan join timestamp for time-based ranks
                         const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-                        const expectedRank = determineRank(ehb, clanJoinTimestamp);
+                        const expectedRankIndex = determineRankIndex(ehb, clanJoinTimestamp);
 
                         // Only update if it's an upgrade or they have no rank
-                        if (currentRankRole !== expectedRank && isRankUpgrade(currentRankRole, expectedRank)) {
+                        if (currentRankIndex !== expectedRankIndex && isRankUpgrade(currentRankIndex, expectedRankIndex)) {
                             // ACTIVE MODE - Only upgrade ranks, never downgrade
                             const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
                             const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
 
                             try {
-                                // Get all rank role IDs
-                                const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
                                 const currentRankRoleObj = discordMember.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
                                 // Remove old rank role if exists
@@ -207,33 +152,33 @@ async function fullClanSync (interaction, clanId) {
                                 }
 
                                 // Add new rank role
-                                const newRoleId = RANK_ROLES[expectedRank];
+                                const newRoleId = getRoleIdByIndex(expectedRankIndex);
                                 if (newRoleId) {
                                     await discordMember.roles.add(newRoleId);
                                     ranksUpdated++;
-                                    console.log(`[FullSync] ⬆️ Upgraded rank for ${rsn}: ${currentRankRole || 'None'} -> ${expectedRank} (${ehb} EHB, ${daysInClan} days)`);
+                                    console.log(`[FullSync] ⬆️ Upgraded rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)} (${ehb} EHB, ${daysInClan} days)`);
 
                                     rankMismatches.push({
                                         rsn,
-                                        currentRank: currentRankRole || 'None',
-                                        expectedRank,
+                                        currentRankIndex,
+                                        expectedRankIndex,
                                         ehb,
                                         daysInClan,
-                                        issue: `Upgraded: ${currentRankRole || 'None'} -> ${expectedRank}`
+                                        issue: `Upgraded: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)}`
                                     });
                                 } else {
-                                    console.warn(`[FullSync] Role ID not configured for rank: ${expectedRank}`);
+                                    console.warn(`[FullSync] Role ID not configured for rank index: ${expectedRankIndex}`);
                                 }
                             } catch (roleError) {
                                 rankUpdatesFailed++;
-                                rankMismatches.push({ rsn, currentRank: currentRankRole || 'None', expectedRank, ehb, daysInClan, issue: `Failed: ${roleError.message}` });
+                                rankMismatches.push({ rsn, currentRankIndex, expectedRankIndex, ehb, daysInClan, issue: `Failed: ${roleError.message}` });
                                 console.error(`[FullSync] Failed to update rank for ${rsn}:`, roleError.message);
                             }
-                        } else if (currentRankRole !== expectedRank) {
+                        } else if (currentRankIndex !== expectedRankIndex) {
                             // Rank would be a downgrade - skip it
                             const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
                             const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
-                            console.log(`[FullSync] ⏭️ Skipped downgrade for ${rsn}: keeping ${currentRankRole} (earned rank: ${expectedRank}, ${ehb} EHB, ${daysInClan} days)`);
+                            console.log(`[FullSync] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(interaction.guild, currentRankIndex)} (earned rank: ${getRankName(interaction.guild, expectedRankIndex)}, ${ehb} EHB, ${daysInClan} days)`);
                         }
                     } catch (error) {
                         // Check if error is "Unknown Member" (Discord user no longer in server)
@@ -250,7 +195,7 @@ async function fullClanSync (interaction, clanId) {
                             }
                         } else {
                             rankUpdatesFailed++;
-                            rankMismatches.push({ rsn, expectedRank: 'Error', issue: error.message });
+                            rankMismatches.push({ rsn, expectedRankIndex: -1, issue: error.message });
                             console.error(`[FullSync] Failed to check rank for ${rsn}:`, error.message);
                         }
                     }
@@ -307,7 +252,7 @@ async function fullClanSync (interaction, clanId) {
         // Add new members details if any
         if (newMembers.length > 0) {
             let newMembersText = newMembers.slice(0, 10).map(m =>
-                `• ${m.rsn} (${m.ehb} EHB - ${m.rank})`
+                `• ${m.rsn} (${m.ehb} EHB - ${formatRank(interaction.guild, m.rankIndex)})`
             ).join('\n');
 
             if (newMembers.length > 10) {
@@ -333,7 +278,7 @@ async function fullClanSync (interaction, clanId) {
         // Add rank mismatch alerts if any
         if (rankMismatches.length > 0) {
             let mismatchText = rankMismatches.slice(0, 10).map(m =>
-                `• **${m.rsn}**: ${formatRankWithEmoji(m.currentRank, interaction.guild)} -> ${formatRankWithEmoji(m.expectedRank, interaction.guild)} (${m.ehb} EHB, ${m.daysInClan} days)`
+                `• **${m.rsn}**: ${m.currentRankIndex >= 0 ? formatRank(interaction.guild, m.currentRankIndex) : 'None'} -> ${formatRank(interaction.guild, m.expectedRankIndex)} (${m.ehb} EHB, ${m.daysInClan} days)`
             ).join('\n');
 
             if (rankMismatches.length > 10) {
@@ -368,119 +313,4 @@ async function fullClanSync (interaction, clanId) {
     }
 }
 
-// Rank hierarchy - higher index = higher rank
-const RANK_HIERARCHY = [
-    ':AP: Brewaholic',       // 0 - Lowest
-    ':HE: Discord Kitten',   // 1
-    ':de: Black Hearts',     // 2
-    ':GU: Guthixian',        // 3
-    ':SL: SLAAAAAY',         // 4
-    ':S_~1: Skull',          // 5
-    ':SA: Holy',             // 6
-    ':GO: Mind Goblin',      // 7
-    ':TZ: Top Dawgs',        // 8
-    ':WR: Wrath',            // 9
-    ':TouchGrass: Touch Grass', // 10
-    ':MasterGeneral: Master General', // 11
-    ':Sweat: Sweat'          // 12 - Highest
-];
-
-/**
- * Compare two ranks to determine if newRank is higher than currentRank
- * @param {string} currentRank - Current rank like ":TZ: Top Dawgs"
- * @param {string} newRank - New rank to compare
- * @returns {boolean} - True if newRank is higher than currentRank
- */
-function isRankUpgrade(currentRank, newRank) {
-    if (!currentRank) return true; // No current rank, any rank is an upgrade
-    if (!newRank) return false; // Can't upgrade to nothing
-
-    const currentIndex = RANK_HIERARCHY.indexOf(currentRank);
-    const newIndex = RANK_HIERARCHY.indexOf(newRank);
-
-    // If rank not found in hierarchy, treat as upgrade to be safe
-    if (currentIndex === -1) return true;
-    if (newIndex === -1) return false;
-
-    return newIndex > currentIndex;
-}
-
-function determineRank (ehb, memberJoinedTimestamp = null, guild = null) {
-    // Calculate time in clan (in milliseconds)
-    const timeInClan = memberJoinedTimestamp ? Date.now() - memberJoinedTimestamp : 0;
-    const daysInClan = timeInClan / (1000 * 60 * 60 * 24);
-    const monthsInClan = daysInClan / 30;
-    const yearsInClan = daysInClan / 365;
-
-    let rankName = '';
-    let emojiName = '';
-
-    // Check pure EHB ranks first (no time requirement)
-    if (ehb >= 3000) {
-        emojiName = 'Sweat';
-        rankName = 'Sweat';
-    } else if (ehb >= 2500) {
-        emojiName = 'MasterGeneral';
-        rankName = 'Master General';
-    } else if (ehb >= 2000) {
-        emojiName = 'TouchGrass';
-        rankName = 'Touch Grass';
-    } else if (ehb >= 1500) {
-        emojiName = 'WR';
-        rankName = 'Wrath';
-    } else if (ehb >= 1250) {
-        emojiName = 'TZ';
-        rankName = 'Top Dawgs';
-    } else if (ehb >= 1000) {
-        emojiName = 'GO';
-        rankName = 'Mind Goblin';
-    } else if (ehb >= 900) {
-        emojiName = 'SA';
-        rankName = 'Holy';
-    } else if (ehb >= 800) {
-        emojiName = 'S_~1';
-        rankName = 'Skull';
-    } else if (ehb >= 650) {
-        emojiName = 'SL';
-        rankName = 'SLAAAAAY';
-    } else if (ehb >= 500 || yearsInClan >= 2) {
-        emojiName = 'GU';
-        rankName = 'Guthixian';
-    } else if (ehb >= 350 || yearsInClan >= 1) {
-        emojiName = 'de';
-        rankName = 'Black Hearts';
-    } else if (ehb >= 200 || monthsInClan >= 6) {
-        emojiName = 'HE';
-        rankName = 'Discord Kitten';
-    } else {
-        emojiName = 'AP';
-        rankName = 'Brewaholic';
-    }
-
-    // Always return the text format that matches RANK_ROLES keys
-    // The guild parameter is ignored to ensure consistent format
-    return `:${emojiName}: ${rankName}`;
-}
-
-function getRankRole (member) {
-    const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
-    const memberRankRole = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
-
-    if (!memberRankRole) return null;
-
-    // Find the rank name by role ID
-    for (const [rankName, roleId] of Object.entries(RANK_ROLES)) {
-        if (roleId === memberRankRole.id) {
-            return rankName;
-        }
-    }
-
-    return null;
-}
-
 module.exports.fullClanSync = fullClanSync;
-module.exports.determineRank = determineRank;
-module.exports.RANK_ROLES = RANK_ROLES;
-module.exports.formatRankWithEmoji = formatRankWithEmoji;
-module.exports.isRankUpgrade = isRankUpgrade;
-module.exports.RANK_HIERARCHY = RANK_HIERARCHY;

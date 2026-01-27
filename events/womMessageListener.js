@@ -2,7 +2,15 @@ const { Events, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../db/supabase');
 const config = require('../config.json');
-const { RANK_ROLES, determineRank, formatRankWithEmoji, isRankUpgrade } = require('../commands/utility/sync');
+const {
+    getAllRoleIds,
+    formatRank,
+    getRankName,
+    determineRankIndex,
+    isRankUpgrade,
+    getRoleIdByIndex,
+    getMemberRankIndex
+} = require('../utils/ranks');
 
 // Parse and handle join messages
 async function handleJoinMessage (description, originalMessage) {
@@ -370,7 +378,7 @@ async function processMemberJoin (rsn, originalMessage) {
         let member = null;
         let nicknameChanged = false;
         let rankAssigned = false;
-        let rank = null;
+        let rankIndex = null;
 
         if (discordId) {
             try {
@@ -379,31 +387,21 @@ async function processMemberJoin (rsn, originalMessage) {
 
                 // Determine rank using clan join timestamp from WOM
                 const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-                rank = determineRank(ehb, clanJoinTimestamp);
-                console.log(`[JOIN] Assigned rank: ${rank}`);
+                rankIndex = determineRankIndex(ehb, clanJoinTimestamp);
+                console.log(`[JOIN] Assigned rank index: ${rankIndex}`);
 
                 // Nickname changes disabled
                 console.log(`[JOIN] Nickname update skipped (disabled)`);
 
                 // Assign Discord rank
                 try {
-                    // Get current rank role (if any)
-                    const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
+                    // Get current rank index
+                    const currentRankIndex = getMemberRankIndex(member);
+                    const allRankRoleIds = getAllRoleIds();
                     const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
 
-                    // Get current rank name
-                    let currentRankName = null;
-                    if (currentRankRoleObj) {
-                        for (const [rankName, roleId] of Object.entries(RANK_ROLES)) {
-                            if (roleId === currentRankRoleObj.id) {
-                                currentRankName = rankName;
-                                break;
-                            }
-                        }
-                    }
-
                     // Only upgrade ranks, never downgrade
-                    if (!currentRankName || isRankUpgrade(currentRankName, rank)) {
+                    if (currentRankIndex === -1 || isRankUpgrade(currentRankIndex, rankIndex)) {
                         // Only remove the current rank role if we're upgrading
                         if (currentRankRoleObj) {
                             await member.roles.remove(currentRankRoleObj);
@@ -411,18 +409,18 @@ async function processMemberJoin (rsn, originalMessage) {
                         }
 
                         // Add new rank role if it exists
-                        const newRoleId = RANK_ROLES[rank];
+                        const newRoleId = getRoleIdByIndex(rankIndex);
                         if (newRoleId) {
                             await member.roles.add(newRoleId);
                             rankAssigned = true;
-                            console.log(`[JOIN] ✅ Upgraded rank: ${currentRankName || 'None'} -> ${rank}`);
+                            console.log(`[JOIN] ✅ Upgraded rank: ${currentRankIndex >= 0 ? getRankName(originalMessage.guild, currentRankIndex) : 'None'} -> ${getRankName(originalMessage.guild, rankIndex)}`);
                         } else {
-                            console.warn(`[JOIN] ⚠️ Role ID not configured for rank: ${rank}`);
+                            console.warn(`[JOIN] ⚠️ Role ID not configured for rank index: ${rankIndex}`);
                         }
                     } else {
                         // Rank would be a downgrade - skip it
                         rankAssigned = true;
-                        console.log(`[JOIN] ⏭️ Skipped downgrade: keeping ${currentRankName} (earned rank: ${rank})`);
+                        console.log(`[JOIN] ⏭️ Skipped downgrade: keeping ${getRankName(originalMessage.guild, currentRankIndex)} (earned rank: ${getRankName(originalMessage.guild, rankIndex)})`);
                     }
                 } catch (error) {
                     console.error(`[JOIN] ⚠️ Failed to assign rank:`, error.message);
@@ -433,7 +431,7 @@ async function processMemberJoin (rsn, originalMessage) {
         } else {
             console.log(`[JOIN] No Discord ID linked for this player`);
             // For non-linked players, determine rank without time consideration
-            rank = determineRank(ehb, null);
+            rankIndex = determineRankIndex(ehb, null);
         }
 
         // Update or create player in database
@@ -456,13 +454,13 @@ async function processMemberJoin (rsn, originalMessage) {
         }
 
         // Send custom notification with full stats
-        await sendJoinNotification(rsn, totalLevel, ehb, ehp, rank, womId, originalMessage, nicknameChanged, rankAssigned, discordId);
+        await sendJoinNotification(rsn, totalLevel, ehb, ehp, rankIndex, womId, originalMessage, nicknameChanged, rankAssigned, discordId);
 
         // Send confirmation to log channel
         const confirmDetails = `**Player:** ${rsn}\n` +
             `**Total Level:** ${totalLevel}\n` +
             `**EHB:** ${ehb} | **EHP:** ${ehp}\n` +
-            `**Rank:** ${formatRankWithEmoji(rank, originalMessage.guild)}\n` +
+            `**Rank:** ${formatRank(originalMessage.guild, rankIndex)}\n` +
             `**Discord:** ${discordId ? `<@${discordId}>` : 'Not linked'}\n` +
             (autoLinked ? `**Auto-Linked:** ✅ Matched by nickname\n` : '') +
             `**Discord Roles:** ${rankAssigned ? '✅ Assigned' : (discordId ? '⚠️ Not assigned (check permissions)' : 'N/A (not linked)')}\n` +
@@ -634,7 +632,7 @@ async function processMemberLeave (rsn, originalMessage) {
 }
 
 // Send custom join notification (thread reply to WOM message)
-async function sendJoinNotification (rsn, totalLevel, ehb, ehp, rank, womId, originalMessage, nicknameChanged, rankAssigned, discordId) {
+async function sendJoinNotification (rsn, totalLevel, ehb, ehp, rankIndex, womId, originalMessage, nicknameChanged, rankAssigned, discordId) {
     try {
         const hasDiscordLink = !!discordId;
 
@@ -660,7 +658,7 @@ async function sendJoinNotification (rsn, totalLevel, ehb, ehp, rank, womId, ori
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Assigned Rank', value: formatRankWithEmoji(rank, originalMessage.guild), inline: false },
+                { name: 'Assigned Rank', value: formatRank(originalMessage.guild, rankIndex), inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )
             .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
