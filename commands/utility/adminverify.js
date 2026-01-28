@@ -4,7 +4,7 @@ const {
     PermissionFlagsBits
 } = require('discord.js');
 const axios = require('axios');
-const { determineRank, formatRankWithEmoji } = require('./sync');
+const { determineRankIndex, formatRank } = require('../../utils/ranks');
 const { isAdmin } = require('../../utils/permissions');
 
 module.exports = {
@@ -83,7 +83,7 @@ module.exports = {
             const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
             // Determine rank
-            const rank = determineRank(ehb, null);
+            const rankIndex = determineRankIndex(ehb, null);
 
             // Nickname changes disabled
             const nicknameChanged = false;
@@ -113,7 +113,7 @@ module.exports = {
                     { name: 'Total Level', value: totalLevel.toString(), inline: true },
                     { name: 'EHB', value: ehb.toString(), inline: true },
                     { name: 'EHP', value: ehp.toString(), inline: true },
-                    { name: 'Expected Rank', value: formatRankWithEmoji(rank, interaction.guild), inline: true },
+                    { name: 'Expected Rank', value: formatRank(interaction.guild, rankIndex), inline: true },
                     { name: '\u200B', value: '\u200B', inline: true },
                     { name: '\u200B', value: '\u200B', inline: true },
                     { name: 'Discord Nickname', value: nicknameChanged ? `✅ Updated to ${actualRsn}` : `⚠️ ${nicknameError || 'Could not update'}`, inline: false },

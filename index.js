@@ -190,7 +190,16 @@ async function runDailyRankUpdate() {
     // Import the rank update logic
     const axios = require('axios');
     const db = require('./db/supabase');
-    const { RANK_ROLES, determineRank, isRankUpgrade } = require('./commands/utility/sync');
+    const {
+      getAllRoleIds,
+      formatRank,
+      getRankName,
+      determineRankIndex,
+      isRankUpgrade,
+      getRankIndexByRoleId,
+      getRoleIdByIndex,
+      getMemberRankIndex
+    } = require('./utils/ranks');
     const { EmbedBuilder } = require('discord.js');
 
     const clanId = config.clanId;
@@ -206,7 +215,7 @@ async function runDailyRankUpdate() {
     }
 
     const clanMembers = clanData.memberships;
-    const allRankRoleIds = Object.values(RANK_ROLES).filter(id => id !== null);
+    const allRankRoleIds = getAllRoleIds();
     const existingPlayers = await db.getAllPlayers();
 
     const discordIdToRsnMap = {};
@@ -220,23 +229,6 @@ async function runDailyRankUpdate() {
     await guild.members.fetch();
     const allMembers = guild.members.cache;
 
-    // Map of rank names to their respective emojis
-    const rankEmojiMap = {
-      'Sweat': '<:Sweat:1339598866818793505>',
-      'Master General': '<:MasterGeneral:1339598851304063077>',
-      'Touch Grass': '<:TouchGrass:1339598837110669354>',
-      'Wrath': '<:WR:1239257793199083580>',
-      'Top Dawgs': '<:TZ:1309544425298329681>',
-      'Mind Goblin': '<:GO:1213799278150164490>',
-      'Holy': '<:SA:1309547678694248488>',
-      'Skull': '<:S_:1239658968654282863>',
-      'SLAAAAAY': '<:SL:1309544667561459712>',
-      'Guthixian': '<:GU:1213799334773129236>',
-      'Black Hearts': '<:de:1341120690325028865>',
-      'Discord Kitten': '<:HE:1213787848088494100>',
-      'Brewaholic': '<:AP:1213784678419406858>',
-    };
-
     let mismatchOutput = [];
     let userMentions = [];
 
@@ -247,42 +239,43 @@ async function runDailyRankUpdate() {
         const clanMember = clanMembers.find(m => m.player.username === rsn);
         const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
-        const calculatedRank = determineRank(ehb, member.joinedTimestamp);
-        const calculatedRankId = RANK_ROLES[calculatedRank];
+        // Get clan join timestamp from WOM data
+        const clanJoinedAt = clanMember?.createdAt ? new Date(clanMember.createdAt).getTime() : null;
+
+        const calculatedRankIndex = determineRankIndex(ehb, clanJoinedAt);
+        const calculatedRankId = getRoleIdByIndex(calculatedRankIndex);
         const memberRoles = member.roles.cache;
 
-        const currentRankRole = memberRoles.find(role => allRankRoleIds.includes(role.id));
-        const currentRank = currentRankRole
-          ? Object.keys(RANK_ROLES).find(key => RANK_ROLES[key] === currentRankRole.id)
-          : 'None';
-        const currentRankEmoji = rankEmojiMap[currentRank] || '';
+        const currentRankRoleObj = memberRoles.find(role => allRankRoleIds.includes(role.id));
+        const currentRankIndex = currentRankRoleObj ? getRankIndexByRoleId(currentRankRoleObj.id) : -1;
 
         const hasCorrectRank = memberRoles.some(role => role.id === calculatedRankId);
 
-        // Only upgrade ranks, never downgrade
-        if (!hasCorrectRank && (!currentRank || currentRank === 'None' || isRankUpgrade(currentRank, calculatedRank))) {
-          if (currentRankRole) {
-            await member.roles.remove(currentRankRole, 'Removing old rank role');
+        // Only upgrade ranks, never downgrade (for daily auto-update)
+        if (!hasCorrectRank && isRankUpgrade(currentRankIndex, calculatedRankIndex)) {
+          if (currentRankRoleObj) {
+            await member.roles.remove(currentRankRoleObj, 'Removing old rank role');
           }
 
           if (calculatedRankId) {
             await member.roles.add(calculatedRankId, 'Adding correct EHB role');
-            const calculatedRankEmoji = rankEmojiMap[calculatedRank] || '';
 
             userMentions.push(`<@${member.id}>`);
 
-            if (currentRank == "None") {
+            if (currentRankIndex === -1) {
               mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **${currentRank}** - Updated to: ${calculatedRankEmoji} **${calculatedRank}**`
+                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, calculatedRankIndex)}`
               );
             } else {
               mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${currentRankEmoji} **${currentRank}** - Upgraded to: ${calculatedRankEmoji} **${calculatedRank}**`
+                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, currentRankIndex)} - Upgraded to: ${formatRank(guild, calculatedRankIndex)}`
               );
             }
+
+            console.log(`[Daily Rank Update] ⬆️ Upgraded rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(guild, currentRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (${ehb} EHB)`);
           }
         } else if (!hasCorrectRank) {
-          console.log(`[Daily Rank Update] ⏭️ Skipped downgrade for ${rsn}: keeping ${currentRank} (earned rank: ${calculatedRank}, ${ehb} EHB)`);
+          console.log(`[Daily Rank Update] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(guild, currentRankIndex)} (earned rank: ${getRankName(guild, calculatedRankIndex)}, ${ehb} EHB)`);
         }
       }
     }

@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const axios = require('axios');
 const config = require('../../config.json');
-const { determineRank, formatRankWithEmoji } = require('./sync');
+const { determineRankIndex, formatRank } = require('../../utils/ranks');
 const { isAdmin } = require('../../utils/permissions');
 const features = require('../../utils/features');
 const db = require('../../db/supabase');
@@ -185,7 +185,7 @@ async function handleVerifySubmit (interaction) {
         const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
         // Determine rank
-        const rank = determineRank(ehb, null);
+        const rankIndex = determineRankIndex(ehb, null);
 
         // Handle nickname change and role updates if requirements met
         let nicknameChanged = false;
@@ -284,7 +284,7 @@ async function handleVerifySubmit (interaction) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Expected Rank', value: formatRankWithEmoji(rank, interaction.guild), inline: false }
+                { name: 'Expected Rank', value: formatRank(interaction.guild, rankIndex), inline: false }
             );
 
         if (nicknameChanged) {
