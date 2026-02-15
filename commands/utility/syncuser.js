@@ -206,9 +206,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         // Fetch member for role assignment
         const member = await interaction.guild.members.fetch(targetUser.id);
 
-        // Determine and assign rank using clan join timestamp from WOM
-        const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-        const rankIndex = determineRankIndex(ehb, clanJoinTimestamp);
+        const rankIndex = determineRankIndex(ehb);
         let rankAssigned = false;
         let rankError = null;
 

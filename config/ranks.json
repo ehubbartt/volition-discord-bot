@@ -1,17 +1,17 @@
 {
   "ranks": [
-    { "roleId": "1213921453762809886", "ehbMin": 0, "monthsMin": null, "yearsMin": null, "womRole": "bronze" },
-    { "roleId": "1087482275307978894", "ehbMin": 150, "monthsMin": 6, "yearsMin": null, "womRole": "iron" },
-    { "roleId": "1309548746844930058", "ehbMin": 300, "monthsMin": null, "yearsMin": 1, "womRole": "steel" },
-    { "roleId": "1087167843998650399", "ehbMin": 450, "monthsMin": null, "yearsMin": 2, "womRole": "gold" },
-    { "roleId": "1309545367880208405", "ehbMin": 600, "monthsMin": null, "yearsMin": null, "womRole": "mithril" },
-    { "roleId": "1087485648832843796", "ehbMin": 750, "monthsMin": null, "yearsMin": null, "womRole": "adamant" },
-    { "roleId": "1309547277966377050", "ehbMin": 1000, "monthsMin": null, "yearsMin": null, "womRole": "rune" },
-    { "roleId": "1087162684602056775", "ehbMin": 1250, "monthsMin": null, "yearsMin": null, "womRole": "dragon" },
-    { "roleId": "1309545563498352772", "ehbMin": 1500, "monthsMin": null, "yearsMin": null, "womRole": "sage" },
-    { "roleId": "1238443298625159220", "ehbMin": 1750, "monthsMin": null, "yearsMin": null, "womRole": "legend" },
-    { "roleId": "1339599017813741652", "ehbMin": 2000, "monthsMin": null, "yearsMin": null, "womRole": "myth" },
-    { "roleId": "1339599293413068860", "ehbMin": 2500, "monthsMin": null, "yearsMin": null, "womRole": "tztok" },
-    { "roleId": "1339599170394259517", "ehbMin": 3000, "monthsMin": null, "yearsMin": null, "womRole": "tzkal" }
+    { "roleId": "1213921453762809886", "ehbMin": 0, "womRole": "bronze" },
+    { "roleId": "1087482275307978894", "ehbMin": 150, "womRole": "iron" },
+    { "roleId": "1309548746844930058", "ehbMin": 300, "womRole": "steel" },
+    { "roleId": "1087167843998650399", "ehbMin": 450, "womRole": "gold" },
+    { "roleId": "1309545367880208405", "ehbMin": 600, "womRole": "mithril" },
+    { "roleId": "1087485648832843796", "ehbMin": 750, "womRole": "adamant" },
+    { "roleId": "1309547277966377050", "ehbMin": 1000, "womRole": "rune" },
+    { "roleId": "1087162684602056775", "ehbMin": 1250, "womRole": "dragon" },
+    { "roleId": "1309545563498352772", "ehbMin": 1500, "womRole": "sage" },
+    { "roleId": "1238443298625159220", "ehbMin": 1750, "womRole": "legend" },
+    { "roleId": "1339599017813741652", "ehbMin": 2000, "womRole": "myth" },
+    { "roleId": "1339599293413068860", "ehbMin": 2500, "womRole": "tztok" },
+    { "roleId": "1339599170394259517", "ehbMin": 3000, "womRole": "tzkal" }
   ]
 }

@@ -18,8 +18,7 @@ const {
     getMemberRankIndex,
     getWomRole,
     getRankIndexByWomRole,
-    standardWomRoles,
-    ranksConfig
+    standardWomRoles
 } = require('../../utils/ranks');
 
 module.exports = {
@@ -66,27 +65,7 @@ module.exports = {
       const allMembers = guild.members.cache;
 
       // Helper function to determine why someone earned a rank
-      const getRankReason = (rankIndex, ehb, joinedTimestamp) => {
-        if (!joinedTimestamp) return `${ehb} EHB`;
-
-        const rank = ranksConfig.ranks[rankIndex];
-        if (!rank) return `${ehb} EHB`;
-
-        const timeInClan = Date.now() - joinedTimestamp;
-        const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
-        const monthsInClan = daysInClan / 30;
-        const yearsInClan = daysInClan / 365;
-
-        // Check if rank was earned by time instead of EHB
-        if (rank.yearsMin && yearsInClan >= rank.yearsMin && ehb < rank.ehbMin) {
-          return `${Math.floor(yearsInClan * 10) / 10} years in clan`;
-        }
-        if (rank.monthsMin && monthsInClan >= rank.monthsMin && ehb < rank.ehbMin) {
-          return `${Math.floor(monthsInClan)} months in clan`;
-        }
-
-        return `${ehb} EHB`;
-      };
+      const getRankReason = (ehb) => `${ehb} EHB`;
 
       // Check for matches between Discord IDs in the server and EHB -> update rank(s)
       let mismatchOutput = [];
@@ -104,11 +83,7 @@ module.exports = {
           const clanMember = clanMembers.find(m => m.player.username === rsn);
           const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
-          // Get clan join timestamp from WOM data (when they joined the OSRS clan)
-          const clanJoinedAt = clanMember?.createdAt ? new Date(clanMember.createdAt).getTime() : null;
-
-          // Determine the rank using centralized function with CLAN join time, not Discord join time
-          const calculatedRankIndex = determineRankIndex(ehb, clanJoinedAt);
+          const calculatedRankIndex = determineRankIndex(ehb);
           const calculatedRankId = getRoleIdByIndex(calculatedRankIndex);
 
           const memberRoles = member.roles.cache;
@@ -183,7 +158,7 @@ module.exports = {
             // 1. Calculated rank has a WOM equivalent
             // 2. Current WOM role is a standard role (not moderator, maxed, etc.)
             if (expectedWomRole && womRole !== expectedWomRole && standardWomRoles.includes(womRole)) {
-              const reason = getRankReason(calculatedRankIndex, ehb, clanJoinedAt);
+              const reason = getRankReason(ehb);
 
               // Get current WOM rank index
               const currentWomRankIndex = getRankIndexByWomRole(womRole);

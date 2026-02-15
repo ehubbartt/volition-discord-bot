@@ -83,7 +83,7 @@ module.exports = {
             const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
             // Determine rank
-            const rankIndex = determineRankIndex(ehb, null);
+            const rankIndex = determineRankIndex(ehb);
 
             // Nickname changes disabled
             const nicknameChanged = false;

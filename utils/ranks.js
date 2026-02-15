@@ -48,21 +48,10 @@ function getRankName(guild, rankIndex) {
  * @param {number|null} clanJoinTimestamp - Timestamp when player joined clan
  * @returns {number} Rank index (0 = lowest)
  */
-function determineRankIndex(ehb, clanJoinTimestamp) {
-    const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
-    const monthsInClan = timeInClan / (1000 * 60 * 60 * 24 * 30);
-    const yearsInClan = timeInClan / (1000 * 60 * 60 * 24 * 365);
-
+function determineRankIndex(ehb) {
     // Check from highest to lowest
     for (let i = ranksConfig.ranks.length - 1; i >= 0; i--) {
-        const rank = ranksConfig.ranks[i];
-
-        // Check EHB requirement
-        if (ehb >= rank.ehbMin) return i;
-
-        // Check time-based requirements
-        if (rank.yearsMin && yearsInClan >= rank.yearsMin) return i;
-        if (rank.monthsMin && monthsInClan >= rank.monthsMin) return i;
+        if (ehb >= ranksConfig.ranks[i].ehbMin) return i;
     }
 
     return 0; // Default to lowest rank

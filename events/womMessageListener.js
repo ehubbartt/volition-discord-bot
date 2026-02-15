@@ -385,9 +385,7 @@ async function processMemberJoin (rsn, originalMessage) {
                 member = await originalMessage.guild.members.fetch(discordId);
                 console.log(`[JOIN] Found linked Discord user: ${member.user.tag}`);
 
-                // Determine rank using clan join timestamp from WOM
-                const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-                rankIndex = determineRankIndex(ehb, clanJoinTimestamp);
+                rankIndex = determineRankIndex(ehb);
                 console.log(`[JOIN] Assigned rank index: ${rankIndex}`);
 
                 // Nickname changes disabled
@@ -433,8 +431,7 @@ async function processMemberJoin (rsn, originalMessage) {
             }
         } else {
             console.log(`[JOIN] No Discord ID linked for this player`);
-            // For non-linked players, determine rank without time consideration
-            rankIndex = determineRankIndex(ehb, null);
+            rankIndex = determineRankIndex(ehb);
         }
 
         // Update or create player in database

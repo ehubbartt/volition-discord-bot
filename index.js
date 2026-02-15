@@ -239,10 +239,7 @@ async function runDailyRankUpdate() {
         const clanMember = clanMembers.find(m => m.player.username === rsn);
         const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
-        // Get clan join timestamp from WOM data
-        const clanJoinedAt = clanMember?.createdAt ? new Date(clanMember.createdAt).getTime() : null;
-
-        const calculatedRankIndex = determineRankIndex(ehb, clanJoinedAt);
+        const calculatedRankIndex = determineRankIndex(ehb);
         const calculatedRankId = getRoleIdByIndex(calculatedRankIndex);
         const memberRoles = member.roles.cache;
 

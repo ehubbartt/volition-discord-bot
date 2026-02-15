@@ -100,8 +100,7 @@ async function fullClanSync (interaction, clanId) {
                         clan_joined_at: clanJoinedAt
                     }, 0);
                     newMembersAdded++;
-                    const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-                    const expectedRankIndex = determineRankIndex(ehb, clanJoinTimestamp);
+                    const expectedRankIndex = determineRankIndex(ehb);
                     newMembers.push({ rsn, womId, ehb, rankIndex: expectedRankIndex });
                     console.log(`[FullSync] Added new member: ${rsn} (${womId})`);
                 } catch (error) {
@@ -132,14 +131,10 @@ async function fullClanSync (interaction, clanId) {
                         const discordMember = await interaction.guild.members.fetch(existingPlayer.discord_id);
                         const currentRankIndex = getMemberRankIndex(discordMember);
 
-                        // Use clan join timestamp for time-based ranks
-                        const clanJoinTimestamp = clanJoinedAt ? new Date(clanJoinedAt).getTime() : null;
-                        const expectedRankIndex = determineRankIndex(ehb, clanJoinTimestamp);
+                        const expectedRankIndex = determineRankIndex(ehb);
 
                         // Update rank if it doesn't match expected (both upgrades and downgrades)
                         if (currentRankIndex !== expectedRankIndex) {
-                            const timeInClan = clanJoinTimestamp ? Date.now() - clanJoinTimestamp : 0;
-                            const daysInClan = Math.floor(timeInClan / (1000 * 60 * 60 * 24));
                             const isUpgrade = isRankUpgrade(currentRankIndex, expectedRankIndex);
 
                             try {
@@ -158,7 +153,7 @@ async function fullClanSync (interaction, clanId) {
                                     ranksUpdated++;
                                     const arrow = isUpgrade ? '⬆️' : '⬇️';
                                     const action = isUpgrade ? 'Upgraded' : 'Downgraded';
-                                    console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)} (${ehb} EHB, ${daysInClan} days)`);
+                                    console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)} (${ehb} EHB)`);
 
                                     rankMismatches.push({
                                         rsn,
