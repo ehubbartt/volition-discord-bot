@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,7 +17,8 @@ module.exports = {
                 '1. Click the button below to copy the config\n' +
                 '2. Open RuneLite\n' +
                 '3. Type `::dinkimport` in the game chat\n' +
-                '4. The settings will be imported automatically'
+                '4. The settings will be imported automatically\n' +
+                '5. Feel free to change your messages in the Dink plugins for overrides!'
             )
             .setFooter({ text: 'Requires the Dink plugin installed in RuneLite' });
 
@@ -37,8 +38,11 @@ module.exports = {
             const configPath = path.join(__dirname, '../../dinkconfig.json');
             const configData = fs.readFileSync(configPath, 'utf-8');
 
+            const attachment = new AttachmentBuilder(Buffer.from(configData), { name: 'dinkconfig.json' });
+
             await interaction.reply({
-                content: '**Copy the entire text below, then type `::dinkimport` in-game:**\n```json\n' + configData + '\n```',
+                content: '**Download the file below, then type `::dinkimport` in RuneLite game chat to import the settings.**',
+                files: [attachment],
                 ephemeral: true
             });
         } catch (error) {
