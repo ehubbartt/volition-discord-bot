@@ -18,7 +18,7 @@ module.exports = {
                 '2. Open RuneLite\n' +
                 '3. Type `::dinkimport` in the game chat\n' +
                 '4. The settings will be imported automatically\n' +
-                '5. Feel free to change your messages in the Dink plugins for overrides!'
+                '5. Feel free to change your messages in the Dink plugin settings for overrides!'
             )
             .setFooter({ text: 'Requires the Dink plugin installed in RuneLite' });
 
@@ -41,7 +41,7 @@ module.exports = {
             const attachment = new AttachmentBuilder(Buffer.from(configData), { name: 'dinkconfig.json' });
 
             await interaction.reply({
-                content: '**Download the file below, then type `::dinkimport` in RuneLite game chat to import the settings.**',
+                content: '**Click the copy button (📋) on the file preview below, then type `::dinkimport` in RuneLite game chat to import the settings.**',
                 files: [attachment],
                 ephemeral: true
             });
