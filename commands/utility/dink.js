@@ -41,7 +41,7 @@ module.exports = {
             const attachment = new AttachmentBuilder(Buffer.from(configData), { name: 'dinkconfig.json' });
 
             await interaction.reply({
-                content: '**Click the copy button (📋) on the file preview below, then type `::dinkimport` in RuneLite game chat to import the settings.**',
+                content: '**Copy the contents of the file below, then type `::dinkimport` in RuneLite game chat to import the settings.**',
                 files: [attachment],
                 ephemeral: true
             });
