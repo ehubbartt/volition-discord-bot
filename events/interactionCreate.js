@@ -964,6 +964,14 @@ module.exports = {
         }
       }
 
+      if (interaction.customId === 'dink_copy_config') {
+        const dinkCommand = require('../commands/utility/dink.js');
+        if (dinkCommand?.handleCopyConfig) {
+          try { await dinkCommand.handleCopyConfig(interaction); }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
       if (interaction.customId === 'ignore_sync') {
         const syncUserCommand = require('../commands/utility/syncuser.js');
         if (syncUserCommand?.handleIgnoreSync) {
