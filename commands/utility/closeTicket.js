@@ -37,49 +37,27 @@ module.exports = {
             });
         }
 
-        // Send public closing message
+        // Send close options
         const closeEmbed = new EmbedBuilder()
             .setColor('Orange')
-            .setTitle('🔒 Ticket Close Request')
+            .setTitle('🔒 Close Ticket')
             .setDescription(
-                `${interaction.user} has requested to close this ticket.\n\n` +
-                `An admin will process this request shortly.`
+                `${interaction.user} wants to close this ticket.\n\n` +
+                `**Close** - Archive transcript and delete immediately\n` +
+                `**Soft Close** - Start a 24-hour timer. Auto-closes if no further messages.`
             )
             .setTimestamp();
 
-        await interaction.reply({ embeds: [closeEmbed] });
-
-        // Send admin-only message with buttons
-        const adminEmbed = new EmbedBuilder()
-            .setColor('Red')
-            .setTitle('🔐 Admin: Close Ticket Options')
-            .setDescription(
-                `Choose how to close this ticket:\n\n` +
-                `**Delete Ticket** - Permanently delete without archiving\n` +
-                `**Transcript** - Archive all messages to the archive channel`
-            )
-            .setFooter({ text: 'Only admins can see this message' })
-            .setTimestamp();
-
-        const deleteButton = new ButtonBuilder()
-            .setCustomId('ticket_delete')
-            .setLabel('Delete Ticket')
+        const closeButton = new ButtonBuilder()
+            .setCustomId('ticket_close')
+            .setLabel('Close')
             .setStyle(ButtonStyle.Danger)
-            .setEmoji('🗑️');
+            .setEmoji('🔒');
 
-        const transcriptButton = new ButtonBuilder()
-            .setCustomId('ticket_transcript')
-            .setLabel('Transcript')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('📋');
-
-        const row = new ActionRowBuilder().addComponents(deleteButton, transcriptButton);
-
-        // Send ephemeral message visible only to admins
-        await channel.send({
-            content: config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' '),
-            embeds: [adminEmbed],
-            components: [row]
-        });
+        const softCloseButton = new ButtonBuilder()
+            .setCustomId('ticket_soft_close')
+            .setLabel('Soft Close')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('⏰');
     },
 };
