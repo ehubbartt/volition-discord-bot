@@ -73,6 +73,7 @@ async function createPlayer(playerData, initialPoints = 0) {
       wom_id: playerData.wom_id || null,
       clan_joined_at: playerData.clan_joined_at || null,
       points: initialPoints,
+      lifetime_vp: initialPoints,
       last_loot_date: null,
     })
     .select()
@@ -122,9 +123,15 @@ async function addPoints(rsn, amount) {
   const currentPoints = player.points || 0;
   const newPoints = currentPoints + amount;
 
+  // Build update - increment lifetime_vp only when earning VP (positive amount)
+  const updates = { points: newPoints };
+  if (amount > 0) {
+    updates.lifetime_vp = (player.lifetime_vp || 0) + amount;
+  }
+
   const { data, error } = await supabase
     .from('players')
-    .update({ points: newPoints })
+    .update(updates)
     .eq('id', player.id)
     .select()
     .single();
@@ -139,9 +146,17 @@ async function setPoints(rsn, points) {
     throw new Error(`Player not found: ${rsn}`);
   }
 
+  // If new balance is higher than current, the difference was earned
+  const updates = { points };
+  const currentPoints = player.points || 0;
+  const diff = points - currentPoints;
+  if (diff > 0) {
+    updates.lifetime_vp = (player.lifetime_vp || 0) + diff;
+  }
+
   const { data, error } = await supabase
     .from('players')
-    .update({ points })
+    .update(updates)
     .eq('id', player.id)
     .select()
     .single();
