@@ -59,5 +59,12 @@ module.exports = {
             .setLabel('Soft Close')
             .setStyle(ButtonStyle.Secondary)
             .setEmoji('⏰');
+
+        const row = new ActionRowBuilder().addComponents(closeButton, softCloseButton);
+
+        await interaction.reply({
+            embeds: [closeEmbed],
+            components: [row],
+        });
     },
 };
