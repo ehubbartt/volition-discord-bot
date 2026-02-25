@@ -81,8 +81,14 @@ module.exports = {
           const rsn = discordIdToRsnMap[discordId];
 
           const clanMember = clanMembers.find(m => m.player.username === rsn);
-          const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
+          // Skip players not in the WOM clan
+          if (!clanMember) {
+            console.log(`[UpdateRanks] ⏭️ Skipped ${rsn} - not found in WOM clan data`);
+            continue;
+          }
+
+          const ehb = Math.round(clanMember.player.ehb || 0);
           const calculatedRankIndex = determineRankIndex(ehb);
           const calculatedRankId = getRoleIdByIndex(calculatedRankIndex);
 
