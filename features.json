@@ -45,7 +45,8 @@
     "dailyWordle": true,
     "duels": true,
     "weeklyTasks": true,
-    "eventRewards": true
+    "eventRewards": true,
+    "voiceTracking": true
   },
   "commands": {
     "verification": {
@@ -106,7 +107,8 @@
       "allset": true,
       "fixarchiveperms": true,
       "age": true,
-      "undonicknames": true
+      "undonicknames": true,
+      "voicestats": true
     }
   },
   "notifications": {

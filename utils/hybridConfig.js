@@ -268,6 +268,22 @@ class HybridConfig {
     }
 
     /**
+     * Convenience: get voice tracking config
+     */
+    async getVoiceTracking() {
+        const localFallback = {
+            enabled: true,
+            minutesPerTick: 5,
+            minEligibleUsers: 2,
+            excludeAfkChannel: true,
+            excludedChannelIds: [],
+            requireUnmuted: true,
+            requireUndeafened: true
+        };
+        return this.getConfigGroup('voice_tracking', localFallback);
+    }
+
+    /**
      * Force reload (bypasses cache)
      */
     async reload() {

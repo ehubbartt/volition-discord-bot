@@ -80,6 +80,7 @@ for (const file of eventFiles) {
 const { getWeeklyTaskAndMove } = require('./commands/fun/weeklyTask.js');
 const { getDailyWordleAndMove } = require('./commands/fun/dailyWordle.js');
 const { startSoftCloseChecker } = require('./jobs/softCloseChecker.js');
+const { startVoiceTracker } = require('./jobs/voiceTracker.js');
 
 const weeklyTaskRoleID = config.weeklyTaskRoleID; // used for push notifications
 const taskSubmissionChannelID = config.WEEKLY_CHALLENGE_SUBMISSION_CHANNEL_ID;
@@ -100,6 +101,9 @@ client.once(Events.ClientReady, async () => {
 
   // Start soft-close checker (runs on startup + every hour)
   startSoftCloseChecker(client);
+
+  // Start voice activity tracker (runs every 5 minutes)
+  startVoiceTracker(client);
 
   setInterval(async () => {
     const now = new Date();

@@ -80,6 +80,20 @@ const DEFAULT_CONFIG = [
         value: true,
         group: 'events',
         description: 'Are sabotage commands enabled'
+    },
+    {
+        name: CONFIG_KEYS.VOICE_TRACKING,
+        value: {
+            enabled: true,
+            minutesPerTick: 5,
+            minEligibleUsers: 2,
+            excludeAfkChannel: true,
+            excludedChannelIds: [],
+            requireUnmuted: true,
+            requireUndeafened: true
+        },
+        group: 'economy',
+        description: 'Voice chat time tracking - awards Voice Minutes for active VC participation'
     }
 ];
 

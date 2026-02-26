@@ -129,7 +129,8 @@ const CONFIG_KEYS = {
     BOARD_ENABLED: 'board_enabled',
     BOARD_UPDATE_ON_COMMANDS: 'board_update_on_commands',
     SABOTAGE_ENABLED: 'sabotage_enabled',
-    LOOT_TABLES: 'loot_tables'
+    LOOT_TABLES: 'loot_tables',
+    VOICE_TRACKING: 'voice_tracking'
 };
 
 module.exports = {
