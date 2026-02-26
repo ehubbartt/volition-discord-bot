@@ -289,6 +289,90 @@ async function deletePlayerByWomId(womId) {
   if (error) throw error;
 }
 
+// ----------------------------------------------------------------------------
+// Warnings
+
+async function createWarning({ discord_id, username, reason, warned_by, warned_by_tag }) {
+  const now = new Date();
+  const expiresAt = new Date(now);
+  expiresAt.setMonth(expiresAt.getMonth() + 6);
+
+  const { data, error } = await supabase
+    .from('warnings')
+    .insert({
+      discord_id,
+      username,
+      reason,
+      warned_by,
+      warned_by_tag,
+      created_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getActiveWarnings(discordId) {
+  const { data, error } = await supabase
+    .from('warnings')
+    .select('*')
+    .eq('discord_id', discordId)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function getAllWarnings(discordId) {
+  const { data, error } = await supabase
+    .from('warnings')
+    .select('*')
+    .eq('discord_id', discordId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+// ----------------------------------------------------------------------------
+// Bans
+
+async function createBan({ discord_id, username, reason, banned_by, banned_by_tag }) {
+  const { data, error } = await supabase
+    .from('bans')
+    .insert({
+      discord_id,
+      username,
+      reason,
+      banned_by,
+      banned_by_tag,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function getBan(discordId) {
+  const { data, error } = await supabase
+    .from('bans')
+    .select('*')
+    .eq('discord_id', discordId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return data;
+}
+
 module.exports = {
   supabase,
   getPlayerByRSN,
@@ -312,4 +396,9 @@ module.exports = {
   batchCreatePlayers,
   updatePlayerRsnByWomId,
   deletePlayerByWomId,
+  createWarning,
+  getActiveWarnings,
+  getAllWarnings,
+  createBan,
+  getBan,
 };

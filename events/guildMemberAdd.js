@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const config = require('../config.json');
 const features = require('../utils/features');
+const db = require('../db/supabase');
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -14,6 +15,18 @@ module.exports = {
         }
 
         try {
+            // Check if user is on the ban list
+            const ban = await db.getBan(member.id);
+            if (ban) {
+                console.log(`[GuildMemberAdd] ${member.user.tag} is banned. Kicking...`);
+                try {
+                    await member.send(`You are banned from **${member.guild.name}**.\n**Reason:** ${ban.reason}`);
+                } catch {
+                    // User may have DMs disabled
+                }
+                await member.kick(`Banned: ${ban.reason}`);
+                return;
+            }
             // Add unverified role
             if (await features.isEventEnabled('autoAddUnverifiedRole')) {
                 const unverifiedRoleId = config.unverifiedRoleID;
