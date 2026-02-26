@@ -396,8 +396,9 @@ module.exports = {
     async function handleLootInteraction (interaction, free = false) {
       const walletPrices = await hybridConfig.getWalletPrices();
       const lootTables = await hybridConfig.getLootTables();
-      // Allow items on both free and paid, but roles only on paid
-      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(lootTables, true, !free);
+      // Allow items based on config for free crates, always for paid; roles only on paid
+      const allowItems = free ? (lootTables.freeDropItems !== false) : true;
+      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(lootTables, allowItems, !free);
       const today = new Date().toISOString().slice(0, 10);
       const PRICE = lootTables.spinCost || 5;
       const MAX_BUTTON_AGE_MS = 20 * 60 * 60 * 1000; // 20h

@@ -234,6 +234,7 @@ class HybridConfig {
     async getLootTables() {
         const localFallback = {
             spinCost: 5,
+            freeDropItems: true,
             vpTiers: [
                 { label: 'Junk', chance: 29.7, min: 0, max: 0, color: '808080', title: 'Loot Crate Result', image: 'https://i.imgur.com/jABzYyd.png?v=2' },
                 { label: 'Common (1–3 VP)', chance: 50.0, min: 1, max: 3, color: '808080', title: 'Loot Crate Result', image: 'https://i.imgur.com/EF6qFMM.png' },
