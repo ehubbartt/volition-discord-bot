@@ -35,11 +35,17 @@ const DEFAULT_CONFIG = {
 async function checkVoiceChannels(client) {
     // Check feature flag
     const isEnabled = await features.isEnabled('gamification.voiceTracking');
-    if (!isEnabled) return;
+    if (!isEnabled) {
+        console.log('[VoiceTracker] Skipped — feature flag gamification.voiceTracking is disabled. Run /syncconfig to enable.');
+        return;
+    }
 
     // Fetch config
     const vcConfig = await hybridConfig.getConfigGroup('voice_tracking', DEFAULT_CONFIG);
-    if (!vcConfig || !vcConfig.enabled) return;
+    if (!vcConfig || !vcConfig.enabled) {
+        console.log('[VoiceTracker] Skipped — voice_tracking config is disabled.');
+        return;
+    }
 
     const guild = client.guilds.cache.get(config.guildId);
     if (!guild) return;
