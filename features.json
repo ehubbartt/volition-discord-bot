@@ -1,13 +1,5 @@
 {
-  "_comment": "Feature toggle configuration - Enable/disable bot features and commands",
-  "environment": {
-    "_description": "Environment settings - Switch between production and test configurations",
-    "_options": [
-      "production",
-      "test"
-    ],
-    "mode": "production"
-  },
+  "_comment": "Feature toggle configuration - Local fallback only. Primary source is Supabase bot_config table.",
   "events": {
     "_description": "Control automatic bot event handlers",
     "autoJoinTickets": true,
@@ -56,10 +48,10 @@
     "eventRewards": true
   },
   "commands": {
-    "_description": "Individual command toggles - Set to false to disable specific commands",
     "verification": {
       "verify": true,
       "adminverify": true,
+      "forceverify": true,
       "createverifymessage": true
     },
     "tickets": {
@@ -69,29 +61,52 @@
     "points": {
       "checkpoints": true,
       "adjustpoints": true,
-      "leaderboard": true
+      "leaderboard": true,
+      "rewardevent": true
+    },
+    "wallet": {
+      "wallet": true,
+      "adminwallet": true
     },
     "admin": {
       "sync": true,
       "syncuser": true,
       "updateranks": true,
-      "syncwomdiscids": true,
+      "syncwomids": true,
       "inactive": true,
-      "rewardevent": true
+      "updateconfig": true,
+      "syncconfig": true,
+      "sendweeklytask": true,
+      "senddailywordle": true
     },
     "fun": {
       "lootcrate": true,
-      "weeklytask": true,
-      "dailywordle": true,
       "duel": true
     },
-    "debug": {
-      "_description": "Testing and debug commands - Keep disabled in production",
-      "testpreverify": false,
-      "testpostverify": false,
-      "testverifyflow": false,
-      "debugtasks": false,
-      "undonicknames": false
+    "moderation": {
+      "warn": true,
+      "warnings": true,
+      "ban": true
+    },
+    "tileEvent": {
+      "addplayer": true,
+      "initboard": true,
+      "updateboard": true,
+      "roll": true,
+      "reroll": true,
+      "submit": true,
+      "submitpet": true,
+      "admintile": true,
+      "checkprogress": true,
+      "sabotage": true,
+      "checksabotage": true,
+      "tileleaderboard": true
+    },
+    "utility": {
+      "allset": true,
+      "fixarchiveperms": true,
+      "age": true,
+      "undonicknames": true
     }
   },
   "notifications": {

@@ -5,7 +5,7 @@ const features = require('../utils/features');
 const lootcrateAnalytics = require('../db/lootcrate_analytics');
 const gamificationAnalytics = require('../db/gamification_analytics');
 const walletDb = require('../db/wallet');
-const walletPrices = require('../config/walletPrices.json');
+const hybridConfig = require('../utils/hybridConfig');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -103,6 +103,7 @@ module.exports = {
 
       // For shop/payout tickets, check wallet status first (skip if force creating)
       if (ticketType === 'shop' && !forceShopTicket) {
+        const walletPrices = await hybridConfig.getWalletPrices();
         const items = await walletDb.getUnpaidItems(interaction.user.id);
         const total = items.reduce((sum, item) => {
           const price = walletPrices.items[item.item_name]?.price || 0;
@@ -320,21 +321,30 @@ module.exports = {
       }
     }
 
-    function rollLoot (allowItems = true, allowRole = true) {
-      const KING_GAMBA_ROLE_ID = '1423714480369434675';
+    function rollLoot (lootConfig, allowItems = true, allowRole = true) {
+      const entries = [];
 
-      const entries = [
-        { p: 29.7, kind: 'vp', label: 'Junk', min: 0, max: 0, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/jABzYyd.png?v=2' },
-        { p: 0.01, kind: 'role', label: 'King Gamba role', roleId: KING_GAMBA_ROLE_ID, color: 0x800080, title: 'A King of Gamba has been crowned!', image: 'https://i.imgur.com/zeSTA3O.png' },
+      // VP tiers from config
+      for (const tier of lootConfig.vpTiers) {
+        entries.push({
+          p: tier.chance, kind: 'vp',
+          label: tier.label, min: tier.min, max: tier.max,
+          color: parseInt(tier.color, 16), title: tier.title, image: tier.image
+        });
+      }
 
-        { p: 50.0, kind: 'vp', label: 'Common (1–3 VP)', min: 1, max: 3, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/EF6qFMM.png' },
-        { p: 10.0, kind: 'vp', label: 'Uncommon (4–10 VP)', min: 4, max: 10, color: 0x808080, title: 'Loot Crate Result', image: 'https://i.imgur.com/FyOzqw2.png' },
-        { p: 5.55, kind: 'vp', label: 'Rare (11–25 VP)', min: 11, max: 25, color: 0x00FF00, title: 'Loot Crate Result', image: 'https://i.imgur.com/SWDduXl.png' },
-        { p: 2.2, kind: 'vp', label: 'Unique (25–50 VP)', min: 26, max: 50, color: 0x00FF00, title: 'Not bad!', image: 'https://i.imgur.com/FIaGFsf.png' },
-        { p: 0.4, kind: 'vp', label: 'Legendary (100 VP)', min: 100, max: 100, color: 0x00FF00, title: `Hooo boy, it's a big one!`, image: 'https://i.imgur.com/nYUY964.png' },
-        { p: 0.05, kind: 'vp', label: 'Megarare (200–400 VP)', min: 200, max: 400, color: 0x800080, title: 'VP JACKPOT! 🔥', image: 'https://i.imgur.com/uweE4rx.png' },
-        { p: 2.0, kind: 'item', label: 'Item Drop', color: 0x2b2d31, title: 'Rare Item Drop!' }
-      ];
+      // Role reward from config
+      if (lootConfig.roleReward?.enabled) {
+        entries.push({
+          p: lootConfig.roleReward.chance, kind: 'role',
+          label: lootConfig.roleReward.label, roleId: lootConfig.roleReward.roleId,
+          color: parseInt(lootConfig.roleReward.color, 16),
+          title: lootConfig.roleReward.title, image: lootConfig.roleReward.image
+        });
+      }
+
+      // Item drop entry
+      entries.push({ p: lootConfig.itemDropChance, kind: 'item', label: 'Item Drop', color: 0x2b2d31, title: 'Rare Item Drop!' });
 
       const pool = entries.filter(e => (allowItems || e.kind !== 'item') && (allowRole || e.kind !== 'role'));
       const totalP = pool.reduce((s, e) => s + e.p, 0);
@@ -343,56 +353,36 @@ module.exports = {
       let chosen = pool[0];
       for (const e of pool) { r -= e.p; if (r <= 0) { chosen = e; break; } }
 
-      // ---
       if (chosen.kind === 'vp') {
         const amount = chosen.min === chosen.max ? chosen.min : Math.floor(Math.random() * (chosen.max - chosen.min + 1)) + chosen.min;
         return {
-          kind: 'vp', amount,
-          label: chosen.label,
-          color: chosen.color,
-          title: chosen.title,
-          image: chosen.image,
+          kind: 'vp', amount, label: chosen.label, color: chosen.color,
+          title: chosen.title, image: chosen.image,
           chance: chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1)
         };
       }
 
-      // ---
       if (chosen.kind === 'role') {
         return {
-          kind: 'role',
-          roleId: chosen.roleId,
-          amount: 0, label:
-            chosen.label, color:
-            chosen.color, title:
-            chosen.title, image:
-            chosen.image, chance:
-            chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1)
+          kind: 'role', roleId: chosen.roleId, amount: 0,
+          label: chosen.label, color: chosen.color, title: chosen.title,
+          image: chosen.image, chance: chosen.p >= 1 ? chosen.p.toFixed(0) : chosen.p.toFixed(1)
         };
       }
-      const itemTable = [
-        { p: 80, name: 'Abyssal Whip', color: 0x00FF00, image: 'https://i.imgur.com/tMM7G91.png' },
-        { p: 16.55, name: `Elidinis' Ward`, color: 0x00FF00, image: 'https://i.imgur.com/ZrL4y9r.png' },
-        { p: 2.82, name: 'Bond', color: 0x00FF00, image: 'https://i.imgur.com/K9rLNtO.png' },
-        { p: 0.4, name: '25M GP', color: 0x800080, image: 'https://i.imgur.com/bEkl6mC.png' },
-        { p: 0.1, name: 'Dragon Claws', color: 0x800080, image: 'https://i.imgur.com/Szu9nxV.png' },
-        { p: 0.13, name: '100M GP', color: 0x800080, image: 'https://i.imgur.com/CPxoJ4k.png' },
-        { p: 0.00, name: 'Twisted Bow', color: 0x800080, image: 'https://i.imgur.com/RzONkPT.png' }
-      ];
 
-      const rr = Math.random() * 100;
-      let acc = 0, it = itemTable[0];
-      for (const i of itemTable) { acc += i.p; if (rr < acc) { it = i; break; } }
+      // Item drop - pick from enabled items only
+      const enabledItems = lootConfig.items.filter(i => i.enabled);
+      const itemTotalP = enabledItems.reduce((s, i) => s + i.chance, 0);
 
-      const effective = 2.0 * it.p / 100;
+      let rr = Math.random() * itemTotalP;
+      let it = enabledItems[0];
+      for (const i of enabledItems) { rr -= i.chance; if (rr <= 0) { it = i; break; } }
+
+      const effective = lootConfig.itemDropChance * it.chance / itemTotalP;
       return {
-        kind: 'item',
-        amount: 0,
-        itemName: it.name,
-        label: chosen.label,
-        color: it.color,
-        title: chosen.title,
-        image: it.image,
-        chance: effective
+        kind: 'item', amount: 0, itemName: it.name,
+        label: chosen.label, color: parseInt(it.color, 16),
+        title: chosen.title, image: it.image, chance: effective
       };
     }
 
@@ -404,10 +394,12 @@ module.exports = {
     }
 
     async function handleLootInteraction (interaction, free = false) {
+      const walletPrices = await hybridConfig.getWalletPrices();
+      const lootTables = await hybridConfig.getLootTables();
       // Allow items on both free and paid, but roles only on paid
-      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(true, !free);
+      const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(lootTables, true, !free);
       const today = new Date().toISOString().slice(0, 10);
-      const PRICE = 5;
+      const PRICE = lootTables.spinCost || 5;
       const MAX_BUTTON_AGE_MS = 20 * 60 * 60 * 1000; // 20h
       const ageMs = Date.now() - (interaction.message?.createdTimestamp ?? Date.now());
       if (ageMs > MAX_BUTTON_AGE_MS) return interaction.reply({ content: 'This button has expired. Please use the most recent one!', ephemeral: true });
@@ -985,6 +977,7 @@ module.exports = {
         try {
           const { PermissionFlagsBits, ChannelType } = require('discord.js');
           const forceCreate = interaction.customId === 'wallet_cashout_force';
+          const walletPrices = await hybridConfig.getWalletPrices();
 
           await interaction.deferReply({ ephemeral: true });
 
@@ -1185,6 +1178,7 @@ module.exports = {
         }
 
         try {
+          const walletPrices = await hybridConfig.getWalletPrices();
           const userId = interaction.customId.replace('wallet_mark_paid_', '');
 
           await interaction.deferReply({ ephemeral: false });

@@ -21,6 +21,9 @@ class HybridConfig {
         this.remoteCacheDuration = 60000; // 1 minute
         this.useRemote = false; // Auto-detected on first fetch
         this.remoteAvailable = null; // null = unknown, true/false = status
+
+        // Per-group cache for getConfigGroup()
+        this.groupCache = new Map(); // config_name → { value, fetchedAt }
     }
 
     /**
@@ -173,12 +176,104 @@ class HybridConfig {
     }
 
     /**
+     * Fetch any config group from Supabase by config_name (e.g. 'game_settings', 'wallet_prices')
+     * Uses per-group caching with 60-second TTL
+     * @param {string} configName - The config_name in bot_config table
+     * @param {any} fallback - Local fallback value if remote unavailable
+     */
+    async getConfigGroup(configName, fallback = null) {
+        const now = Date.now();
+        const cached = this.groupCache.get(configName);
+
+        if (cached && (now - cached.fetchedAt) < this.remoteCacheDuration) {
+            return cached.value;
+        }
+
+        try {
+            const { data, error } = await db.supabase
+                .from('bot_config')
+                .select('config_value')
+                .eq('config_name', configName)
+                .single();
+
+            if (error || !data) {
+                return fallback;
+            }
+
+            this.groupCache.set(configName, { value: data.config_value, fetchedAt: now });
+            return data.config_value;
+        } catch {
+            return fallback;
+        }
+    }
+
+    /**
+     * Convenience: get game settings (duel limits, VP economy)
+     */
+    async getGameSettings() {
+        const localFallback = {
+            duelMinimumStake: 10,
+            duelMaximumStake: 10000,
+            pointAdjustmentMaxPerCommand: 10000,
+            pointsAward: [50, 30, 20]
+        };
+        return this.getConfigGroup('game_settings', localFallback);
+    }
+
+    /**
+     * Convenience: get wallet prices
+     */
+    async getWalletPrices() {
+        const localFallback = require('../config/walletPrices.json');
+        return this.getConfigGroup('wallet_prices', localFallback);
+    }
+
+    /**
+     * Convenience: get loot tables (VP tiers, item drop rates, role reward)
+     */
+    async getLootTables() {
+        const localFallback = {
+            spinCost: 5,
+            vpTiers: [
+                { label: 'Junk', chance: 29.7, min: 0, max: 0, color: '808080', title: 'Loot Crate Result', image: 'https://i.imgur.com/jABzYyd.png?v=2' },
+                { label: 'Common (1–3 VP)', chance: 50.0, min: 1, max: 3, color: '808080', title: 'Loot Crate Result', image: 'https://i.imgur.com/EF6qFMM.png' },
+                { label: 'Uncommon (4–10 VP)', chance: 10.0, min: 4, max: 10, color: '808080', title: 'Loot Crate Result', image: 'https://i.imgur.com/FyOzqw2.png' },
+                { label: 'Rare (11–25 VP)', chance: 5.55, min: 11, max: 25, color: '00FF00', title: 'Loot Crate Result', image: 'https://i.imgur.com/SWDduXl.png' },
+                { label: 'Unique (25–50 VP)', chance: 2.2, min: 26, max: 50, color: '00FF00', title: 'Not bad!', image: 'https://i.imgur.com/FIaGFsf.png' },
+                { label: 'Legendary (100 VP)', chance: 0.4, min: 100, max: 100, color: '00FF00', title: "Hooo boy, it's a big one!", image: 'https://i.imgur.com/nYUY964.png' },
+                { label: 'Megarare (200–400 VP)', chance: 0.05, min: 200, max: 400, color: '800080', title: 'VP JACKPOT!', image: 'https://i.imgur.com/uweE4rx.png' }
+            ],
+            itemDropChance: 2.0,
+            roleReward: {
+                enabled: true,
+                chance: 0.01,
+                roleId: '1423714480369434675',
+                label: 'King Gamba role',
+                color: '800080',
+                title: 'A King of Gamba has been crowned!',
+                image: 'https://i.imgur.com/zeSTA3O.png'
+            },
+            items: [
+                { name: 'Abyssal Whip', chance: 80, enabled: true, color: '00FF00', image: 'https://i.imgur.com/tMM7G91.png' },
+                { name: "Elidinis' Ward", chance: 16.55, enabled: true, color: '00FF00', image: 'https://i.imgur.com/ZrL4y9r.png' },
+                { name: 'Bond', chance: 2.82, enabled: true, color: '00FF00', image: 'https://i.imgur.com/K9rLNtO.png' },
+                { name: '25M GP', chance: 0.4, enabled: true, color: '800080', image: 'https://i.imgur.com/bEkl6mC.png' },
+                { name: 'Dragon Claws', chance: 0.1, enabled: true, color: '800080', image: 'https://i.imgur.com/Szu9nxV.png' },
+                { name: '100M GP', chance: 0.13, enabled: true, color: '800080', image: 'https://i.imgur.com/CPxoJ4k.png' },
+                { name: 'Twisted Bow', chance: 0.0, enabled: false, color: '800080', image: 'https://i.imgur.com/RzONkPT.png' }
+            ]
+        };
+        return this.getConfigGroup('loot_tables', localFallback);
+    }
+
+    /**
      * Force reload (bypasses cache)
      */
     async reload() {
         this.remoteConfig = null;
         this.lastRemoteFetch = null;
         this.localConfig = null;
+        this.groupCache.clear();
         return await this.getConfig();
     }
 
@@ -282,7 +377,9 @@ class HybridConfig {
                     .from('bot_config')
                     .insert({
                         config_name: 'features',
-                        config_value: localConfig
+                        config_value: localConfig,
+                        config_group: 'features',
+                        description: 'Feature flags, command toggles, event toggles'
                     });
 
                 if (error) throw error;

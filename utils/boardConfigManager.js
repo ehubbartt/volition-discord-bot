@@ -18,7 +18,7 @@ async function setEventActive(active) {
     return botConfigDb.setConfig(
         CONFIG_KEYS.EVENT_ACTIVE,
         active,
-        'Is the tile event open for players'
+        { group: 'events', description: 'Is the tile event open for players' }
     );
 }
 
@@ -27,7 +27,7 @@ async function getConfigValue(key) {
 }
 
 async function setConfigValue(key, value, description) {
-    return botConfigDb.setConfig(key, value, description);
+    return botConfigDb.setConfig(key, value, { group: 'events', description });
 }
 
 async function getAllConfig() {
@@ -45,7 +45,7 @@ async function getFullConfig() {
         const allDbConfig = await botConfigDb.getAllConfig();
         const dbConfigMap = {};
         allDbConfig.forEach(item => {
-            dbConfigMap[item.key] = item.value;
+            dbConfigMap[item.config_name] = item.config_value;
         });
 
         return {

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const walletDb = require('../../db/wallet');
-const walletPrices = require('../../config/walletPrices.json');
+const hybridConfig = require('../../utils/hybridConfig');
 
 /**
  * Format a GP value for display (e.g., 1500000 -> "1.5M")
@@ -42,6 +42,7 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         try {
+            const walletPrices = await hybridConfig.getWalletPrices();
             const userId = interaction.user.id;
             console.log(`[Wallet] Fetching wallet for user ${userId}`);
             const items = await walletDb.getUnpaidItems(userId);

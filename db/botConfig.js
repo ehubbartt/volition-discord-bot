@@ -14,17 +14,17 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 let configCache = new Map();
 const CACHE_TTL = 5000; // 5 seconds
 
-async function getConfig(key) {
+async function getConfig(configName) {
     // Check cache first
-    const cached = configCache.get(key);
+    const cached = configCache.get(configName);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
         return cached.value;
     }
 
     const { data, error } = await supabase
         .from('bot_config')
-        .select('value')
-        .eq('key', key)
+        .select('config_value')
+        .eq('config_name', configName)
         .single();
 
     if (error) {
@@ -33,18 +33,19 @@ async function getConfig(key) {
     }
 
     // Update cache
-    configCache.set(key, {
-        value: data.value,
+    configCache.set(configName, {
+        value: data.config_value,
         timestamp: Date.now()
     });
 
-    return data.value;
+    return data.config_value;
 }
 
-async function setConfig(key, value, description = null) {
+async function setConfig(configName, value, { group = 'general', description = null } = {}) {
     const updateData = {
-        key,
-        value,
+        config_name: configName,
+        config_value: value,
+        config_group: group,
         updated_at: new Date().toISOString()
     };
 
@@ -54,33 +55,34 @@ async function setConfig(key, value, description = null) {
 
     const { data, error } = await supabase
         .from('bot_config')
-        .upsert(updateData, { onConflict: 'key' })
+        .upsert(updateData, { onConflict: 'config_name' })
         .select()
         .single();
 
     if (error) throw error;
 
     // Update cache
-    configCache.set(key, {
-        value: data.value,
+    configCache.set(configName, {
+        value: data.config_value,
         timestamp: Date.now()
     });
 
-    return data.value;
+    return data.config_value;
 }
 
 async function getAllConfig() {
     const { data, error } = await supabase
         .from('bot_config')
         .select('*')
-        .order('key');
+        .order('config_group')
+        .order('config_name');
 
     if (error) throw error;
 
     // Update cache for all items
     data.forEach(item => {
-        configCache.set(item.key, {
-            value: item.value,
+        configCache.set(item.config_name, {
+            value: item.config_value,
             timestamp: Date.now()
         });
     });
@@ -88,37 +90,53 @@ async function getAllConfig() {
     return data;
 }
 
-async function deleteConfig(key) {
+async function getConfigsByGroup(group) {
+    const { data, error } = await supabase
+        .from('bot_config')
+        .select('*')
+        .eq('config_group', group)
+        .order('config_name');
+
+    if (error) throw error;
+    return data || [];
+}
+
+async function deleteConfig(configName) {
     const { error } = await supabase
         .from('bot_config')
         .delete()
-        .eq('key', key);
+        .eq('config_name', configName);
 
     if (error) throw error;
 
     // Remove from cache
-    configCache.delete(key);
+    configCache.delete(configName);
 }
 
 function clearCache() {
     configCache.clear();
 }
 
-// Config key constants for type safety
+// Config name constants
 const CONFIG_KEYS = {
+    FEATURES: 'features',
+    GAME_SETTINGS: 'game_settings',
+    WALLET_PRICES: 'wallet_prices',
+    TILE_EVENT: 'tile_event',
     EVENT_ACTIVE: 'event_active',
-    TILE_EVENT_CHANNEL: 'tile_event_channel',
     BOARD_CHANNEL: 'board_channel',
     BOARD_MESSAGE: 'board_message',
     BOARD_ENABLED: 'board_enabled',
     BOARD_UPDATE_ON_COMMANDS: 'board_update_on_commands',
-    SABOTAGE_ENABLED: 'sabotage_enabled'
+    SABOTAGE_ENABLED: 'sabotage_enabled',
+    LOOT_TABLES: 'loot_tables'
 };
 
 module.exports = {
     getConfig,
     setConfig,
     getAllConfig,
+    getConfigsByGroup,
     deleteConfig,
     clearCache,
     CONFIG_KEYS

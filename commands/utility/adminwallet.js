@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const walletDb = require('../../db/wallet');
-const walletPrices = require('../../config/walletPrices.json');
+const hybridConfig = require('../../utils/hybridConfig');
 const { isAdmin } = require('../../utils/permissions');
 
 /**
@@ -52,6 +52,7 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         try {
+            const walletPrices = await hybridConfig.getWalletPrices();
             const targetUser = interaction.options.getUser('user');
             const userId = targetUser.id;
 
