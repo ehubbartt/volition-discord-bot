@@ -70,7 +70,8 @@ module.exports = {
                         )
                         .setTimestamp();
 
-                    await alertChannel.send({ embeds: [alertEmbed] });
+                    const adminPings = config.ADMIN_ROLE_IDS.map(id => `<@&${id}>`).join(' ');
+                    await alertChannel.send({ content: adminPings, embeds: [alertEmbed] });
                 }
             }
         } catch (error) {
