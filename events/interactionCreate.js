@@ -808,6 +808,47 @@ module.exports = {
               await member.roles.add(config.verifiedRoleID);
             }
 
+            // Set nickname to RSN
+            let nicknameChanged = false;
+            try {
+              await member.setNickname(rsn);
+              nicknameChanged = true;
+              console.log(`[ForceVerify] Updated nickname for ${member.user.tag} to ${rsn}`);
+            } catch (error) {
+              console.log(`[ForceVerify] Could not set nickname for ${member.user.tag}: ${error.message}`);
+            }
+
+            // WOM lookup + DB save (same as normal verify flow)
+            let dbSaved = false;
+            try {
+              const axios = require('axios');
+              const db = require('../db/supabase');
+              const response = await axios.get(
+                `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`
+              );
+              const playerData = response.data;
+
+              const existingPlayer = await db.getPlayerByWomId(playerData.id);
+              if (existingPlayer) {
+                await db.updatePlayer(existingPlayer.id, {
+                  discord_id: userId,
+                  rsn: playerData.username,
+                  wom_id: playerData.id
+                });
+              } else {
+                await db.createPlayer({
+                  discord_id: userId,
+                  rsn: playerData.username,
+                  wom_id: playerData.id,
+                  clan_joined_at: null
+                }, 0);
+              }
+              dbSaved = true;
+              console.log(`[ForceVerify] Saved ${member.user.tag} to database (WOM ID: ${playerData.id})`);
+            } catch (error) {
+              console.error('[ForceVerify] WOM/DB save error:', error.message);
+            }
+
             // Update ticket name if in a ticket channel
             const ticketCategories = [
               config.TICKET_JOIN_CATEGORY_ID,
@@ -836,7 +877,9 @@ module.exports = {
                 `**RSN:** ${rsn}\n` +
                 `**Roles Updated:**\n` +
                 `• Removed: Unverified\n` +
-                `• Added: Verified`
+                `• Added: Verified\n` +
+                `**Nickname:** ${nicknameChanged ? `✅ Updated to ${rsn}` : '⚠️ Could not update'}\n` +
+                `**Database:** ${dbSaved ? '✅ Saved' : '⚠️ Could not save'}`
               )
               .setTimestamp();
 

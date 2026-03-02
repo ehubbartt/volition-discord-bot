@@ -2,6 +2,7 @@ const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Perm
 const config = require('../config.json');
 const features = require('../utils/features');
 const db = require('../db/supabase');
+const ticketManager = require('../utils/ticketManager');
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -88,6 +89,9 @@ module.exports = {
             });
 
             console.log(`[GuildMemberAdd] Created ticket channel: ${ticketChannel.name}`);
+
+            // Track ticket creator for force verify resolution
+            ticketManager.setTicketCreator(ticketChannel.id, member.id, member.user.tag);
 
             // Create welcome message with verify button
             const welcomeEmbed = new EmbedBuilder()

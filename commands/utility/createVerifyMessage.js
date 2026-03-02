@@ -128,7 +128,43 @@ async function handleVerifyButton (interaction, bypassCheck = false) {
 
 async function handleVerifySubmit (interaction) {
     const rsn = interaction.fields.getTextInputValue('rsn_input');
-    const targetUser = interaction.user;
+    let targetUser = interaction.user;
+
+    // If in a ticket channel, resolve the actual ticket owner (not necessarily the modal submitter)
+    const ticketCategories = [
+        config.TICKET_JOIN_CATEGORY_ID,
+        config.TICKET_GENERAL_CATEGORY_ID,
+        config.TICKET_SHOP_CATEGORY_ID
+    ];
+    if (ticketCategories.includes(interaction.channel?.parentId)) {
+        const ticketManager = require('../../utils/ticketManager');
+        const state = ticketManager.getTicketState(interaction.channel.id);
+
+        if (state.createdBy && state.createdBy !== interaction.user.id) {
+            // Admin submitted on behalf of the ticket owner — use ticket owner
+            try {
+                targetUser = await interaction.client.users.fetch(state.createdBy);
+                console.log(`[CreateVerify] Resolved ticket owner: ${targetUser.tag} (submitted by admin ${interaction.user.tag})`);
+            } catch (e) {
+                console.error('[CreateVerify] Could not fetch ticket owner, trying permission fallback');
+            }
+        }
+
+        // Fallback: find ticket owner from channel permission overwrites (works after bot restart)
+        if (targetUser.id === interaction.user.id && state.createdBy !== interaction.user.id) {
+            const userOverwrite = interaction.channel.permissionOverwrites.cache.find(
+                o => o.type === 1 && o.id !== interaction.client.user.id && o.id !== interaction.user.id
+            );
+            if (userOverwrite) {
+                try {
+                    targetUser = await interaction.client.users.fetch(userOverwrite.id);
+                    console.log(`[CreateVerify] Resolved ticket owner from permissions: ${targetUser.tag}`);
+                } catch (e) {
+                    console.error('[CreateVerify] Could not fetch user from permissions, using modal submitter');
+                }
+            }
+        }
+    }
 
     await interaction.deferReply({ ephemeral: false }); // PUBLIC response
 
@@ -304,7 +340,7 @@ async function handleVerifySubmit (interaction) {
 
         if (!meetsRequirements) {
             const forceVerifyButton = new ButtonBuilder()
-                .setCustomId(`force_verify_${interaction.user.id}_${actualRsn}`)
+                .setCustomId(`force_verify_${targetUser.id}_${actualRsn}`)
                 .setLabel('Force Verify (Admin Only)')
                 .setStyle(ButtonStyle.Danger)
                 .setEmoji('🔓');
