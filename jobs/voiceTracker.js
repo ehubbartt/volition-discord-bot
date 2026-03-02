@@ -59,8 +59,8 @@ async function checkVoiceChannels(client) {
     );
 
     const awardedUsers = new Set();
+    const allEligibleUsers = new Set(); // Track all eligible users across all channels
     let totalTicks = 0;
-    let peakConcurrent = 0;
 
     for (const [channelId, channel] of voiceChannels) {
         // Skip AFK channel
@@ -78,9 +78,9 @@ async function checkVoiceChannels(client) {
             return true;
         });
 
-        // Track peak for analytics
-        if (eligibleMembers.size > peakConcurrent) {
-            peakConcurrent = eligibleMembers.size;
+        // Track all eligible users across the entire server
+        for (const [memberId] of eligibleMembers) {
+            allEligibleUsers.add(memberId);
         }
 
         // Need minimum eligible users
@@ -106,6 +106,8 @@ async function checkVoiceChannels(client) {
             totalTicks++;
         }
     }
+
+    const peakConcurrent = allEligibleUsers.size;
 
     // Log daily metrics
     if (totalTicks > 0) {
