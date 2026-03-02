@@ -1,9 +1,13 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db/supabase');
+const clanLeavers = require('../../db/clanLeavers');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
@@ -103,6 +107,57 @@ async function fullClanSync (interaction, clanId) {
                     const expectedRankIndex = determineRankIndex(ehb);
                     newMembers.push({ rsn, womId, ehb, rankIndex: expectedRankIndex });
                     console.log(`[FullSync] Added new member: ${rsn} (${womId})`);
+
+                    // Check if this is a returning former member
+                    try {
+                        const formerMember = await clanLeavers.getFormerMemberByWomId(womId);
+                        if (formerMember) {
+                            const logChannel = interaction.client.channels.cache.get(config.TEST_CHANNEL_ID);
+                            if (logChannel) {
+                                const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+                                const leftDate = formerMember.left_at
+                                    ? `<t:${Math.floor(new Date(formerMember.left_at).getTime() / 1000)}:R>`
+                                    : 'Unknown';
+
+                                const returnEmbed = new EmbedBuilder()
+                                    .setColor('Orange')
+                                    .setTitle('🔄 Former Member Returning!')
+                                    .setDescription(
+                                        `**${rsn}** was previously in the clan and has rejoined via WOM sync.\n\n` +
+                                        `**Previous Data:**\n` +
+                                        `• RSN: ${formerMember.rsn}\n` +
+                                        `• VP Balance: ${formerMember.points || 0}\n` +
+                                        `• Lifetime VP: ${formerMember.lifetime_vp || 0}\n` +
+                                        `• Discord: ${formerMember.discord_id ? `<@${formerMember.discord_id}>` : 'Not linked'}\n` +
+                                        `• Left: ${leftDate}\n\n` +
+                                        `Use the button below to restore their VP.`
+                                    )
+                                    .setTimestamp();
+
+                                const restoreButton = new ButtonBuilder()
+                                    .setCustomId(`restore_vp_${formerMember.id}`)
+                                    .setLabel('Restore VP')
+                                    .setStyle(ButtonStyle.Success)
+                                    .setEmoji('💰');
+
+                                const dismissButton = new ButtonBuilder()
+                                    .setCustomId(`restore_vp_dismiss_${formerMember.id}`)
+                                    .setLabel('Dismiss')
+                                    .setStyle(ButtonStyle.Secondary);
+
+                                const row = new ActionRowBuilder().addComponents(restoreButton, dismissButton);
+
+                                await logChannel.send({
+                                    content: `${adminMentions}`,
+                                    embeds: [returnEmbed],
+                                    components: [row],
+                                    allowedMentions: { roles: config.ADMIN_ROLE_IDS }
+                                });
+                            }
+                        }
+                    } catch (leaverErr) {
+                        console.error(`[FullSync] Error checking former member ${rsn}:`, leaverErr.message);
+                    }
                 } catch (error) {
                     console.error(`[FullSync] Failed to add ${rsn}:`, error.message);
                 }
@@ -206,15 +261,17 @@ async function fullClanSync (interaction, clanId) {
                 `Step 4/4: Removing members who left...`
         });
 
-        // Remove players who are no longer in the clan
+        // Remove players who are no longer in the clan (archive first)
         for (const player of existingPlayers) {
             const womId = player.wom_id?.toString();
             if (womId && !clanMemberWomIds.has(womId)) {
                 try {
+                    // Archive player data before deletion
+                    await clanLeavers.archivePlayer(player);
                     await db.deletePlayerByWomId(womId);
                     membersRemoved++;
                     removedMembers.push({ rsn: player.rsn, womId });
-                    console.log(`[FullSync] Removed leaver: ${player.rsn} (${womId})`);
+                    console.log(`[FullSync] Archived & removed leaver: ${player.rsn} (${womId})`);
                 } catch (error) {
                     console.error(`[FullSync] Failed to remove ${player.rsn}:`, error.message);
                 }

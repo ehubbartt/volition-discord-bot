@@ -7,6 +7,7 @@ const {
 } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db/supabase');
+const clanLeavers = require('../../db/clanLeavers');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
@@ -84,6 +85,8 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 });
 
                 try {
+                    // Archive player data before deletion
+                    await clanLeavers.archivePlayer(existingPlayer);
                     await db.deletePlayerByWomId(existingPlayer.wom_id);
 
                     const removedEmbed = new EmbedBuilder()

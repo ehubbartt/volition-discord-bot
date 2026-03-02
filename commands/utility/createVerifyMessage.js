@@ -206,6 +206,60 @@ async function handleVerifySubmit (interaction) {
             return interaction.editReply({ content: null, embeds: [errorEmbed] });
         }
 
+        // Check if this is a returning former member
+        try {
+            const clanLeavers = require('../../db/clanLeavers');
+            const formerMember = await clanLeavers.getFormerMemberByWomId(womId.toString());
+            if (formerMember) {
+                const logChannel = interaction.client.channels.cache.get(config.TEST_CHANNEL_ID);
+                if (logChannel) {
+                    const { ActionRowBuilder: AR, ButtonBuilder: BB, ButtonStyle: BS } = require('discord.js');
+                    const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+                    const leftDate = formerMember.left_at
+                        ? `<t:${Math.floor(new Date(formerMember.left_at).getTime() / 1000)}:R>`
+                        : 'Unknown';
+
+                    const returnEmbed = new EmbedBuilder()
+                        .setColor('Orange')
+                        .setTitle('🔄 Former Member Returning!')
+                        .setDescription(
+                            `**${actualRsn}** was previously in the clan and is now verifying again.\n\n` +
+                            `**Previous Data:**\n` +
+                            `• RSN: ${formerMember.rsn}\n` +
+                            `• VP Balance: ${formerMember.points || 0}\n` +
+                            `• Lifetime VP: ${formerMember.lifetime_vp || 0}\n` +
+                            `• Discord: ${formerMember.discord_id ? `<@${formerMember.discord_id}>` : 'Not linked'}\n` +
+                            `• Left: ${leftDate}\n\n` +
+                            `Use the button below to restore their VP after they're verified.`
+                        )
+                        .setTimestamp();
+
+                    const restoreButton = new BB()
+                        .setCustomId(`restore_vp_${formerMember.id}`)
+                        .setLabel('Restore VP')
+                        .setStyle(BS.Success)
+                        .setEmoji('💰');
+
+                    const dismissButton = new BB()
+                        .setCustomId(`restore_vp_dismiss_${formerMember.id}`)
+                        .setLabel('Dismiss')
+                        .setStyle(BS.Secondary);
+
+                    const row = new AR().addComponents(restoreButton, dismissButton);
+
+                    await logChannel.send({
+                        content: `${adminMentions}`,
+                        embeds: [returnEmbed],
+                        components: [row],
+                        allowedMentions: { roles: config.ADMIN_ROLE_IDS }
+                    });
+                    console.log(`[CreateVerify] Notified admins: ${actualRsn} is a returning former member`);
+                }
+            }
+        } catch (leaverErr) {
+            console.error('[CreateVerify] Error checking former member:', leaverErr.message);
+        }
+
         const ehb = Math.round(playerData.ehb || 0);
         const ehp = Math.round(playerData.ehp || 0);
 
