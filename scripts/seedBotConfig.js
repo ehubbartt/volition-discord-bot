@@ -90,7 +90,8 @@ const DEFAULT_CONFIG = [
             excludeAfkChannel: true,
             excludedChannelIds: [],
             requireUnmuted: true,
-            requireUndeafened: true
+            requireUndeafened: true,
+            weeklyVPRewards: [15, 10, 5]
         },
         group: 'economy',
         description: 'Voice chat time tracking - awards Voice Minutes for active VC participation'

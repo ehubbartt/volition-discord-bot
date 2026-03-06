@@ -278,7 +278,8 @@ class HybridConfig {
             excludeAfkChannel: true,
             excludedChannelIds: [],
             requireUnmuted: true,
-            requireUndeafened: true
+            requireUndeafened: true,
+            weeklyVPRewards: [15, 10, 5]
         };
         return this.getConfigGroup('voice_tracking', localFallback);
     }

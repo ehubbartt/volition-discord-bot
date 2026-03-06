@@ -104,10 +104,25 @@ async function getDailyMetrics(startDate, endDate) {
     return data || [];
 }
 
+/**
+ * Get weekly voice leaderboard (top users by minutes in last N days)
+ * Uses the get_weekly_voice_leaderboard RPC function
+ */
+async function getWeeklyVoiceLeaderboard(days = 7, limit = 3) {
+    const { data, error } = await supabase.rpc('get_weekly_voice_leaderboard', {
+        p_days: days,
+        p_limit: limit
+    });
+
+    if (error) throw error;
+    return data || [];
+}
+
 module.exports = {
     logVoiceTick,
     logDailyMetrics,
     getUserVoiceStats,
     getVoiceLeaderboard,
-    getDailyMetrics
+    getDailyMetrics,
+    getWeeklyVoiceLeaderboard
 };
