@@ -401,13 +401,15 @@ async function awardWeeklyVoiceRewards() {
 
     if (awarded.length === 0) return;
 
-    // Post results to test channel
-    const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
-    if (testChannel) {
+    // Post results to payouts channel, @ing each user
+    const payoutChannel = client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+    if (payoutChannel) {
       const medals = ['🥇', '🥈', '🥉'];
       const lines = awarded.map(a =>
-        `${medals[a.place - 1] || '•'} <@${a.userId}> — **${a.time}** → +${a.vp} ${vpEmoji}`
+        `${medals[a.place - 1] || '•'} <@${a.userId}> — **${a.time}** in VC → **+${a.vp}** ${vpEmoji}`
       ).join('\n');
+
+      const mentions = awarded.map(a => `<@${a.userId}>`).join(' ');
 
       const embed = new EmbedBuilder()
         .setColor('Blue')
@@ -417,7 +419,7 @@ async function awardWeeklyVoiceRewards() {
         )
         .setTimestamp();
 
-      await testChannel.send({ embeds: [embed] });
+      await payoutChannel.send({ content: mentions, embeds: [embed] });
     }
 
     console.log(`[WeeklyVoiceRewards] Awarded VP to ${awarded.length} user(s)`);
