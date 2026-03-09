@@ -111,21 +111,30 @@ async function getDailyMetrics(startDate, endDate) {
 async function getWeeklyVoiceLeaderboard(days = 7, limit = 3) {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await supabase
-        .from('voice_activity_log')
-        .select('user_id, username, minutes_awarded')
-        .gte('created_at', since);
-
-    if (error) throw error;
-    if (!data || data.length === 0) return [];
-
-    // Aggregate minutes per user in JS
+    // Paginate through all rows to avoid Supabase's default 1000-row limit
     const totals = {};
-    for (const row of data) {
-        if (!totals[row.user_id]) {
-            totals[row.user_id] = { user_id: row.user_id, username: row.username, week_minutes: 0 };
+    const PAGE_SIZE = 1000;
+    let from = 0;
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('voice_activity_log')
+            .select('user_id, username, minutes_awarded')
+            .gte('created_at', since)
+            .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        for (const row of data) {
+            if (!totals[row.user_id]) {
+                totals[row.user_id] = { user_id: row.user_id, username: row.username, week_minutes: 0 };
+            }
+            totals[row.user_id].week_minutes += row.minutes_awarded;
         }
-        totals[row.user_id].week_minutes += row.minutes_awarded;
+
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
     }
 
     return Object.values(totals)
