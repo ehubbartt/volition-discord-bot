@@ -106,16 +106,31 @@ async function getDailyMetrics(startDate, endDate) {
 
 /**
  * Get weekly voice leaderboard (top users by minutes in last N days)
- * Uses the get_weekly_voice_leaderboard RPC function
+ * Aggregates directly from voice_activity_log
  */
 async function getWeeklyVoiceLeaderboard(days = 7, limit = 3) {
-    const { data, error } = await supabase.rpc('get_weekly_voice_leaderboard', {
-        p_days: days,
-        p_limit: limit
-    });
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+        .from('voice_activity_log')
+        .select('user_id, username, minutes_awarded')
+        .gte('created_at', since);
 
     if (error) throw error;
-    return data || [];
+    if (!data || data.length === 0) return [];
+
+    // Aggregate minutes per user in JS
+    const totals = {};
+    for (const row of data) {
+        if (!totals[row.user_id]) {
+            totals[row.user_id] = { user_id: row.user_id, username: row.username, week_minutes: 0 };
+        }
+        totals[row.user_id].week_minutes += row.minutes_awarded;
+    }
+
+    return Object.values(totals)
+        .sort((a, b) => b.week_minutes - a.week_minutes)
+        .slice(0, limit);
 }
 
 module.exports = {
