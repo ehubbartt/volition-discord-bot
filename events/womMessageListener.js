@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../db/supabase');
+const clanLeavers = require('../db/clanLeavers');
 const config = require('../config.json');
 const {
     getAllRoleIds,
@@ -599,6 +600,14 @@ async function processMemberLeave (rsn, originalMessage) {
             console.log(`  - RSN: ${existingPlayer.rsn}`);
             console.log(`  - Discord ID: ${existingPlayer.discord_id || 'Not linked'}`);
             console.log(`  - VP Balance: ${existingPlayer.points || 0}`);
+
+            // Archive player before removing
+            try {
+                await clanLeavers.archivePlayer(existingPlayer);
+                console.log(`[LEAVE] ✅ Archived to clan_leavers`);
+            } catch (error) {
+                console.error(`[LEAVE] ❌ Error archiving player:`, error.message);
+            }
 
             // Remove from database
             try {
