@@ -7,6 +7,9 @@ const gamificationAnalytics = require('../db/gamification_analytics');
 const walletDb = require('../db/wallet');
 const hybridConfig = require('../utils/hybridConfig');
 
+// Per-user spin lock to prevent race conditions from rapid button clicks across multiple messages
+const spinLocks = new Set();
+
 module.exports = {
   name: Events.InteractionCreate,
 
@@ -392,9 +395,6 @@ module.exports = {
         new ButtonBuilder().setCustomId('lootcrate_spin_paid').setLabel('Open for 5 VP').setStyle(ButtonStyle.Primary)
       );
     }
-
-    // Per-user spin lock to prevent race conditions from rapid button clicks
-    const spinLocks = new Set();
 
     async function handleLootInteraction (interaction, free = false) {
       const userId = interaction.user.id;
