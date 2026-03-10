@@ -1102,6 +1102,14 @@ module.exports = {
         }
       }
 
+      if (interaction.customId === 'dink_dynamic_url') {
+        const dinkCommand = require('../commands/utility/dink.js');
+        if (dinkCommand?.handleDynamicUrl) {
+          try { await dinkCommand.handleDynamicUrl(interaction); }
+          catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }); }
+        }
+      }
+
       if (interaction.customId === 'dink_copy_config') {
         const dinkCommand = require('../commands/utility/dink.js');
         if (dinkCommand?.handleCopyConfig) {

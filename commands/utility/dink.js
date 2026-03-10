@@ -1,6 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,45 +10,29 @@ module.exports = {
             .setColor(0xFFF400)
             .setTitle('Dink Plugin Settings')
             .setDescription(
-                'Import the clan Dink plugin settings to automatically send your drops, pets, and collection log entries to the right Discord channels.\n\n' +
-                '**How to import:**\n' +
-                '1. Click the button below to copy the config\n' +
-                '2. Open RuneLite\n' +
-                '3. Type `::dinkimport` in the game chat\n' +
-                '4. The settings will be imported automatically\n' +
-                '5. Feel free to change your messages in the Dink plugin settings for overrides!'
+                'Set up the Dink plugin to automatically send your drops, pets, and collection log entries to the right Discord channels.\n\n' +
+                '**How to set up:**\n' +
+                '1. Click the button below to get the config URL\n' +
+                '2. In RuneLite, open the **Dink** plugin settings\n' +
+                '3. Go to **Advanced Settings** and paste it into **Dynamic Config URL**'
             )
             .setFooter({ text: 'Requires the Dink plugin installed in RuneLite' });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('dink_copy_config')
-                .setLabel('Copy Dink Config')
+                .setCustomId('dink_dynamic_url')
+                .setLabel('Get Config URL')
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji('📋')
+                .setEmoji('🔗')
         );
 
         await interaction.reply({ embeds: [embed], components: [row] });
     },
 
-    async handleCopyConfig (interaction) {
-        try {
-            const configPath = path.join(__dirname, '../../dinkconfig.json');
-            const configData = fs.readFileSync(configPath, 'utf-8');
-
-            const attachment = new AttachmentBuilder(Buffer.from(configData), { name: 'dinkconfig.json' });
-
-            await interaction.reply({
-                content: '**Copy the contents of the file below, then type `::dinkimport` in RuneLite game chat to import the settings.**',
-                files: [attachment],
-                ephemeral: true
-            });
-        } catch (error) {
-            console.error('Error reading dinkconfig.json:', error);
-            await interaction.reply({
-                content: '❌ Failed to load the Dink config. Please contact an admin.',
-                ephemeral: true
-            });
-        }
+    async handleDynamicUrl (interaction) {
+        await interaction.reply({
+            content: 'Paste this into **Dynamic Config URL** under Dink\'s Advanced Settings:\n```\nhttps://raw.githubusercontent.com/ehubbartt/volition-discord-bot/main/dinkconfig.json\n```',
+            ephemeral: true
+        });
     },
 };
