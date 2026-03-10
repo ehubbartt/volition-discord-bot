@@ -393,7 +393,23 @@ module.exports = {
       );
     }
 
+    // Per-user spin lock to prevent race conditions from rapid button clicks
+    const spinLocks = new Set();
+
     async function handleLootInteraction (interaction, free = false) {
+      const userId = interaction.user.id;
+      if (spinLocks.has(userId)) {
+        return interaction.reply({ content: 'Please wait for your current spin to finish!', ephemeral: true });
+      }
+      spinLocks.add(userId);
+      try {
+        await _handleLootInteraction(interaction, free);
+      } finally {
+        spinLocks.delete(userId);
+      }
+    }
+
+    async function _handleLootInteraction (interaction, free = false) {
       const walletPrices = await hybridConfig.getWalletPrices();
       const lootTables = await hybridConfig.getLootTables();
       // Allow items based on config for free crates, always for paid; roles only on paid
