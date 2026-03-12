@@ -29,7 +29,7 @@
   "lootEnabled": true,
   "petNotifMessage": "%USERNAME% %GAME_MESSAGE%",
   "nameFilterMode": "DENY",
-  "lootRarityThreshold": 1500,
+  "lootRarityThreshold": 0,
   "maxRetries": 3,
   "speedrunPBOnly": true,
   "embedFooterText": "Powered by Dink",
