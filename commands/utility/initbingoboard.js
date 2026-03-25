@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const bingoBoardService = require('../../services/bingoBoard');
 const bingoConfigManager = require('../../utils/bingoConfigManager');
+const { isAdmin } = require('../../utils/permissions');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,10 +10,12 @@ const BINGO_CONFIG_PATH = path.join(__dirname, '../../config/bingoConfig.json');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('initbingoboard')
-        .setDescription('Initialize the bingo event board in this channel')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDescription('Initialize the bingo event board in this channel'),
 
     async execute(interaction) {
+        if (!isAdmin(interaction.member)) {
+            return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+        }
         await interaction.deferReply({ ephemeral: true });
 
         try {

@@ -63,8 +63,8 @@ class BingoBoardService {
             }
 
             const compositeOps = [];
-            const circleSize = 32;
-            const spacing = 36;
+            const circleSize = 48;
+            const spacing = 52;
 
             // For each tile, draw completion markers for teams that completed it
             for (const tile of bingoTiles) {
@@ -94,7 +94,7 @@ class BingoBoardService {
                     const svg = `
                         <svg width="${circleSize}" height="${circleSize}" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="${circleSize / 2}" cy="${circleSize / 2}" r="${circleSize / 2 - 2}" fill="${color}" stroke="#FFFFFF" stroke-width="2"/>
-                            <text x="${circleSize / 2}" y="${circleSize / 2 + 6}" font-size="18" font-weight="bold" font-family="Liberation Sans, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="1" paint-order="stroke">${teamIndex}</text>
+                            <text x="${circleSize / 2}" y="${circleSize / 2 + 8}" font-size="26" font-weight="bold" font-family="Liberation Sans, sans-serif" fill="#FFFFFF" text-anchor="middle" stroke="#000000" stroke-width="1" paint-order="stroke">${teamIndex}</text>
                         </svg>
                     `;
 
