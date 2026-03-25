@@ -89,6 +89,13 @@
       "warnings": true,
       "ban": true
     },
+    "bingoEvent": {
+      "bingosubmit": true,
+      "bingoprogress": true,
+      "bingoleaderboard": true,
+      "initbingoboard": true,
+      "adminbingo": true
+    },
     "tileEvent": {
       "addplayer": true,
       "initboard": true,
