@@ -35,7 +35,7 @@ module.exports = {
             .setName('setprogress')
             .setDescription('Set progress for a team\'s tile')
             .addStringOption(opt => opt.setName('team').setDescription('Team name').setRequired(true).setAutocomplete(true))
-            .addIntegerOption(opt => opt.setName('tile').setDescription('Tile number (1-26)').setRequired(true).setMinValue(1).setMaxValue(26))
+            .addStringOption(opt => opt.setName('tile').setDescription('Tile to set progress for').setRequired(true).setAutocomplete(true))
             .addIntegerOption(opt => opt.setName('quantity').setDescription('Set current quantity').setRequired(true).setMinValue(0))
         )
         .addSubcommand(sub => sub
@@ -221,7 +221,7 @@ module.exports = {
 
         try {
             const teamName = interaction.options.getString('team');
-            const tileNumber = interaction.options.getInteger('tile');
+            const tileNumber = parseInt(interaction.options.getString('tile'));
             const quantity = interaction.options.getInteger('quantity');
 
             const team = await bingoDb.getTeamByName(teamName);
