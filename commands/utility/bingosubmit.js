@@ -73,6 +73,10 @@ module.exports = {
             const tileNumber = parseInt(interaction.options.getString('tile'));
             const messageLink = interaction.options.getString('proof');
 
+            if (messageLink.includes('attachments')) {
+                return interaction.editReply({ content: 'Please click \'copy message link\' not \'copy image\'.' });
+            }
+
             if (!messageLink.includes('discord') || !messageLink.includes('channels/')) {
                 return interaction.editReply({ content: 'Please provide a valid Discord message link.' });
             }
