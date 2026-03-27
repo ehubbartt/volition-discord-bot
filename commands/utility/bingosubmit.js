@@ -71,7 +71,7 @@ module.exports = {
             const tileNumber = parseInt(interaction.options.getString('tile'));
             const messageLink = interaction.options.getString('proof');
 
-            if (!messageLink.includes('discord.com/channels/')) {
+            if (!messageLink.includes('discord') || !messageLink.includes('channels/')) {
                 return interaction.editReply({ content: 'Please provide a valid Discord message link.' });
             }
 
