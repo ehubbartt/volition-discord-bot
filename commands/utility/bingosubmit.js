@@ -67,6 +67,8 @@ module.exports = {
 
         await interaction.deferReply();
 
+        const BINGO_ANNOUNCEMENTS_CHANNEL = '1486021073710612613';
+
         try {
             const tileNumber = parseInt(interaction.options.getString('tile'));
             const messageLink = interaction.options.getString('proof');
@@ -116,6 +118,28 @@ module.exports = {
                         value: 'Congratulations! Your team has completed all bingo tiles!',
                         inline: false
                     });
+                }
+
+                // Check if this team just took 1st place
+                const allTeams = await bingoDb.getAllTeams();
+                const sorted = [...allTeams].sort((a, b) => b.completed_tiles_count - a.completed_tiles_count);
+                const isFirst = sorted[0].id === team.id;
+                const wasTied = sorted.length > 1 && sorted[0].completed_tiles_count === sorted[1].completed_tiles_count;
+
+                if (isFirst && !wasTied && updatedTeam.completed_tiles_count > 1) {
+                    try {
+                        const announceChannel = await interaction.client.channels.fetch(BINGO_ANNOUNCEMENTS_CHANNEL);
+                        if (announceChannel) {
+                            const announceEmbed = new EmbedBuilder()
+                                .setColor('Gold')
+                                .setTitle('New Bingo Leader!')
+                                .setDescription(`**${updatedTeam.long_name || updatedTeam.team_name}** has taken the lead with **${updatedTeam.completed_tiles_count}/${bingoDb.TOTAL_TILES}** tiles completed!`)
+                                .setTimestamp();
+                            await announceChannel.send({ embeds: [announceEmbed] });
+                        }
+                    } catch (err) {
+                        console.error('[BingoSubmit] Failed to send lead announcement:', err);
+                    }
                 }
             }
 
