@@ -124,13 +124,15 @@ module.exports = {
                     });
                 }
 
-                // Check if this team just took 1st place
+                // Check if this team just took 1st place (wasn't 1st before this tile)
                 const allTeams = await bingoDb.getAllTeams();
                 const sorted = [...allTeams].sort((a, b) => b.completed_tiles_count - a.completed_tiles_count);
                 const isFirst = sorted[0].id === team.id;
-                const wasTied = sorted.length > 1 && sorted[0].completed_tiles_count === sorted[1].completed_tiles_count;
+                const secondPlace = sorted.length > 1 ? sorted[1].completed_tiles_count : 0;
+                // They just took the lead if they're 1st and were tied or behind before this tile
+                const justTookLead = isFirst && (updatedTeam.completed_tiles_count - 1) <= secondPlace;
 
-                if (isFirst && !wasTied && updatedTeam.completed_tiles_count > 1) {
+                if (justTookLead && updatedTeam.completed_tiles_count > 1) {
                     try {
                         const announceChannel = await interaction.client.channels.fetch(BINGO_ANNOUNCEMENTS_CHANNEL);
                         if (announceChannel) {
