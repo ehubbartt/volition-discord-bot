@@ -128,18 +128,20 @@ module.exports = {
                 const allTeams = await bingoDb.getAllTeams();
                 const sorted = [...allTeams].sort((a, b) => b.completed_tiles_count - a.completed_tiles_count);
                 const isFirst = sorted[0].id === team.id;
-                const secondPlace = sorted.length > 1 ? sorted[1].completed_tiles_count : 0;
+                const secondPlaceTeam = sorted.length > 1 ? sorted[1] : null;
+                const secondPlaceCount = secondPlaceTeam ? secondPlaceTeam.completed_tiles_count : 0;
                 // They just took the lead if they're 1st and were tied or behind before this tile
-                const justTookLead = isFirst && (updatedTeam.completed_tiles_count - 1) <= secondPlace;
+                const justTookLead = isFirst && (updatedTeam.completed_tiles_count - 1) <= secondPlaceCount;
 
                 if (justTookLead && updatedTeam.completed_tiles_count > 1) {
                     try {
                         const announceChannel = await interaction.client.channels.fetch(BINGO_ANNOUNCEMENTS_CHANNEL);
                         if (announceChannel) {
+                            const overtakenName = secondPlaceTeam ? (secondPlaceTeam.long_name || secondPlaceTeam.team_name) : 'the competition';
                             const announceEmbed = new EmbedBuilder()
                                 .setColor('Gold')
                                 .setTitle('New Bingo Leader!')
-                                .setDescription(`**${updatedTeam.long_name || updatedTeam.team_name}** has taken the lead with **${updatedTeam.completed_tiles_count}/${bingoDb.TOTAL_TILES}** tiles completed!`)
+                                .setDescription(`**${updatedTeam.long_name || updatedTeam.team_name}** has overtaken **${overtakenName}** to take the lead with **${updatedTeam.completed_tiles_count}/${bingoDb.TOTAL_TILES}** tiles completed!`)
                                 .setTimestamp();
                             await announceChannel.send({ embeds: [announceEmbed] });
                         }
