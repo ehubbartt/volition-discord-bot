@@ -80,16 +80,23 @@ class BingoBoardService {
 
                 if (completedTeams.length === 0) continue;
 
-                // Position markers in a row below the tile coordinate
-                const totalWidth = completedTeams.length * spacing;
-                const startX = coord.x - totalWidth / 2 + spacing / 2;
+                // Position markers in a grid centered on the coordinate
+                const cols = completedTeams.length <= 2 ? completedTeams.length : Math.ceil(completedTeams.length / 2);
+                const rows = Math.ceil(completedTeams.length / cols);
+                const gridWidth = cols * spacing;
+                const gridHeight = rows * spacing;
 
                 for (let i = 0; i < completedTeams.length; i++) {
                     const team = completedTeams[i];
                     const teamIndex = sortedTeams.indexOf(team) + 1;
                     const color = TEAM_COLORS[teamIndex] || '#888888';
-                    const x = Math.round(startX + i * spacing);
-                    const y = coord.y + 30; // Below the tile coordinate
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    // Center the last row if it has fewer items
+                    const itemsInRow = row === rows - 1 ? completedTeams.length - row * cols : cols;
+                    const rowWidth = itemsInRow * spacing;
+                    const x = Math.round(coord.x - rowWidth / 2 + spacing / 2 + col * spacing);
+                    const y = Math.round(coord.y - gridHeight / 2 + spacing / 2 + row * spacing);
 
                     const svg = `
                         <svg width="${circleSize}" height="${circleSize}" xmlns="http://www.w3.org/2000/svg">
