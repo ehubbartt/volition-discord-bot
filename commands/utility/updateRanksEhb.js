@@ -20,6 +20,7 @@ const {
     getRankIndexByWomRole,
     standardWomRoles
 } = require('../../utils/ranks');
+const { broadcastRankUps } = require('../../utils/rankAnnouncements');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -291,49 +292,7 @@ module.exports = {
       }
 
       // Broadcast rank-ups to #rank-ups channel
-      if (rankUpAnnouncements.length > 0) {
-        try {
-          const rankUpsChannel = await guild.channels.fetch(config.RANK_UPS_CHANNEL_ID);
-
-          if (rankUpsChannel) {
-            for (const announcement of rankUpAnnouncements) {
-              const { member, rsn, ehb, oldRankIndex, newRankIndex, isInitial } = announcement;
-
-              const embed = new EmbedBuilder()
-                .setColor('Gold')
-                .setTitle('🎉 Rank Up!')
-                .setDescription(
-                  isInitial
-                    ? `Congratulations <@${member.id}>! You've been assigned your first rank!`
-                    : `Congratulations <@${member.id}>! You've ranked up!`
-                )
-                .addFields(
-                  { name: 'RSN', value: rsn, inline: true },
-                  { name: 'EHB', value: ehb.toString(), inline: true },
-                  { name: '\u200B', value: '\u200B', inline: true }
-                )
-                .setThumbnail(member.user.displayAvatarURL())
-                .setTimestamp();
-
-              if (!isInitial) {
-                embed.addFields(
-                  { name: 'Previous Rank', value: formatRank(guild, oldRankIndex), inline: true },
-                  { name: 'New Rank', value: formatRank(guild, newRankIndex), inline: true }
-                );
-              } else {
-                embed.addFields(
-                  { name: 'Rank', value: formatRank(guild, newRankIndex), inline: false }
-                );
-              }
-
-              await rankUpsChannel.send({ embeds: [embed] });
-            }
-            console.log(`[UpdateRanks] 📢 Broadcast ${rankUpAnnouncements.length} rank-up(s) to #rank-ups`);
-          }
-        } catch (error) {
-          console.error('[UpdateRanks] Error broadcasting to rank-ups channel:', error);
-        }
-      }
+      await broadcastRankUps(guild, rankUpAnnouncements, '[UpdateRanks]');
 
 
     } catch (error) {

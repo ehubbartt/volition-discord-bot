@@ -236,6 +236,7 @@ async function runDailyRankUpdate() {
 
     let mismatchOutput = [];
     let userMentions = [];
+    let rankUpAnnouncements = [];
 
     for (const discordId in discordIdToRsnMap) {
       const member = allMembers.get(discordId);
@@ -274,10 +275,22 @@ async function runDailyRankUpdate() {
               mismatchOutput.push(
                 `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, calculatedRankIndex)}`
               );
+              rankUpAnnouncements.push({
+                member, rsn, ehb,
+                oldRankIndex: currentRankIndex,
+                newRankIndex: calculatedRankIndex,
+                isInitial: true
+              });
             } else {
               mismatchOutput.push(
                 `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, currentRankIndex)} - Upgraded to: ${formatRank(guild, calculatedRankIndex)}`
               );
+              rankUpAnnouncements.push({
+                member, rsn, ehb,
+                oldRankIndex: currentRankIndex,
+                newRankIndex: calculatedRankIndex,
+                isInitial: false
+              });
             }
 
             console.log(`[Daily Rank Update] ⬆️ Upgraded rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(guild, currentRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (${ehb} EHB)`);
@@ -331,6 +344,10 @@ async function runDailyRankUpdate() {
     } else if (testChannel) {
       await testChannel.send(`✅ **[Auto-Run]** Daily rank update completed at ${new Date().toLocaleString()}\nNo ranks were updated.`);
     }
+
+    // Broadcast rank-ups to #rank-ups channel
+    const { broadcastRankUps } = require('./utils/rankAnnouncements');
+    await broadcastRankUps(guild, rankUpAnnouncements, '[Daily Rank Update]');
 
     console.log(`[Daily Rank Update] Completed. ${mismatchOutput.length} rank(s) updated.`);
 
