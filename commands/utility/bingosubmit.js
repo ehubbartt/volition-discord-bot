@@ -14,9 +14,9 @@ module.exports = {
                 .setRequired(true)
                 .setAutocomplete(true)
         )
-        .addStringOption(option =>
+        .addAttachmentOption(option =>
             option.setName('proof')
-                .setDescription('Discord message link to image proof')
+                .setDescription('Screenshot proof of the drop')
                 .setRequired(true)
         ),
 
@@ -71,15 +71,13 @@ module.exports = {
 
         try {
             const tileNumber = parseInt(interaction.options.getString('tile'));
-            const messageLink = interaction.options.getString('proof');
+            const attachment = interaction.options.getAttachment('proof');
 
-            if (messageLink.includes('attachments')) {
-                return interaction.editReply({ content: 'Please click \'copy message link\' not \'copy image\'.' });
+            if (!attachment.contentType || !attachment.contentType.startsWith('image/')) {
+                return interaction.editReply({ content: 'Please attach an image file (png, jpg, etc).' });
             }
 
-            if (!messageLink.includes('discord') || !messageLink.includes('channels/')) {
-                return interaction.editReply({ content: 'Please provide a valid Discord message link.' });
-            }
+            const proofUrl = attachment.url;
 
             const tileData = bingoTiles.find(t => t.tile_number === tileNumber);
             if (!tileData) {
@@ -98,7 +96,7 @@ module.exports = {
             // Increment by 1 (each submission = 1 drop instance)
             const updated = await bingoDb.incrementProgress(team.id, tileNumber);
 
-            await bingoDb.logSubmission(team.id, interaction.user.id, tileNumber, tileData.item_name, messageLink);
+            await bingoDb.logSubmission(team.id, interaction.user.id, tileNumber, tileData.item_name, proofUrl);
 
             const embed = new EmbedBuilder()
                 .setColor(updated.is_completed ? 'Gold' : 'Green')
@@ -107,9 +105,9 @@ module.exports = {
                     { name: 'Team', value: team.long_name || team.team_name, inline: true },
                     { name: 'Tile', value: `#${tileNumber}`, inline: true },
                     { name: 'Item', value: `${tileData.item_name} from ${tileData.source_name}`, inline: true },
-                    { name: 'Progress', value: `${updated.current_quantity}/${updated.required_quantity}`, inline: true },
-                    { name: 'Proof', value: `[Link](${messageLink})`, inline: true }
+                    { name: 'Progress', value: `${updated.current_quantity}/${updated.required_quantity}`, inline: true }
                 )
+                .setImage(proofUrl)
                 .setTimestamp();
 
             if (updated.is_completed) {
