@@ -8,6 +8,7 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require('discord.js');
+const chrono = require('chrono-node');
 const config = require('../config.json');
 const bosses = require('../config/bosses.json');
 const lfgDb = require('../db/lfg');
@@ -27,7 +28,8 @@ const TIME_OPTIONS = [
   { value: '2hr',     label: 'In 2 hours',      description: 'Starting in about 2 hours',       offsetMs: 2 * 60 * 60 * 1000, expiryMs: 4 * 60 * 60 * 1000 },
   { value: '3hr',     label: 'In 3 hours',      description: 'Starting in about 3 hours',       offsetMs: 3 * 60 * 60 * 1000, expiryMs: 5 * 60 * 60 * 1000 },
   { value: '4hr',     label: 'In 4 hours',      description: 'Starting in about 4 hours',       offsetMs: 4 * 60 * 60 * 1000, expiryMs: 6 * 60 * 60 * 1000 },
-  { value: 'flexible', label: 'Flexible',       description: "No set time — whenever we're ready", offsetMs: 0,              expiryMs: 8 * 60 * 60 * 1000 }
+  { value: 'flexible', label: 'Flexible',       description: "No set time — whenever we're ready", offsetMs: 0,              expiryMs: 8 * 60 * 60 * 1000 },
+  { value: 'custom',   label: 'Custom time...',  description: 'Type a specific date/time (e.g. tomorrow 8pm EST)', offsetMs: 0,  expiryMs: 0 }
 ];
 
 // Experience options for the select menu
@@ -56,22 +58,40 @@ function formatExperience(level) {
 
 /**
  * Get the time display string for a party
+ * For preset options, show the label. For custom times, show a Discord timestamp.
+ */
+/**
+ * Format time for display in embeds.
+ * Preset values like "now", "1hr" show their label.
+ * ISO date strings (from custom input) show as Discord timestamps.
  */
 function formatTimeDisplay(timeValue) {
   if (!timeValue) return 'Flexible';
+
+  // Check if it's an ISO date string (custom time)
+  const asDate = new Date(timeValue);
+  if (!isNaN(asDate.getTime()) && timeValue.includes('-')) {
+    const unix = Math.floor(asDate.getTime() / 1000);
+    return `<t:${unix}:F> (<t:${unix}:R>)`;
+  }
+
   const option = TIME_OPTIONS.find(t => t.value === timeValue);
   return option ? option.label : timeValue;
 }
 
 /**
  * Calculate expiry timestamp from a time option value
+ * For custom times, expire 2 hours after the scheduled time.
  */
-function calculateExpiry(timeValue) {
+function calculateExpiry(timeValue, customTimestamp) {
+  if (timeValue === 'custom' && customTimestamp) {
+    const scheduledMs = new Date(customTimestamp).getTime();
+    return new Date(scheduledMs + 2 * 60 * 60 * 1000);
+  }
   const option = TIME_OPTIONS.find(t => t.value === timeValue);
-  if (option) {
+  if (option && option.expiryMs > 0) {
     return new Date(Date.now() + option.expiryMs);
   }
-  // Fallback: 8 hours
   return new Date(Date.now() + 8 * 60 * 60 * 1000);
 }
 
@@ -442,7 +462,28 @@ async function handleTimeSelect(interaction) {
       return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
     }
 
-    pending.time = interaction.values[0];
+    const selected = interaction.values[0];
+
+    // If "Custom time" selected, show a modal for text input
+    if (selected === 'custom') {
+      const modal = new ModalBuilder()
+        .setCustomId('lfg_custom_time_modal')
+        .setTitle('Custom Time');
+
+      const timeInput = new TextInputBuilder()
+        .setCustomId('lfg_custom_time')
+        .setLabel('When is the event?')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('e.g. tomorrow 8pm EST, Saturday 3pm, April 10 7:30pm')
+        .setRequired(true)
+        .setMaxLength(60);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(timeInput));
+      return interaction.showModal(modal);
+    }
+
+    pending.time = selected;
+    pending.customTimestamp = null;
     const timeOption = TIME_OPTIONS.find(t => t.value === pending.time);
     const expOption = pending.experience ? EXPERIENCE_OPTIONS.find(o => o.value === pending.experience) : null;
 
@@ -456,6 +497,54 @@ async function handleTimeSelect(interaction) {
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling time select:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
+ * Handle custom time modal submission
+ */
+async function handleCustomTimeModal(interaction) {
+  try {
+    const pending = pendingParties.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
+    }
+
+    const rawInput = interaction.fields.getTextInputValue('lfg_custom_time');
+    const parsed = chrono.parseDate(rawInput, new Date(), { forwardDate: true });
+
+    if (!parsed) {
+      return interaction.reply({
+        content: `Couldn't understand "${rawInput}". Try something like **tomorrow 8pm EST**, **Saturday 3pm**, or **April 10 7:30pm**.`,
+        ephemeral: true
+      });
+    }
+
+    // Don't allow times in the past
+    if (parsed.getTime() < Date.now() - 5 * 60 * 1000) {
+      return interaction.reply({
+        content: 'That time is in the past. Please pick a future time.',
+        ephemeral: true
+      });
+    }
+
+    pending.time = 'custom';
+    pending.customTimestamp = parsed.toISOString();
+
+    const unix = Math.floor(parsed.getTime() / 1000);
+    const expOption = pending.experience ? EXPERIENCE_OPTIONS.find(o => o.value === pending.experience) : null;
+
+    let status = `**${bosses[pending.bossKey].name}** — Set up your party details:\n\n`;
+    status += expOption ? `> Group type: ${expOption.emoji} **${expOption.label}**\n` : '> Group type: *not selected yet*\n';
+    status += `> Time: <t:${unix}:F> (<t:${unix}:R>)`;
+
+    const msg = buildOptionsMessage(pending.bossKey);
+    msg.content = status;
+
+    await interaction.update(msg);
+  } catch (error) {
+    console.error('[LFG] Error handling custom time modal:', error);
     await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
   }
 }
@@ -530,10 +619,14 @@ async function handleModalSubmit(interaction) {
 
     const experienceLevel = pending.experience;
     const timeValue = pending.time;
-    const expiresAt = calculateExpiry(timeValue);
+    const customTimestamp = pending.customTimestamp || null;
+    const expiresAt = calculateExpiry(timeValue, customTimestamp);
 
     // Clean up pending state
     pendingParties.delete(interaction.user.id);
+
+    // Store the custom timestamp in scheduled_time for display, or the preset value
+    const scheduledTime = timeValue === 'custom' ? customTimestamp : timeValue;
 
     // Build initial embed with creator as first member
     const partyData = {
@@ -541,7 +634,7 @@ async function handleModalSubmit(interaction) {
       boss_key: bossKey,
       group_size: groupSize,
       experience_level: experienceLevel,
-      scheduled_time: timeValue,
+      scheduled_time: scheduledTime,
       notes,
       message_id: 'pending',
       channel_id: interaction.channelId,
@@ -563,7 +656,7 @@ async function handleModalSubmit(interaction) {
       bossKey,
       groupSize,
       experienceLevel,
-      scheduledTime: timeValue,
+      scheduledTime: scheduledTime,
       notes,
       messageId: message.id,
       channelId: interaction.channelId,
@@ -739,6 +832,7 @@ module.exports = {
   handleBossSelect,
   handleExpSelect,
   handleTimeSelect,
+  handleCustomTimeModal,
   handleNext,
   handleModalSubmit,
   handleJoin,

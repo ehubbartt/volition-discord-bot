@@ -676,6 +676,11 @@ module.exports = {
         return transcriptHandler.handleModal(interaction);
       }
 
+      // LFG custom time modal
+      if (interaction.customId === 'lfg_custom_time_modal') {
+        return lfgHandler.handleCustomTimeModal(interaction);
+      }
+
       // LFG party creation modal
       if (interaction.customId.startsWith('lfg_modal_')) {
         return lfgHandler.handleModalSubmit(interaction);
