@@ -8,7 +8,7 @@ const { formatRank } = require('./ranks');
  * @param {Array} announcements - Array of { member, rsn, ehb, oldRankIndex, newRankIndex, isInitial }
  * @param {string} logPrefix - Prefix for console logs (e.g. '[UpdateRanks]' or '[Daily Rank Update]')
  */
-async function broadcastRankUps(guild, announcements, logPrefix = '[RankAnnouncements]') {
+async function broadcastRankUps (guild, announcements, logPrefix = '[RankAnnouncements]') {
     if (announcements.length === 0) return;
 
     try {
@@ -48,7 +48,7 @@ async function broadcastRankUps(guild, announcements, logPrefix = '[RankAnnounce
                 );
             }
 
-            await rankUpsChannel.send({ content: `<@${member.id}>`, embeds: [embed] });
+            await rankUpsChannel.send({ embeds: [embed] });
         }
 
         console.log(`${logPrefix} Broadcast ${announcements.length} rank-up(s) to #rank-ups`);

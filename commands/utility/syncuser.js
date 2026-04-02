@@ -11,14 +11,10 @@ const clanLeavers = require('../../db/clanLeavers');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
-    getAllRoleIds,
     formatRank,
     getRankName,
-    determineRankIndex,
-    isRankUpgrade,
-    getRankIndexByRoleId,
-    getRoleIdByIndex,
-    getMemberRankIndex
+    applyRank,
+    getWomRole
 } = require('../../utils/ranks');
 
 module.exports = {
@@ -209,46 +205,19 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         // Fetch member for role assignment
         const member = await interaction.guild.members.fetch(targetUser.id);
 
-        const rankIndex = determineRankIndex(ehb);
-        let rankAssigned = false;
-        let rankError = null;
+        const rankResult = await applyRank({ ehb, member });
+        const rankIndex = rankResult.newRankIndex;
+        const rankAssigned = !rankResult.error;
+        const rankError = rankResult.error;
 
-        try {
-            // Get current rank index
-            const currentRankIndex = getMemberRankIndex(member);
-            const allRankRoleIds = getAllRoleIds();
-            const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
-
-            // Update rank if it doesn't match (both upgrades and downgrades)
-            if (currentRankIndex !== rankIndex) {
-                const isUpgrade = isRankUpgrade(currentRankIndex, rankIndex);
-
-                // Remove the current rank role
-                if (currentRankRoleObj) {
-                    await member.roles.remove(currentRankRoleObj);
-                    console.log(`[SyncUser] Removed old rank role: ${currentRankRoleObj.name}`);
-                }
-
-                // Add new rank role if it exists
-                const newRoleId = getRoleIdByIndex(rankIndex);
-                if (newRoleId) {
-                    await member.roles.add(newRoleId);
-                    rankAssigned = true;
-                    const arrow = isUpgrade ? '⬆️' : '⬇️';
-                    const action = isUpgrade ? 'Upgraded' : 'Downgraded';
-                    console.log(`[SyncUser] ${arrow} ${action} rank for ${targetUser.tag}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, rankIndex)}`);
-                } else {
-                    rankError = 'Role ID not configured in bot';
-                    console.warn(`[SyncUser] Role ID not configured for rank index: ${rankIndex}`);
-                }
-            } else {
-                // Rank is already correct
-                rankAssigned = true;
-                console.log(`[SyncUser] ✅ Rank already correct for ${targetUser.tag}: ${getRankName(interaction.guild, rankIndex)}`);
-            }
-        } catch (error) {
-            rankError = error.message;
-            console.error('[SyncUser] Failed to assign rank:', error);
+        if (rankResult.changed) {
+            const arrow = rankResult.isUpgrade ? '⬆️' : '⬇️';
+            const action = rankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
+            console.log(`[SyncUser] ${arrow} ${action} rank for ${targetUser.tag}: ${rankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, rankIndex)}`);
+        } else if (rankResult.error) {
+            console.error('[SyncUser] Failed to assign rank:', rankResult.error);
+        } else {
+            console.log(`[SyncUser] ✅ Rank already correct for ${targetUser.tag}: ${getRankName(interaction.guild, rankIndex)}`);
         }
 
         await interaction.editReply({
@@ -266,7 +235,8 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 discord_id: targetUser.id,
                 rsn: actualRsn,
                 wom_id: womId.toString(),
-                clan_joined_at: clanJoinedAt
+                clan_joined_at: clanJoinedAt,
+                rank: getWomRole(rankResult.newRankIndex)
             });
             console.log(`[SyncUser] Updated existing player in database`);
         } else {
@@ -274,7 +244,8 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 rsn: actualRsn,
                 discord_id: targetUser.id,
                 wom_id: womId.toString(),
-                clan_joined_at: clanJoinedAt
+                clan_joined_at: clanJoinedAt,
+                rank: getWomRole(rankResult.newRankIndex)
             }, 0);
             console.log(`[SyncUser] Created new player in database`);
         }

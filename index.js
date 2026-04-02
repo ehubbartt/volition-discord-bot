@@ -196,14 +196,10 @@ async function runDailyRankUpdate() {
     const axios = require('axios');
     const db = require('./db/supabase');
     const {
-      getAllRoleIds,
       formatRank,
       getRankName,
-      determineRankIndex,
-      isRankUpgrade,
-      getRankIndexByRoleId,
-      getRoleIdByIndex,
-      getMemberRankIndex
+      applyRank,
+      getWomRole
     } = require('./utils/ranks');
     const { EmbedBuilder } = require('discord.js');
 
@@ -220,13 +216,14 @@ async function runDailyRankUpdate() {
     }
 
     const clanMembers = clanData.memberships;
-    const allRankRoleIds = getAllRoleIds();
     const existingPlayers = await db.getAllPlayers();
 
     const discordIdToRsnMap = {};
+    const discordIdToPlayerIdMap = {};
     existingPlayers.forEach(player => {
       if (player.discord_id && player.rsn) {
         discordIdToRsnMap[player.discord_id] = player.rsn;
+        discordIdToPlayerIdMap[player.discord_id] = player.id;
       }
     });
 
@@ -251,52 +248,42 @@ async function runDailyRankUpdate() {
         }
 
         const ehb = Math.round(clanMember.player.ehb || 0);
-        const calculatedRankIndex = determineRankIndex(ehb);
-        const calculatedRankId = getRoleIdByIndex(calculatedRankIndex);
-        const memberRoles = member.roles.cache;
+        const rankResult = await applyRank({ ehb, member, allowDowngrade: false });
 
-        const currentRankRoleObj = memberRoles.find(role => allRankRoleIds.includes(role.id));
-        const currentRankIndex = currentRankRoleObj ? getRankIndexByRoleId(currentRankRoleObj.id) : -1;
+        if (rankResult.changed) {
+          userMentions.push(`<@${member.id}>`);
 
-        const hasCorrectRank = memberRoles.some(role => role.id === calculatedRankId);
-
-        // Only upgrade ranks, never downgrade (for daily auto-update)
-        if (!hasCorrectRank && isRankUpgrade(currentRankIndex, calculatedRankIndex)) {
-          if (currentRankRoleObj) {
-            await member.roles.remove(currentRankRoleObj, 'Removing old rank role');
+          if (rankResult.oldRankIndex === -1) {
+            mismatchOutput.push(
+              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, rankResult.newRankIndex)}`
+            );
+            rankUpAnnouncements.push({
+              member, rsn, ehb,
+              oldRankIndex: rankResult.oldRankIndex,
+              newRankIndex: rankResult.newRankIndex,
+              isInitial: true
+            });
+          } else {
+            mismatchOutput.push(
+              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, rankResult.oldRankIndex)} - Upgraded to: ${formatRank(guild, rankResult.newRankIndex)}`
+            );
+            rankUpAnnouncements.push({
+              member, rsn, ehb,
+              oldRankIndex: rankResult.oldRankIndex,
+              newRankIndex: rankResult.newRankIndex,
+              isInitial: false
+            });
           }
 
-          if (calculatedRankId) {
-            await member.roles.add(calculatedRankId, 'Adding correct EHB role');
+          console.log(`[Daily Rank Update] ⬆️ Upgraded rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, rankResult.newRankIndex)} (${ehb} EHB)`);
 
-            userMentions.push(`<@${member.id}>`);
-
-            if (currentRankIndex === -1) {
-              mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, calculatedRankIndex)}`
-              );
-              rankUpAnnouncements.push({
-                member, rsn, ehb,
-                oldRankIndex: currentRankIndex,
-                newRankIndex: calculatedRankIndex,
-                isInitial: true
-              });
-            } else {
-              mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, currentRankIndex)} - Upgraded to: ${formatRank(guild, calculatedRankIndex)}`
-              );
-              rankUpAnnouncements.push({
-                member, rsn, ehb,
-                oldRankIndex: currentRankIndex,
-                newRankIndex: calculatedRankIndex,
-                isInitial: false
-              });
-            }
-
-            console.log(`[Daily Rank Update] ⬆️ Upgraded rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(guild, currentRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (${ehb} EHB)`);
+          // Persist rank to database
+          const playerId = discordIdToPlayerIdMap[discordId];
+          if (playerId) {
+            await db.updatePlayer(playerId, { rank: getWomRole(rankResult.newRankIndex) });
           }
-        } else if (!hasCorrectRank) {
-          console.log(`[Daily Rank Update] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(guild, currentRankIndex)} (earned rank: ${getRankName(guild, calculatedRankIndex)}, ${ehb} EHB)`);
+        } else if (rankResult.oldRankIndex !== rankResult.newRankIndex) {
+          console.log(`[Daily Rank Update] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(guild, rankResult.oldRankIndex)} (earned rank: ${getRankName(guild, rankResult.newRankIndex)}, ${ehb} EHB)`);
         }
       }
     }

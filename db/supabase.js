@@ -72,6 +72,7 @@ async function createPlayer(playerData, initialPoints = 0) {
       discord_id: playerData.discord_id || null,
       wom_id: playerData.wom_id || null,
       clan_joined_at: playerData.clan_joined_at || null,
+      rank: playerData.rank || null,
       points: initialPoints,
       lifetime_vp: initialPoints,
       last_loot_date: null,

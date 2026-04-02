@@ -136,6 +136,57 @@ function getRankCount() {
 }
 
 /**
+ * Calculate rank from EHB, optionally update Discord roles, and return change info.
+ * Centralizes the rank determination + role assignment pattern used across the bot.
+ *
+ * @param {Object} options
+ * @param {number}            options.ehb                  - Player's EHB value
+ * @param {GuildMember|null}  [options.member=null]         - Discord guild member, or null if not linked
+ * @param {boolean}           [options.allowDowngrade=true]  - Whether to apply downgrades
+ * @returns {Promise<{newRankIndex: number, oldRankIndex: number, changed: boolean, isUpgrade: boolean, error: string|null}>}
+ */
+async function applyRank({ ehb, member = null, allowDowngrade = true }) {
+    const newRankIndex = determineRankIndex(Math.round(ehb));
+    const oldRankIndex = member ? getMemberRankIndex(member) : -1;
+
+    const result = {
+        newRankIndex,
+        oldRankIndex,
+        changed: false,
+        isUpgrade: isRankUpgrade(oldRankIndex, newRankIndex),
+        error: null,
+    };
+
+    // No Discord member — just return the calculation
+    if (!member) return result;
+
+    // Already correct rank
+    if (oldRankIndex === newRankIndex) return result;
+
+    // Skip downgrades when not allowed
+    if (!result.isUpgrade && !allowDowngrade) return result;
+
+    // Apply the role change
+    try {
+        const allRankRoleIds = getAllRoleIds();
+        const currentRoleObj = member.roles.cache.find(r => allRankRoleIds.includes(r.id));
+        if (currentRoleObj) await member.roles.remove(currentRoleObj);
+
+        const newRoleId = getRoleIdByIndex(newRankIndex);
+        if (newRoleId) {
+            await member.roles.add(newRoleId);
+            result.changed = true;
+        } else {
+            result.error = `Role ID not configured for rank index ${newRankIndex}`;
+        }
+    } catch (err) {
+        result.error = err.message;
+    }
+
+    return result;
+}
+
+/**
  * List of standard WOM roles that are part of the progression system
  */
 const standardWomRoles = ranksConfig.ranks
@@ -156,5 +207,6 @@ module.exports = {
     getMemberRankIndex,
     getRankByIndex,
     getRankCount,
+    applyRank,
     standardWomRoles
 };

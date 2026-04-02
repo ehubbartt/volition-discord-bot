@@ -11,14 +11,10 @@ const clanLeavers = require('../../db/clanLeavers');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
-    getAllRoleIds,
     formatRank,
     getRankName,
-    determineRankIndex,
-    isRankUpgrade,
-    getRankIndexByRoleId,
-    getRoleIdByIndex,
-    getMemberRankIndex
+    applyRank,
+    getWomRole
 } = require('../../utils/ranks');
 
 module.exports = {
@@ -82,9 +78,6 @@ async function fullClanSync (interaction, clanId) {
         const removedMembers = [];
         const rankMismatches = [];
 
-        // Get all rank role IDs
-        const allRankRoleIds = getAllRoleIds();
-
         // Process each WOM clan member
         for (const member of clanMembers) {
             const womId = member.player.id.toString();
@@ -97,15 +90,16 @@ async function fullClanSync (interaction, clanId) {
             if (!existingPlayer) {
                 // New member - add to database
                 try {
+                    const rankResult = await applyRank({ ehb });
                     await db.createPlayer({
                         rsn: rsn,
                         discord_id: null,
                         wom_id: womId,
-                        clan_joined_at: clanJoinedAt
+                        clan_joined_at: clanJoinedAt,
+                        rank: getWomRole(rankResult.newRankIndex)
                     }, 0);
                     newMembersAdded++;
-                    const expectedRankIndex = determineRankIndex(ehb);
-                    newMembers.push({ rsn, womId, ehb, rankIndex: expectedRankIndex });
+                    newMembers.push({ rsn, womId, ehb, rankIndex: rankResult.newRankIndex });
                     console.log(`[FullSync] Added new member: ${rsn} (${womId})`);
 
                     // Check if this is a returning former member
@@ -162,13 +156,19 @@ async function fullClanSync (interaction, clanId) {
                     console.error(`[FullSync] Failed to add ${rsn}:`, error.message);
                 }
             } else {
-                // Existing member - update RSN and clan join date if changed
+                // Existing member - update RSN, clan join date, and rank
                 const updates = {};
                 if (existingPlayer.rsn !== rsn) {
                     updates.rsn = rsn;
                 }
                 if (clanJoinedAt && existingPlayer.clan_joined_at !== clanJoinedAt) {
                     updates.clan_joined_at = clanJoinedAt;
+                }
+                // Always update rank based on current EHB
+                const rankResult = await applyRank({ ehb });
+                const currentRank = getWomRole(rankResult.newRankIndex);
+                if (existingPlayer.rank !== currentRank) {
+                    updates.rank = currentRank;
                 }
 
                 if (Object.keys(updates).length > 0) {
@@ -184,48 +184,26 @@ async function fullClanSync (interaction, clanId) {
                 if (existingPlayer.discord_id) {
                     try {
                         const discordMember = await interaction.guild.members.fetch(existingPlayer.discord_id);
-                        const currentRankIndex = getMemberRankIndex(discordMember);
+                        const discordRankResult = await applyRank({ ehb, member: discordMember });
 
-                        const expectedRankIndex = determineRankIndex(ehb);
+                        if (discordRankResult.changed) {
+                            ranksUpdated++;
+                            const arrow = discordRankResult.isUpgrade ? '⬆️' : '⬇️';
+                            const action = discordRankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
+                            console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${discordRankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, discordRankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, discordRankResult.newRankIndex)} (${ehb} EHB)`);
 
-                        // Update rank if it doesn't match expected (both upgrades and downgrades)
-                        if (currentRankIndex !== expectedRankIndex) {
-                            const isUpgrade = isRankUpgrade(currentRankIndex, expectedRankIndex);
-
-                            try {
-                                const currentRankRoleObj = discordMember.roles.cache.find(role => allRankRoleIds.includes(role.id));
-
-                                // Remove old rank role if exists
-                                if (currentRankRoleObj) {
-                                    await discordMember.roles.remove(currentRankRoleObj);
-                                    console.log(`[FullSync] Removed old rank role: ${currentRankRoleObj.name}`);
-                                }
-
-                                // Add new rank role
-                                const newRoleId = getRoleIdByIndex(expectedRankIndex);
-                                if (newRoleId) {
-                                    await discordMember.roles.add(newRoleId);
-                                    ranksUpdated++;
-                                    const arrow = isUpgrade ? '⬆️' : '⬇️';
-                                    const action = isUpgrade ? 'Upgraded' : 'Downgraded';
-                                    console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)} (${ehb} EHB)`);
-
-                                    rankMismatches.push({
-                                        rsn,
-                                        currentRankIndex,
-                                        expectedRankIndex,
-                                        ehb,
-                                        daysInClan,
-                                        issue: `${action}: ${currentRankIndex >= 0 ? getRankName(interaction.guild, currentRankIndex) : 'None'} -> ${getRankName(interaction.guild, expectedRankIndex)}`
-                                    });
-                                } else {
-                                    console.warn(`[FullSync] Role ID not configured for rank index: ${expectedRankIndex}`);
-                                }
-                            } catch (roleError) {
-                                rankUpdatesFailed++;
-                                rankMismatches.push({ rsn, currentRankIndex, expectedRankIndex, ehb, daysInClan, issue: `Failed: ${roleError.message}` });
-                                console.error(`[FullSync] Failed to update rank for ${rsn}:`, roleError.message);
-                            }
+                            rankMismatches.push({
+                                rsn,
+                                currentRankIndex: discordRankResult.oldRankIndex,
+                                expectedRankIndex: discordRankResult.newRankIndex,
+                                ehb,
+                                daysInClan,
+                                issue: `${action}: ${discordRankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, discordRankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, discordRankResult.newRankIndex)}`
+                            });
+                        } else if (discordRankResult.error) {
+                            rankUpdatesFailed++;
+                            rankMismatches.push({ rsn, currentRankIndex: discordRankResult.oldRankIndex, expectedRankIndex: discordRankResult.newRankIndex, ehb, daysInClan, issue: `Failed: ${discordRankResult.error}` });
+                            console.error(`[FullSync] Failed to update rank for ${rsn}:`, discordRankResult.error);
                         }
                     } catch (error) {
                         // Check if error is "Unknown Member" (Discord user no longer in server)

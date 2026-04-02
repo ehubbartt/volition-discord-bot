@@ -4,13 +4,11 @@ const db = require('../db/supabase');
 const clanLeavers = require('../db/clanLeavers');
 const config = require('../config.json');
 const {
-    getAllRoleIds,
     formatRank,
     getRankName,
     determineRankIndex,
-    isRankUpgrade,
-    getRoleIdByIndex,
-    getMemberRankIndex
+    applyRank,
+    getWomRole
 } = require('../utils/ranks');
 
 // Parse and handle join messages
@@ -386,53 +384,28 @@ async function processMemberJoin (rsn, originalMessage) {
                 member = await originalMessage.guild.members.fetch(discordId);
                 console.log(`[JOIN] Found linked Discord user: ${member.user.tag}`);
 
-                rankIndex = determineRankIndex(ehb);
-                console.log(`[JOIN] Assigned rank index: ${rankIndex}`);
-
                 // Nickname changes disabled
                 console.log(`[JOIN] Nickname update skipped (disabled)`);
 
                 // Assign Discord rank
-                try {
-                    // Get current rank index
-                    const currentRankIndex = getMemberRankIndex(member);
-                    const allRankRoleIds = getAllRoleIds();
-                    const currentRankRoleObj = member.roles.cache.find(role => allRankRoleIds.includes(role.id));
+                const rankResult = await applyRank({ ehb, member });
+                rankIndex = rankResult.newRankIndex;
+                rankAssigned = rankResult.changed || (rankResult.oldRankIndex === rankResult.newRankIndex && !rankResult.error);
 
-                    // Update rank if it doesn't match (both upgrades and downgrades)
-                    if (currentRankIndex !== rankIndex) {
-                        const isUpgrade = isRankUpgrade(currentRankIndex, rankIndex);
-
-                        // Remove the current rank role
-                        if (currentRankRoleObj) {
-                            await member.roles.remove(currentRankRoleObj);
-                            console.log(`[JOIN] Removed old rank role: ${currentRankRoleObj.name}`);
-                        }
-
-                        // Add new rank role if it exists
-                        const newRoleId = getRoleIdByIndex(rankIndex);
-                        if (newRoleId) {
-                            await member.roles.add(newRoleId);
-                            rankAssigned = true;
-                            const action = isUpgrade ? '⬆️ Upgraded' : '⬇️ Downgraded';
-                            console.log(`[JOIN] ✅ ${action} rank: ${currentRankIndex >= 0 ? getRankName(originalMessage.guild, currentRankIndex) : 'None'} -> ${getRankName(originalMessage.guild, rankIndex)}`);
-                        } else {
-                            console.warn(`[JOIN] ⚠️ Role ID not configured for rank index: ${rankIndex}`);
-                        }
-                    } else {
-                        // Rank is already correct
-                        rankAssigned = true;
-                        console.log(`[JOIN] ✅ Rank already correct: ${getRankName(originalMessage.guild, rankIndex)}`);
-                    }
-                } catch (error) {
-                    console.error(`[JOIN] ⚠️ Failed to assign rank:`, error.message);
+                if (rankResult.changed) {
+                    const action = rankResult.isUpgrade ? '⬆️ Upgraded' : '⬇️ Downgraded';
+                    console.log(`[JOIN] ✅ ${action} rank: ${rankResult.oldRankIndex >= 0 ? getRankName(originalMessage.guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(originalMessage.guild, rankResult.newRankIndex)}`);
+                } else if (rankResult.error) {
+                    console.error(`[JOIN] ⚠️ Failed to assign rank:`, rankResult.error);
+                } else {
+                    console.log(`[JOIN] ✅ Rank already correct: ${getRankName(originalMessage.guild, rankResult.newRankIndex)}`);
                 }
             } catch (error) {
                 console.log(`[JOIN] Could not fetch Discord member with ID ${discordId}`);
             }
         } else {
             console.log(`[JOIN] No Discord ID linked for this player`);
-            rankIndex = determineRankIndex(ehb);
+            rankIndex = determineRankIndex(Math.round(ehb));
         }
 
         // Update or create player in database
@@ -441,7 +414,8 @@ async function processMemberJoin (rsn, originalMessage) {
                 rsn: rsn,
                 wom_id: womId,
                 discord_id: discordId, // Update with auto-linked ID if found
-                clan_joined_at: clanJoinedAt
+                clan_joined_at: clanJoinedAt,
+                rank: getWomRole(rankIndex)
             });
             console.log(`[JOIN] ✅ Updated existing player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
         } else {
@@ -449,7 +423,8 @@ async function processMemberJoin (rsn, originalMessage) {
                 rsn: rsn,
                 wom_id: womId,
                 discord_id: discordId, // Use auto-linked ID if found, otherwise null
-                clan_joined_at: clanJoinedAt
+                clan_joined_at: clanJoinedAt,
+                rank: getWomRole(rankIndex)
             }, 0);
             console.log(`[JOIN] ✅ Created new player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
         }
