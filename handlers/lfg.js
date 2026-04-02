@@ -153,7 +153,7 @@ function buildBossSelectMenu() {
     for (const boss of bossesInCategory) {
       options.push({
         label: boss.name,
-        description: `${category} — Default size: ${boss.defaultSize}`,
+        description: category,
         value: boss.key
       });
     }
@@ -229,7 +229,7 @@ function buildPartyModal(bossKey) {
     .setCustomId('lfg_party_size')
     .setLabel('Party Size (total including you)')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder(`e.g. ${boss.defaultSize}`)
+    .setPlaceholder('e.g. 3, 4, 5')
     .setRequired(true)
     .setMaxLength(3);
 
@@ -474,11 +474,22 @@ async function handleTimeSelect(interaction) {
         .setCustomId('lfg_custom_time')
         .setLabel('When is the event?')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. tomorrow 8pm EST, Saturday 3pm, April 10 7:30pm')
+        .setPlaceholder('e.g. tomorrow 8pm, Saturday 3pm, April 10 7:30pm')
         .setRequired(true)
         .setMaxLength(60);
 
-      modal.addComponents(new ActionRowBuilder().addComponents(timeInput));
+      const tzInput = new TextInputBuilder()
+        .setCustomId('lfg_custom_tz')
+        .setLabel('Your timezone')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('e.g. EST, CST, PST, GMT, CET, AEST')
+        .setRequired(true)
+        .setMaxLength(10);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(timeInput),
+        new ActionRowBuilder().addComponents(tzInput)
+      );
       return interaction.showModal(modal);
     }
 
@@ -512,11 +523,15 @@ async function handleCustomTimeModal(interaction) {
     }
 
     const rawInput = interaction.fields.getTextInputValue('lfg_custom_time');
-    const parsed = chrono.parseDate(rawInput, new Date(), { forwardDate: true });
+    const rawTz = interaction.fields.getTextInputValue('lfg_custom_tz').trim().toUpperCase();
+
+    // Combine the time and timezone for chrono to parse together
+    const combined = `${rawInput} ${rawTz}`;
+    const parsed = chrono.parseDate(combined, new Date(), { forwardDate: true });
 
     if (!parsed) {
       return interaction.reply({
-        content: `Couldn't understand "${rawInput}". Try something like **tomorrow 8pm EST**, **Saturday 3pm**, or **April 10 7:30pm**.`,
+        content: `Couldn't understand "${rawInput}" in timezone **${rawTz}**. Try something like **tomorrow 8pm** with timezone **EST**, or **Saturday 3pm** with **PST**.`,
         ephemeral: true
       });
     }
