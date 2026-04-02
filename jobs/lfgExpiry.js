@@ -147,11 +147,41 @@ async function checkExpiredParties (client) {
 }
 
 /**
- * Run both checks
+ * Delete old party messages (8 hours after expiry)
+ */
+async function deleteOldPartyMessages (client) {
+  try {
+    const parties = await lfgDb.getPartiesPendingDeletion();
+
+    for (const party of parties) {
+      try {
+        const channel = client.channels.cache.get(party.channel_id);
+        if (channel) {
+          const message = await channel.messages.fetch(party.message_id).catch(() => null);
+          if (message) {
+            await message.delete();
+            console.log(`[LFG Cleanup] Deleted message for party ${party.id} (${party.boss_key})`);
+          }
+        }
+        await lfgDb.markMessageDeleted(party.id);
+      } catch (error) {
+        // Mark as deleted anyway to avoid retrying forever
+        await lfgDb.markMessageDeleted(party.id).catch(() => {});
+        console.error(`[LFG Cleanup] Error deleting message for party ${party.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('[LFG Cleanup] Error during deletion check:', error);
+  }
+}
+
+/**
+ * Run all checks
  */
 async function runLfgChecks (client) {
   await sendStartNotifications(client);
   await checkExpiredParties(client);
+  await deleteOldPartyMessages(client);
 }
 
 /**

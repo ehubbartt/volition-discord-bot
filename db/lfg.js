@@ -263,8 +263,38 @@ module.exports = {
   markStartNotified,
   setTeacher,
   getTeacherCount,
-  markTeacherPaid
+  markTeacherPaid,
+  getPartiesPendingDeletion,
+  markMessageDeleted
 };
+
+/**
+ * Get expired/cancelled parties that are 8+ hours past expiry and not yet deleted
+ */
+async function getPartiesPendingDeletion() {
+  const cutoff = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('lfg_parties')
+    .select('*')
+    .in('status', ['expired', 'cancelled'])
+    .eq('message_deleted', false)
+    .lt('expires_at', cutoff);
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Mark a party's message as deleted
+ */
+async function markMessageDeleted(partyId) {
+  const { error } = await supabase
+    .from('lfg_parties')
+    .update({ message_deleted: true })
+    .eq('id', partyId);
+
+  if (error) throw error;
+}
 
 /**
  * Mark a teacher's VP as claimed (prevents double-claiming)

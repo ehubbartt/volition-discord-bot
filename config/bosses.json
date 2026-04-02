@@ -4,90 +4,103 @@
     "category": "Raids",
     "image": "https://oldschool.runescape.wiki/images/Chambers_of_Xeric_logo.png",
     "defaultSize": 4,
-    "maxSize": 100
+    "maxSize": 100,
+    "roleId": "1343281849501356102"
   },
   "tob": {
     "name": "Theatre of Blood",
     "category": "Raids",
     "image": "https://oldschool.runescape.wiki/images/Theatre_of_Blood_logo.png",
     "defaultSize": 4,
-    "maxSize": 5
+    "maxSize": 5,
+    "roleId": "1343281785441878117"
   },
   "toa": {
     "name": "Tombs of Amascut",
     "category": "Raids",
     "image": "https://oldschool.runescape.wiki/images/Tombs_of_Amascut.png",
     "defaultSize": 4,
-    "maxSize": 8
+    "maxSize": 8,
+    "roleId": "1343281924910743623"
   },
   "nex": {
     "name": "Nex",
     "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/Nex.png",
     "defaultSize": 5,
-    "maxSize": 60
+    "maxSize": 60,
+    "roleId": "1343282018938523849"
   },
   "nightmare": {
     "name": "The Nightmare",
     "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/The_Nightmare.png",
     "defaultSize": 5,
-    "maxSize": 80
+    "maxSize": 80,
+    "roleId": "1343282545537847307"
   },
   "callisto": {
     "name": "Callisto",
     "category": "Wilderness",
     "image": "https://oldschool.runescape.wiki/images/Callisto.png",
     "defaultSize": 3,
-    "maxSize": 10
+    "maxSize": 10,
+    "roleId": "1343282097665871892"
   },
   "venenatis": {
     "name": "Venenatis",
     "category": "Wilderness",
     "image": "https://oldschool.runescape.wiki/images/Venenatis.png",
     "defaultSize": 3,
-    "maxSize": 10
+    "maxSize": 10,
+    "roleId": "1343282203601141831"
   },
   "vetion": {
     "name": "Vet'ion",
     "category": "Wilderness",
     "image": "https://oldschool.runescape.wiki/images/Vet%27ion.png",
     "defaultSize": 3,
-    "maxSize": 10
+    "maxSize": 10,
+    "roleId": "1343282162400755822"
   },
   "hueycoatl": {
     "name": "Hueycoatl",
     "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/The_Hueycoatl.png",
     "defaultSize": 3,
-    "maxSize": 10
+    "maxSize": 10,
+    "roleId": "1343282743143960639"
   },
   "royal_titans": {
     "name": "Royal Titans",
     "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/Fighting_Royal_Titans.png",
     "defaultSize": 5,
-    "maxSize": 10
+    "maxSize": 10,
+    "roleId": "1343282623316885514"
   },
   "yama": {
     "name": "Yama",
     "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/Yama.png",
     "defaultSize": 5,
-    "maxSize": 10
+    "maxSize": 10,
+    "roleId": "1374767541221589022"
   },
   "ba": {
     "name": "Barbarian Assault",
     "category": "Minigames",
     "image": "https://oldschool.runescape.wiki/images/Barbarian_Assault_logo.png",
     "defaultSize": 5,
-    "maxSize": 5
+    "maxSize": 5,
+    "roleId": "1343283352584720475"
   },
   "zalcano": {
     "name": "Zalcano",
     "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/Zalcano.png",
     "defaultSize": 4,
-    "maxSize": 20
+    "maxSize": 20,
+    "roleId": "1343283196917452922"
   }
 }

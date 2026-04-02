@@ -818,6 +818,20 @@ async function handleModalSubmit (interaction) {
       components: [tempButtons]
     });
 
+    // Ping relevant roles in a separate message (must be separate for Discord to notify)
+    const pings = [];
+    if (boss.roleId) pings.push(`<@&${boss.roleId}>`);
+    if (experienceLevel === 'learner' && config.PVM_TEACHER_ROLE_ID) {
+      pings.push(`<@&${config.PVM_TEACHER_ROLE_ID}>`);
+    } else if (experienceLevel === 'teaching' && config.PVM_LEARNER_ROLE_ID) {
+      pings.push(`<@&${config.PVM_LEARNER_ROLE_ID}>`);
+    }
+    if (pings.length > 0) {
+      await interaction.channel.send(pings.join(' ')).catch(err =>
+        console.error('[LFG] Failed to send role pings:', err)
+      );
+    }
+
     // Acknowledge the modal with an ephemeral confirmation + invite option
     const inviteSelect = new UserSelectMenuBuilder()
       .setCustomId(`lfg_invite_${message.id}`)
