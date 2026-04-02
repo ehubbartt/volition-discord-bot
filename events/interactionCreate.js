@@ -61,12 +61,20 @@ module.exports = {
       }
     }
 
-    // LFG boss select menu
+    // LFG select menus (boss, experience, time)
     if (interaction.isStringSelectMenu() && interaction.customId === 'lfg_boss_select') {
       if (!await features.isEnabled('gamification.partyFinder')) {
         return interaction.reply({ content: '⚠️ Party Finder is currently disabled.', ephemeral: true });
       }
       try { return await lfgHandler.handleBossSelect(interaction); }
+      catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
+    if (interaction.isStringSelectMenu() && interaction.customId === 'lfg_exp_select') {
+      try { return await lfgHandler.handleExpSelect(interaction); }
+      catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
+    if (interaction.isStringSelectMenu() && interaction.customId === 'lfg_time_select') {
+      try { return await lfgHandler.handleTimeSelect(interaction); }
       catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
     }
 
@@ -602,6 +610,9 @@ module.exports = {
           return interaction.reply({ content: '⚠️ Party Finder is currently disabled.', ephemeral: true });
         }
         return lfgHandler.handleCreateButton(interaction);
+      }
+      if (interaction.customId.startsWith('lfg_next_')) {
+        return lfgHandler.handleNext(interaction);
       }
       if (interaction.customId.startsWith('lfg_join_')) {
         return lfgHandler.handleJoin(interaction);

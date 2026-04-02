@@ -14,37 +14,83 @@ const lfgDb = require('../db/lfg');
 
 const MAX_ACTIVE_PARTIES = 3;
 
-// Experience level display mapping
-const EXPERIENCE_LABELS = {
-  any: { emoji: '🟢', label: 'Any experience' },
-  learner: { emoji: '📚', label: 'Learner — Looking for teacher' },
-  teaching: { emoji: '🎓', label: 'Teaching — Happy to guide' },
-  experienced: { emoji: '⚡', label: 'Experienced only' }
+// Pending party creation state (userId → { bossKey, experience, time, timeLabel })
+// Entries are cleaned up after modal submit or after 10 minutes
+const pendingParties = new Map();
+
+// Time options for the select menu (value → { label, description, offsetMs, expiryMs })
+const TIME_OPTIONS = [
+  { value: 'now',     label: 'Right now',       description: 'Starting immediately',            offsetMs: 0,                expiryMs: 2 * 60 * 60 * 1000 },
+  { value: '15min',   label: 'In 15 minutes',   description: 'Starting in about 15 min',        offsetMs: 15 * 60 * 1000,   expiryMs: 2.25 * 60 * 60 * 1000 },
+  { value: '30min',   label: 'In 30 minutes',   description: 'Starting in about 30 min',        offsetMs: 30 * 60 * 1000,   expiryMs: 2.5 * 60 * 60 * 1000 },
+  { value: '1hr',     label: 'In 1 hour',       description: 'Starting in about 1 hour',        offsetMs: 60 * 60 * 1000,   expiryMs: 3 * 60 * 60 * 1000 },
+  { value: '2hr',     label: 'In 2 hours',      description: 'Starting in about 2 hours',       offsetMs: 2 * 60 * 60 * 1000, expiryMs: 4 * 60 * 60 * 1000 },
+  { value: '3hr',     label: 'In 3 hours',      description: 'Starting in about 3 hours',       offsetMs: 3 * 60 * 60 * 1000, expiryMs: 5 * 60 * 60 * 1000 },
+  { value: '4hr',     label: 'In 4 hours',      description: 'Starting in about 4 hours',       offsetMs: 4 * 60 * 60 * 1000, expiryMs: 6 * 60 * 60 * 1000 },
+  { value: 'flexible', label: 'Flexible',       description: "No set time — whenever we're ready", offsetMs: 0,              expiryMs: 8 * 60 * 60 * 1000 }
+];
+
+// Experience options for the select menu
+const EXPERIENCE_OPTIONS = [
+  { value: 'any',         label: 'All welcome',                   description: 'Any experience level can join',                         emoji: '🟢' },
+  { value: 'learner',     label: 'I need a teacher',              description: "I'm new to this boss and looking for someone to teach me", emoji: '📚' },
+  { value: 'teaching',    label: "I'll teach — learners welcome",  description: "I'm experienced and happy to guide newer players",        emoji: '🎓' },
+  { value: 'experienced', label: 'Experienced only',              description: 'Looking for players who already know the boss',          emoji: '⚡' }
+];
+
+// Experience level display mapping (for embeds)
+const EXPERIENCE_DISPLAY = {
+  any:         { emoji: '🟢', label: 'All welcome', detail: 'Any experience level' },
+  learner:     { emoji: '📚', label: 'Looking for a teacher', detail: 'New to this boss — need someone to show the ropes' },
+  teaching:    { emoji: '🎓', label: 'Teaching run', detail: 'Experienced player offering to teach' },
+  experienced: { emoji: '⚡', label: 'Experienced only', detail: 'Know the boss already' }
 };
 
 /**
- * Parse experience level input, normalizing to a known key
- */
-function parseExperienceLevel(input) {
-  if (!input) return 'any';
-  const lower = input.trim().toLowerCase();
-  if (lower.includes('learn')) return 'learner';
-  if (lower.includes('teach') || lower.includes('guide')) return 'teaching';
-  if (lower.includes('exp') || lower.includes('only')) return 'experienced';
-  return 'any';
-}
-
-/**
- * Format experience level for display
+ * Format experience level for party embed
  */
 function formatExperience(level) {
-  const exp = EXPERIENCE_LABELS[level] || EXPERIENCE_LABELS.any;
-  return `${exp.emoji} ${exp.label}`;
+  const exp = EXPERIENCE_DISPLAY[level] || EXPERIENCE_DISPLAY.any;
+  return `${exp.emoji} **${exp.label}**\n${exp.detail}`;
 }
 
 /**
- * Build the persistent "Party Finder" embed with Create Party button
+ * Get the time display string for a party
  */
+function formatTimeDisplay(timeValue) {
+  if (!timeValue) return 'Flexible';
+  const option = TIME_OPTIONS.find(t => t.value === timeValue);
+  return option ? option.label : timeValue;
+}
+
+/**
+ * Calculate expiry timestamp from a time option value
+ */
+function calculateExpiry(timeValue) {
+  const option = TIME_OPTIONS.find(t => t.value === timeValue);
+  if (option) {
+    return new Date(Date.now() + option.expiryMs);
+  }
+  // Fallback: 8 hours
+  return new Date(Date.now() + 8 * 60 * 60 * 1000);
+}
+
+/**
+ * Clean up stale pending party entries (older than 10 min)
+ */
+function cleanupPending() {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [userId, data] of pendingParties) {
+    if (data.createdAt < cutoff) {
+      pendingParties.delete(userId);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Persistent embed (posted once by admin)
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildPersistentEmbed() {
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
@@ -66,17 +112,15 @@ function buildPersistentEmbed() {
   return { embed, row };
 }
 
-/**
- * Post the persistent embed in a channel
- */
 async function postPersistentEmbed(channel) {
   const { embed, row } = buildPersistentEmbed();
   return channel.send({ embeds: [embed], components: [row] });
 }
 
-/**
- * Build the boss select menu (ephemeral)
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 1: Boss select menu
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildBossSelectMenu() {
   const categories = {};
   for (const [key, boss] of Object.entries(bosses)) {
@@ -98,44 +142,76 @@ function buildBossSelectMenu() {
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId('lfg_boss_select')
     .setPlaceholder('Choose a boss or raid...')
-    .addOptions(options.slice(0, 25)); // Discord limit
+    .addOptions(options.slice(0, 25));
 
   return new ActionRowBuilder().addComponents(selectMenu);
 }
 
-/**
- * Build the party details modal
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2: Experience + Time selects with Next button
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildOptionsMessage(bossKey) {
+  const boss = bosses[bossKey];
+
+  const experienceSelect = new StringSelectMenuBuilder()
+    .setCustomId('lfg_exp_select')
+    .setPlaceholder('What kind of group is this?')
+    .addOptions(
+      EXPERIENCE_OPTIONS.map(opt => ({
+        label: opt.label,
+        description: opt.description,
+        value: opt.value,
+        emoji: opt.emoji
+      }))
+    );
+
+  const timeSelect = new StringSelectMenuBuilder()
+    .setCustomId('lfg_time_select')
+    .setPlaceholder('When are you starting?')
+    .addOptions(
+      TIME_OPTIONS.map(opt => ({
+        label: opt.label,
+        description: opt.description,
+        value: opt.value
+      }))
+    );
+
+  const nextButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`lfg_next_${bossKey}`)
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  return {
+    content: `**${boss.name}** — Set up your party details:`,
+    components: [
+      new ActionRowBuilder().addComponents(experienceSelect),
+      new ActionRowBuilder().addComponents(timeSelect),
+      nextButton
+    ]
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 3: Modal (party size + notes only)
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildPartyModal(bossKey) {
   const boss = bosses[bossKey];
 
   const modal = new ModalBuilder()
     .setCustomId(`lfg_modal_${bossKey}`)
-    .setTitle(`${boss.name} — Party Details`);
+    .setTitle(`${boss.name} — Final Details`);
 
   const sizeInput = new TextInputBuilder()
     .setCustomId('lfg_party_size')
-    .setLabel('Party Size (how many total including you)')
+    .setLabel('Party Size (total including you)')
     .setStyle(TextInputStyle.Short)
     .setPlaceholder(`e.g. ${boss.defaultSize}`)
     .setRequired(true)
     .setMaxLength(3);
-
-  const timeInput = new TextInputBuilder()
-    .setCustomId('lfg_time')
-    .setLabel('Time (optional)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. 8pm EST, now, in 30 min')
-    .setRequired(false)
-    .setMaxLength(50);
-
-  const experienceInput = new TextInputBuilder()
-    .setCustomId('lfg_experience')
-    .setLabel('Experience Level')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('any / learner / teaching / experienced')
-    .setRequired(false)
-    .setMaxLength(30);
 
   const notesInput = new TextInputBuilder()
     .setCustomId('lfg_notes')
@@ -147,17 +223,16 @@ function buildPartyModal(bossKey) {
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(sizeInput),
-    new ActionRowBuilder().addComponents(timeInput),
-    new ActionRowBuilder().addComponents(experienceInput),
     new ActionRowBuilder().addComponents(notesInput)
   );
 
   return modal;
 }
 
-/**
- * Build the party listing embed
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Party listing embed + buttons
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildPartyEmbed(party, members) {
   const boss = bosses[party.boss_key];
   const joinedMembers = members.filter(m => m.status === 'joined');
@@ -166,14 +241,21 @@ function buildPartyEmbed(party, members) {
 
   let color;
   if (party.status === 'expired' || party.status === 'cancelled') {
-    color = 0x95a5a6; // grey
+    color = 0x95a5a6;
+  } else if (party.experience_level === 'teaching') {
+    color = 0x9b59b6; // purple for teaching runs
+  } else if (party.experience_level === 'learner') {
+    color = 0xe67e22; // orange for learner runs
   } else if (isFull) {
-    color = 0x2ecc71; // green
+    color = 0x2ecc71;
   } else {
-    color = 0x3498db; // blue
+    color = 0x3498db;
   }
 
   let title = boss ? boss.name : party.boss_key;
+  if (party.experience_level === 'teaching') title = `🎓 ${title} — Teaching Run`;
+  else if (party.experience_level === 'learner') title = `📚 ${title} — Looking for Teacher`;
+
   if (party.status === 'expired') title = `[EXPIRED] ${title}`;
   if (party.status === 'cancelled') title = `[CANCELLED] ${title}`;
 
@@ -195,11 +277,10 @@ function buildPartyEmbed(party, members) {
   embed.addFields({ name: 'Size', value: sizeDisplay, inline: true });
 
   // Time
-  const timeDisplay = party.scheduled_time || 'Not specified';
-  embed.addFields({ name: 'Time', value: timeDisplay, inline: true });
+  embed.addFields({ name: 'Time', value: formatTimeDisplay(party.scheduled_time), inline: true });
 
   // Experience
-  embed.addFields({ name: 'Experience', value: formatExperience(party.experience_level), inline: true });
+  embed.addFields({ name: 'Experience', value: formatExperience(party.experience_level) });
 
   // Notes
   if (party.notes) {
@@ -224,17 +305,13 @@ function buildPartyEmbed(party, members) {
 
   // Expiry footer
   if (party.expires_at) {
-    const expiryUnix = Math.floor(new Date(party.expires_at).getTime() / 1000);
-    embed.setFooter({ text: `Expires` });
+    embed.setFooter({ text: 'Expires' });
     embed.setTimestamp(new Date(party.expires_at));
   }
 
   return embed;
 }
 
-/**
- * Build the action buttons for a party listing
- */
 function buildPartyButtons(party, members) {
   const joinedMembers = members.filter(m => m.status === 'joined');
   const isFull = joinedMembers.length >= party.group_size;
@@ -269,12 +346,15 @@ function buildPartyButtons(party, members) {
   return row;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Interaction handlers
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Handle the "Create Party" button click
+ * Handle the "Create Party" button click → show boss select
  */
 async function handleCreateButton(interaction) {
   try {
-    // Check active party limit
     const activeParties = await lfgDb.getActivePartiesByUser(interaction.user.id);
     if (activeParties.length >= MAX_ACTIVE_PARTIES) {
       return interaction.reply({
@@ -296,7 +376,7 @@ async function handleCreateButton(interaction) {
 }
 
 /**
- * Handle boss selection from the select menu
+ * Handle boss selection → show experience + time selects
  */
 async function handleBossSelect(interaction) {
   try {
@@ -305,8 +385,18 @@ async function handleBossSelect(interaction) {
       return interaction.reply({ content: 'Invalid boss selection.', ephemeral: true });
     }
 
-    const modal = buildPartyModal(bossKey);
-    await interaction.showModal(modal);
+    cleanupPending();
+
+    // Store boss selection in pending state
+    pendingParties.set(interaction.user.id, {
+      bossKey,
+      experience: null,
+      time: null,
+      createdAt: Date.now()
+    });
+
+    const msg = buildOptionsMessage(bossKey);
+    await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling boss select:', error);
     await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
@@ -314,21 +404,108 @@ async function handleBossSelect(interaction) {
 }
 
 /**
- * Handle modal submission — create the party
+ * Handle experience select menu
+ */
+async function handleExpSelect(interaction) {
+  try {
+    const pending = pendingParties.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
+    }
+
+    pending.experience = interaction.values[0];
+    const expOption = EXPERIENCE_OPTIONS.find(o => o.value === pending.experience);
+    const timeOption = pending.time ? TIME_OPTIONS.find(t => t.value === pending.time) : null;
+
+    // Show current selections and keep the menus
+    let status = `**${bosses[pending.bossKey].name}** — Set up your party details:\n\n`;
+    status += `> Group type: ${expOption.emoji} **${expOption.label}**\n`;
+    status += timeOption ? `> Time: **${timeOption.label}**` : '> Time: *not selected yet*';
+
+    const msg = buildOptionsMessage(pending.bossKey);
+    msg.content = status;
+
+    await interaction.update(msg);
+  } catch (error) {
+    console.error('[LFG] Error handling exp select:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
+ * Handle time select menu
+ */
+async function handleTimeSelect(interaction) {
+  try {
+    const pending = pendingParties.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
+    }
+
+    pending.time = interaction.values[0];
+    const timeOption = TIME_OPTIONS.find(t => t.value === pending.time);
+    const expOption = pending.experience ? EXPERIENCE_OPTIONS.find(o => o.value === pending.experience) : null;
+
+    let status = `**${bosses[pending.bossKey].name}** — Set up your party details:\n\n`;
+    status += expOption ? `> Group type: ${expOption.emoji} **${expOption.label}**\n` : '> Group type: *not selected yet*\n';
+    status += `> Time: **${timeOption.label}**`;
+
+    const msg = buildOptionsMessage(pending.bossKey);
+    msg.content = status;
+
+    await interaction.update(msg);
+  } catch (error) {
+    console.error('[LFG] Error handling time select:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
+ * Handle "Next" button → validate selects and open modal
+ */
+async function handleNext(interaction) {
+  try {
+    const bossKey = interaction.customId.replace('lfg_next_', '');
+    const pending = pendingParties.get(interaction.user.id);
+
+    if (!pending || pending.bossKey !== bossKey) {
+      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
+    }
+
+    if (!pending.experience) {
+      return interaction.reply({ content: 'Please select a **group type** before continuing.', ephemeral: true });
+    }
+
+    if (!pending.time) {
+      return interaction.reply({ content: 'Please select a **time** before continuing.', ephemeral: true });
+    }
+
+    const modal = buildPartyModal(bossKey);
+    await interaction.showModal(modal);
+  } catch (error) {
+    console.error('[LFG] Error handling next button:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
+ * Handle modal submission → create the party
  */
 async function handleModalSubmit(interaction) {
   try {
-    // Extract boss key from modal customId: lfg_modal_{bossKey}
     const bossKey = interaction.customId.replace('lfg_modal_', '');
     const boss = bosses[bossKey];
     if (!boss) {
       return interaction.reply({ content: 'Invalid boss selection.', ephemeral: true });
     }
 
-    // Parse fields
+    const pending = pendingParties.get(interaction.user.id);
+    if (!pending || pending.bossKey !== bossKey) {
+      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
+    }
+
+    // Parse modal fields
     const sizeRaw = interaction.fields.getTextInputValue('lfg_party_size');
-    const time = interaction.fields.getTextInputValue('lfg_time') || null;
-    const experienceRaw = interaction.fields.getTextInputValue('lfg_experience') || 'any';
     const notes = interaction.fields.getTextInputValue('lfg_notes') || null;
 
     // Validate party size
@@ -340,7 +517,7 @@ async function handleModalSubmit(interaction) {
       });
     }
 
-    // Re-check active party limit (race condition guard)
+    // Re-check active party limit
     const activeParties = await lfgDb.getActivePartiesByUser(interaction.user.id);
     if (activeParties.length >= MAX_ACTIVE_PARTIES) {
       return interaction.reply({
@@ -351,38 +528,27 @@ async function handleModalSubmit(interaction) {
 
     await interaction.deferReply();
 
-    const experienceLevel = parseExperienceLevel(experienceRaw);
+    const experienceLevel = pending.experience;
+    const timeValue = pending.time;
+    const expiresAt = calculateExpiry(timeValue);
 
-    // Calculate expiry time
-    // If time provided: expires 2 hours after that time (but since we can't parse arbitrary time strings reliably, we use 8 hours from now as a safe default, and if the user wrote "now" we use 2 hours)
-    let expiresAt;
-    const timeStr = time ? time.trim().toLowerCase() : '';
-    if (timeStr === 'now' || timeStr === 'asap') {
-      // Event is now, expire in 2 hours
-      expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
-    } else if (time) {
-      // Time was specified but we can't reliably parse it — default 8 hours
-      expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    } else {
-      // No time specified — default 8 hours
-      expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    }
+    // Clean up pending state
+    pendingParties.delete(interaction.user.id);
 
-    // Build initial embed and buttons (with creator as first member)
+    // Build initial embed with creator as first member
     const partyData = {
       creator_id: interaction.user.id,
       boss_key: bossKey,
       group_size: groupSize,
       experience_level: experienceLevel,
-      scheduled_time: time,
+      scheduled_time: timeValue,
       notes,
-      message_id: 'pending', // placeholder until message is sent
+      message_id: 'pending',
       channel_id: interaction.channelId,
       expires_at: expiresAt.toISOString(),
       status: 'active'
     };
 
-    // Send the party embed first to get the message ID
     const tempEmbed = buildPartyEmbed(partyData, [{ user_id: interaction.user.id, status: 'joined' }]);
     const tempButtons = buildPartyButtons(partyData, [{ user_id: interaction.user.id, status: 'joined' }]);
 
@@ -391,13 +557,13 @@ async function handleModalSubmit(interaction) {
       components: [tempButtons]
     });
 
-    // Now create the party in DB with the real message ID
+    // Create party in DB
     const party = await lfgDb.createParty({
       creatorId: interaction.user.id,
       bossKey,
       groupSize,
       experienceLevel,
-      scheduledTime: time,
+      scheduledTime: timeValue,
       notes,
       messageId: message.id,
       channelId: interaction.channelId,
@@ -407,7 +573,7 @@ async function handleModalSubmit(interaction) {
     // Add creator as first member
     await lfgDb.addMember(party.id, interaction.user.id, 'joined');
 
-    // Re-build embed and buttons with correct message ID for button routing
+    // Re-build with correct message ID for button routing
     const members = await lfgDb.getMembers(party.id);
     const updatedParty = { ...party, message_id: message.id };
     const embed = buildPartyEmbed(updatedParty, members);
@@ -415,14 +581,14 @@ async function handleModalSubmit(interaction) {
 
     await interaction.editReply({ embeds: [embed], components: [buttons] });
 
-    console.log(`[LFG] Party created by ${interaction.user.tag} for ${boss.name} (${groupSize} players)`);
+    console.log(`[LFG] Party created by ${interaction.user.tag} for ${boss.name} (${groupSize} players, ${experienceLevel})`);
   } catch (error) {
     console.error('[LFG] Error handling modal submit:', error);
-    const msg = { content: 'Something went wrong creating your party. Please try again.', ephemeral: true };
+    const msg = { content: 'Something went wrong creating your party. Please try again.' };
     if (interaction.deferred) {
       await interaction.editReply(msg).catch(() => {});
     } else {
-      await interaction.reply(msg).catch(() => {});
+      await interaction.reply({ ...msg, ephemeral: true }).catch(() => {});
     }
   }
 }
@@ -439,7 +605,6 @@ async function handleJoin(interaction) {
       return interaction.reply({ content: 'This party is no longer active.', ephemeral: true });
     }
 
-    // Check if already a member
     const existingMember = await lfgDb.getMember(party.id, interaction.user.id);
     if (existingMember) {
       return interaction.reply({
@@ -456,10 +621,8 @@ async function handleJoin(interaction) {
     const joinedCount = members.filter(m => m.status === 'joined').length;
     const isFull = joinedCount >= party.group_size;
 
-    // Add as joined or waitlisted
     await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined');
 
-    // Update party status if now full
     const updatedMembers = await lfgDb.getMembers(party.id);
     const newJoinedCount = updatedMembers.filter(m => m.status === 'joined').length;
     let updatedParty = party;
@@ -492,7 +655,6 @@ async function handleLeave(interaction) {
       return interaction.reply({ content: 'This party is no longer active.', ephemeral: true });
     }
 
-    // Creator can't leave — they must cancel
     if (interaction.user.id === party.creator_id) {
       return interaction.reply({
         content: "As the party leader, use **Cancel Party** instead of Leave.",
@@ -500,7 +662,6 @@ async function handleLeave(interaction) {
       });
     }
 
-    // Check if actually in the party
     const existingMember = await lfgDb.getMember(party.id, interaction.user.id);
     if (!existingMember) {
       return interaction.reply({ content: "You're not in this party.", ephemeral: true });
@@ -511,12 +672,10 @@ async function handleLeave(interaction) {
     const wasJoined = existingMember.status === 'joined';
     await lfgDb.removeMember(party.id, interaction.user.id);
 
-    // If they were joined (not waitlisted), promote first waitlisted
     if (wasJoined) {
       await lfgDb.promoteFirstWaitlisted(party.id);
     }
 
-    // Update party status if it was full and now has space
     const updatedMembers = await lfgDb.getMembers(party.id);
     const joinedCount = updatedMembers.filter(m => m.status === 'joined').length;
     let updatedParty = party;
@@ -553,7 +712,6 @@ async function handleCancel(interaction) {
       return interaction.reply({ content: 'This party is already ended.', ephemeral: true });
     }
 
-    // Only creator can cancel
     if (interaction.user.id !== party.creator_id) {
       return interaction.reply({ content: 'Only the party leader can cancel.', ephemeral: true });
     }
@@ -579,6 +737,9 @@ module.exports = {
   postPersistentEmbed,
   handleCreateButton,
   handleBossSelect,
+  handleExpSelect,
+  handleTimeSelect,
+  handleNext,
   handleModalSubmit,
   handleJoin,
   handleLeave,
