@@ -99,7 +99,7 @@ const pendingParties = new Map();
 
 // Time options for the select menu (value → { label, description, offsetMs, expiryMs })
 const TIME_OPTIONS = [
-  { value: 'now',     label: 'Right now',       description: 'Starting immediately',            offsetMs: 0,                expiryMs: 2 * 60 * 60 * 1000 },
+  { value: 'now',     label: 'Right now',       description: 'Starting immediately',            offsetMs: 0,                expiryMs: 5 * 60 * 1000 }, // TODO: change back to 2 * 60 * 60 * 1000 after testing
   { value: '15min',   label: 'In 15 minutes',   description: 'Starting in about 15 min',        offsetMs: 15 * 60 * 1000,   expiryMs: 2.25 * 60 * 60 * 1000 },
   { value: '30min',   label: 'In 30 minutes',   description: 'Starting in about 30 min',        offsetMs: 30 * 60 * 1000,   expiryMs: 2.5 * 60 * 60 * 1000 },
   { value: '1hr',     label: 'In 1 hour',       description: 'Starting in about 1 hour',        offsetMs: 60 * 60 * 1000,   expiryMs: 3 * 60 * 60 * 1000 },
@@ -424,10 +424,21 @@ function buildPartyEmbed(party, members) {
   // Party Leader
   embed.addFields({ name: 'Party Leader', value: `<@${party.creator_id}>`, inline: true });
 
-  // Size
-  const sizeDisplay = isFull
-    ? `${joinedMembers.length}/${party.group_size} ✅ FULL`
-    : `${joinedMembers.length}/${party.group_size}`;
+  // Size (with reserved teacher spot info for learner parties)
+  let sizeDisplay;
+  if (isFull) {
+    sizeDisplay = `${joinedMembers.length}/${party.group_size} ✅ FULL`;
+  } else if (party.experience_level === 'learner' && (party.teachers_needed || 0) > 0) {
+    const teachersFilled = joinedMembers.filter(m => m.is_teacher).length;
+    const unfilledTeacherSlots = Math.max(0, (party.teachers_needed || 0) - teachersFilled);
+    if (unfilledTeacherSlots > 0) {
+      sizeDisplay = `${joinedMembers.length}/${party.group_size} (${unfilledTeacherSlots} reserved for teacher${unfilledTeacherSlots > 1 ? 's' : ''})`;
+    } else {
+      sizeDisplay = `${joinedMembers.length}/${party.group_size}`;
+    }
+  } else {
+    sizeDisplay = `${joinedMembers.length}/${party.group_size}`;
+  }
   embed.addFields({ name: 'Size', value: sizeDisplay, inline: true });
 
   // Time
@@ -496,13 +507,23 @@ function buildPartyButtons(party, members) {
   const isFull = joinedMembers.length >= party.group_size;
   const isEnded = party.status === 'expired' || party.status === 'cancelled';
 
+  // Check if non-teacher spots are full (for learner parties with reserved teacher slots)
+  let nonTeacherFull = isFull;
+  if (!isFull && party.experience_level === 'learner' && (party.teachers_needed || 0) > 0) {
+    const teacherCount = joinedMembers.filter(m => m.is_teacher).length;
+    const unfilledTeacherSlots = Math.max(0, (party.teachers_needed || 0) - teacherCount);
+    const nonTeacherSpots = party.group_size - unfilledTeacherSlots;
+    const nonTeacherCount = joinedMembers.filter(m => !m.is_teacher).length;
+    nonTeacherFull = nonTeacherCount >= nonTeacherSpots;
+  }
+
   const row = new ActionRowBuilder();
 
   row.addComponents(
     new ButtonBuilder()
       .setCustomId(`lfg_join_${party.message_id}`)
-      .setLabel(isFull ? 'Join Waitlist' : 'Join')
-      .setStyle(isFull ? ButtonStyle.Secondary : ButtonStyle.Success)
+      .setLabel(isFull || nonTeacherFull ? 'Join Waitlist' : 'Join')
+      .setStyle(isFull || nonTeacherFull ? ButtonStyle.Secondary : ButtonStyle.Success)
       .setDisabled(isEnded)
   );
 
@@ -996,8 +1017,20 @@ async function handleJoin(interaction) {
     await interaction.deferUpdate();
 
     const members = await lfgDb.getMembers(party.id);
-    const joinedCount = members.filter(m => m.status === 'joined').length;
-    const isFull = joinedCount >= party.group_size;
+    const joinedMembers = members.filter(m => m.status === 'joined');
+    const joinedCount = joinedMembers.length;
+
+    // For learner parties, reserve spots for teachers
+    let isFull = joinedCount >= party.group_size;
+    if (!isFull && party.experience_level === 'learner' && (party.teachers_needed || 0) > 0) {
+      const teacherCount = joinedMembers.filter(m => m.is_teacher).length;
+      const unfilledTeacherSlots = Math.max(0, (party.teachers_needed || 0) - teacherCount);
+      const nonTeacherSpots = party.group_size - unfilledTeacherSlots;
+      const nonTeacherCount = joinedMembers.filter(m => !m.is_teacher).length;
+      if (nonTeacherCount >= nonTeacherSpots) {
+        isFull = true; // Non-teacher spots are full, remaining spots reserved for teachers
+      }
+    }
 
     await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined');
 
