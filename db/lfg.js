@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 /**
  * Create a new LFG party
  */
-async function createParty({ creatorId, bossKey, groupSize, experienceLevel, scheduledTime, notes, messageId, channelId, expiresAt, startsAt }) {
+async function createParty({ creatorId, bossKey, groupSize, experienceLevel, scheduledTime, notes, messageId, channelId, expiresAt, startsAt, teachersNeeded }) {
   const { data, error } = await supabase
     .from('lfg_parties')
     .insert({
@@ -22,7 +22,8 @@ async function createParty({ creatorId, bossKey, groupSize, experienceLevel, sch
       channel_id: channelId,
       expires_at: expiresAt,
       starts_at: startsAt || null,
-      teacher_id: experienceLevel === 'teaching' ? creatorId : null
+      teacher_id: experienceLevel === 'teaching' ? creatorId : null,
+      teachers_needed: teachersNeeded || 0
     })
     .select()
     .single();
@@ -65,13 +66,14 @@ async function getActivePartiesByUser(userId) {
 /**
  * Add a member to a party
  */
-async function addMember(partyId, userId, status = 'joined') {
+async function addMember(partyId, userId, status = 'joined', isTeacher = false) {
   const { data, error } = await supabase
     .from('lfg_members')
     .insert({
       party_id: partyId,
       user_id: userId,
-      status
+      status,
+      is_teacher: isTeacher
     })
     .select()
     .single();
@@ -197,9 +199,10 @@ async function getPartiesNeedingStartNotification() {
 }
 
 /**
- * Set the teacher for a learner party
+ * Set a user as teacher (marks on both party and member)
  */
 async function setTeacher(partyId, userId) {
+  // Set teacher_id on party (first teacher or overwrite)
   const { data, error } = await supabase
     .from('lfg_parties')
     .update({ teacher_id: userId })
@@ -208,7 +211,29 @@ async function setTeacher(partyId, userId) {
     .single();
 
   if (error) throw error;
+
+  // Mark the member as a teacher
+  await supabase
+    .from('lfg_members')
+    .update({ is_teacher: true })
+    .eq('party_id', partyId)
+    .eq('user_id', userId);
+
   return data;
+}
+
+/**
+ * Get count of teachers in a party
+ */
+async function getTeacherCount(partyId) {
+  const { count, error } = await supabase
+    .from('lfg_members')
+    .select('*', { count: 'exact', head: true })
+    .eq('party_id', partyId)
+    .eq('is_teacher', true);
+
+  if (error) throw error;
+  return count || 0;
 }
 
 /**
@@ -236,5 +261,20 @@ module.exports = {
   getExpiredParties,
   getPartiesNeedingStartNotification,
   markStartNotified,
-  setTeacher
+  setTeacher,
+  getTeacherCount,
+  markTeacherPaid
 };
+
+/**
+ * Mark a teacher's VP as claimed (prevents double-claiming)
+ */
+async function markTeacherPaid(partyId, userId) {
+  const { error } = await supabase
+    .from('lfg_members')
+    .update({ vp_claimed: true })
+    .eq('party_id', partyId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}

@@ -339,6 +339,12 @@ module.exports = {
       }
     }
 
+    // LFG invite user select
+    if (interaction.isUserSelectMenu() && interaction.customId.startsWith('lfg_invite_')) {
+      try { return await lfgHandler.handleInvite(interaction); }
+      catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
+
     if (interaction.isUserSelectMenu() && interaction.customId === 'mute_user_select') {
       const shopCommand = interaction.client.commands.get('shop');
       if (shopCommand?.handleUserSelection) {
@@ -613,6 +619,9 @@ module.exports = {
       }
       if (interaction.customId.startsWith('lfg_next_')) {
         return lfgHandler.handleNext(interaction);
+      }
+      if (interaction.customId.startsWith('lfg_claim_vp_')) {
+        return lfgHandler.handleClaimVP(interaction);
       }
       if (interaction.customId.startsWith('lfg_teach_')) {
         return lfgHandler.handleVolunteerTeach(interaction);

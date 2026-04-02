@@ -4,6 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
+  UserSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle
@@ -11,6 +12,7 @@ const {
 const chrono = require('chrono-node');
 const config = require('../config.json');
 const bosses = require('../config/bosses.json');
+const db = require('../db/supabase');
 const lfgDb = require('../db/lfg');
 
 const MAX_ACTIVE_PARTIES = 3;
@@ -314,7 +316,7 @@ function buildOptionsMessage(bossKey, selectedExp = null, selectedTime = null) {
 // Step 3: Modal (party size + notes only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildPartyModal(bossKey, includeCustomTime = false) {
+function buildPartyModal(bossKey, { includeCustomTime = false, isLearner = false } = {}) {
   const boss = bosses[bossKey];
 
   const modal = new ModalBuilder()
@@ -330,6 +332,19 @@ function buildPartyModal(bossKey, includeCustomTime = false) {
     .setMaxLength(3);
 
   const rows = [new ActionRowBuilder().addComponents(sizeInput)];
+
+  // Teachers needed (only for learner parties)
+  if (isLearner) {
+    const teachersInput = new TextInputBuilder()
+      .setCustomId('lfg_teachers_needed')
+      .setLabel('How many teachers do you need?')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. 1, 2')
+      .setRequired(false)
+      .setMaxLength(2);
+
+    rows.push(new ActionRowBuilder().addComponents(teachersInput));
+  }
 
   if (includeCustomTime) {
     const timeInput = new TextInputBuilder()
@@ -362,7 +377,8 @@ function buildPartyModal(bossKey, includeCustomTime = false) {
 
   rows.push(new ActionRowBuilder().addComponents(notesInput));
 
-  modal.addComponents(...rows);
+  // Discord modals max 5 rows — learner + custom time = size + teachers + time + tz + notes = 5 (exact fit)
+  modal.addComponents(...rows.slice(0, 5));
 
   return modal;
 }
@@ -427,10 +443,21 @@ function buildPartyEmbed(party, members) {
 
   // Teacher field for learner parties
   if (party.experience_level === 'learner') {
-    if (party.teacher_id) {
-      embed.addFields({ name: 'Teacher', value: `🎓 <@${party.teacher_id}>`, inline: true });
+    const teacherMembers = members.filter(m => m.is_teacher);
+    const needed = party.teachers_needed || 1;
+
+    if (teacherMembers.length > 0) {
+      const teacherList = teacherMembers.map(m => `🎓 <@${m.user_id}>`).join('\n');
+      const spotsLeft = needed - teacherMembers.length;
+      const label = spotsLeft > 0
+        ? `Teacher${needed > 1 ? 's' : ''} (${teacherMembers.length}/${needed})`
+        : `Teacher${teacherMembers.length > 1 ? 's' : ''}`;
+      embed.addFields({ name: label, value: teacherList });
     } else if (party.status !== 'expired' && party.status !== 'cancelled') {
-      embed.addFields({ name: 'Teacher', value: 'Waiting for a volunteer...', inline: true });
+      embed.addFields({
+        name: `Teacher${needed > 1 ? `s needed (0/${needed})` : ''}`,
+        value: 'Waiting for a volunteer...'
+      });
     }
   }
 
@@ -495,15 +522,19 @@ function buildPartyButtons(party, members) {
       .setDisabled(isEnded)
   );
 
-  // "Volunteer to Teach" button for learner parties without a teacher
-  if (party.experience_level === 'learner' && !party.teacher_id && !isEnded) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`lfg_teach_${party.message_id}`)
-        .setLabel('Volunteer to Teach (15 VP)')
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji('🎓')
-    );
+  // "Volunteer to Teach" button for learner parties with open teacher slots
+  if (party.experience_level === 'learner' && !isEnded) {
+    const teacherCount = members.filter(m => m.is_teacher).length;
+    const needed = party.teachers_needed || 1;
+    if (teacherCount < needed) {
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`lfg_teach_${party.message_id}`)
+          .setLabel(`Volunteer to Teach (15 VP)`)
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🎓')
+      );
+    }
   }
 
   return row;
@@ -646,7 +677,10 @@ async function handleNext(interaction) {
       return interaction.reply({ content: 'Please select a **time** before continuing.', ephemeral: true });
     }
 
-    const modal = buildPartyModal(bossKey, pending.time === 'custom');
+    const modal = buildPartyModal(bossKey, {
+      includeCustomTime: pending.time === 'custom',
+      isLearner: pending.experience === 'learner'
+    });
     await interaction.showModal(modal);
   } catch (error) {
     console.error('[LFG] Error handling next button:', error);
@@ -673,6 +707,18 @@ async function handleModalSubmit(interaction) {
     // Parse modal fields
     const sizeRaw = interaction.fields.getTextInputValue('lfg_party_size');
     const notes = interaction.fields.getTextInputValue('lfg_notes') || null;
+
+    // Parse teachers needed (learner parties only)
+    let teachersNeeded = 1;
+    if (pending.experience === 'learner') {
+      try {
+        const raw = interaction.fields.getTextInputValue('lfg_teachers_needed');
+        if (raw) {
+          const parsed = parseInt(raw, 10);
+          if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) teachersNeeded = parsed;
+        }
+      } catch { /* field not present, default to 1 */ }
+    }
 
     // If custom time was selected, parse the time + timezone from the modal
     if (pending.time === 'custom') {
@@ -751,8 +797,18 @@ async function handleModalSubmit(interaction) {
       components: [tempButtons]
     });
 
-    // Acknowledge the modal with an ephemeral confirmation
-    await interaction.reply({ content: `✅ Party created for **${boss.name}**!`, ephemeral: true });
+    // Acknowledge the modal with an ephemeral confirmation + invite option
+    const inviteSelect = new UserSelectMenuBuilder()
+      .setCustomId(`lfg_invite_${message.id}`)
+      .setPlaceholder('Invite players to your party (optional)')
+      .setMinValues(0)
+      .setMaxValues(Math.min(groupSize - 1, 10));
+
+    await interaction.reply({
+      content: `✅ Party created for **${boss.name}**! You can invite players below:`,
+      components: [new ActionRowBuilder().addComponents(inviteSelect)],
+      ephemeral: true
+    });
 
     // Create party in DB
     const party = await lfgDb.createParty({
@@ -765,11 +821,12 @@ async function handleModalSubmit(interaction) {
       messageId: message.id,
       channelId: interaction.channelId,
       expiresAt: expiresAt.toISOString(),
-      startsAt: startsAt ? startsAt.toISOString() : null
+      startsAt: startsAt ? startsAt.toISOString() : null,
+      teachersNeeded: experienceLevel === 'learner' ? teachersNeeded : 0
     });
 
-    // Add creator as first member
-    await lfgDb.addMember(party.id, interaction.user.id, 'joined');
+    // Add creator as first member (mark as teacher if they're running a teaching party)
+    await lfgDb.addMember(party.id, interaction.user.id, 'joined', experienceLevel === 'teaching');
 
     // Re-build with correct message ID for button routing
     const members = await lfgDb.getMembers(party.id);
@@ -802,8 +859,11 @@ async function handleVolunteerTeach(interaction) {
       return interaction.reply({ content: 'This party is not looking for a teacher.', ephemeral: true });
     }
 
-    if (party.teacher_id) {
-      return interaction.reply({ content: 'This party already has a teacher.', ephemeral: true });
+    // Check if teacher slots are full
+    const teacherCount = await lfgDb.getTeacherCount(party.id);
+    const needed = party.teachers_needed || 1;
+    if (teacherCount >= needed) {
+      return interaction.reply({ content: 'All teacher spots are filled for this party.', ephemeral: true });
     }
 
     // Can't teach your own party
@@ -811,18 +871,23 @@ async function handleVolunteerTeach(interaction) {
       return interaction.reply({ content: "You can't volunteer as teacher for your own party.", ephemeral: true });
     }
 
+    // Check if already a teacher
+    const existingMember = await lfgDb.getMember(party.id, interaction.user.id);
+    if (existingMember && existingMember.is_teacher) {
+      return interaction.reply({ content: "You're already a teacher for this party.", ephemeral: true });
+    }
+
     await interaction.deferUpdate();
 
-    // Set as teacher
+    // Set as teacher on the party (stores first/latest teacher_id)
     const updatedParty = await lfgDb.setTeacher(party.id, interaction.user.id);
 
-    // Auto-join the party if not already a member
-    const existingMember = await lfgDb.getMember(party.id, interaction.user.id);
+    // Auto-join the party if not already a member, marking as teacher
     if (!existingMember) {
       const members = await lfgDb.getMembers(party.id);
       const joinedCount = members.filter(m => m.status === 'joined').length;
       const isFull = joinedCount >= party.group_size;
-      await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined');
+      await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined', true);
     }
 
     const members = await lfgDb.getMembers(party.id);
@@ -834,6 +899,74 @@ async function handleVolunteerTeach(interaction) {
     console.log(`[LFG] ${interaction.user.tag} volunteered to teach party ${party.id}`);
   } catch (error) {
     console.error('[LFG] Error handling volunteer teach:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
+ * Handle invite user select menu
+ */
+async function handleInvite(interaction) {
+  try {
+    const messageId = interaction.customId.replace('lfg_invite_', '');
+    const party = await lfgDb.getPartyByMessageId(messageId);
+
+    if (!party || party.status === 'expired' || party.status === 'cancelled') {
+      return interaction.reply({ content: 'This party is no longer active.', ephemeral: true });
+    }
+
+    const selectedUserIds = interaction.values;
+    if (!selectedUserIds || selectedUserIds.length === 0) {
+      return interaction.deferUpdate();
+    }
+
+    await interaction.deferUpdate();
+
+    let added = 0;
+    for (const userId of selectedUserIds) {
+      // Skip bots and the creator (already in party)
+      if (userId === interaction.user.id) continue;
+
+      const existing = await lfgDb.getMember(party.id, userId);
+      if (existing) continue;
+
+      const members = await lfgDb.getMembers(party.id);
+      const joinedCount = members.filter(m => m.status === 'joined').length;
+      const isFull = joinedCount >= party.group_size;
+
+      await lfgDb.addMember(party.id, userId, isFull ? 'waitlisted' : 'joined');
+      added++;
+    }
+
+    if (added > 0) {
+      // Update the party embed
+      const channel = interaction.client.channels.cache.get(party.channel_id);
+      if (channel) {
+        const msg = await channel.messages.fetch(messageId).catch(() => null);
+        if (msg) {
+          const members = await lfgDb.getMembers(party.id);
+          const updatedMembers = members.filter(m => m.status === 'joined');
+          let updatedParty = party;
+          if (updatedMembers.length >= party.group_size && party.status === 'active') {
+            updatedParty = await lfgDb.updatePartyStatus(party.id, 'full');
+          }
+          const embed = buildPartyEmbed(updatedParty, members);
+          const buttons = buildPartyButtons(updatedParty, members);
+          await msg.edit({ embeds: [embed], components: [buttons] });
+        }
+      }
+    }
+
+    await interaction.editReply({
+      content: added > 0
+        ? `✅ Invited ${added} player${added > 1 ? 's' : ''} to your party!`
+        : '✅ Party created! (Selected players were already in the party)',
+      components: []
+    });
+
+    console.log(`[LFG] ${interaction.user.tag} invited ${added} player(s) to party ${party.id}`);
+  } catch (error) {
+    console.error('[LFG] Error handling invite:', error);
     await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
   }
 }
@@ -978,6 +1111,109 @@ async function handleCancel(interaction) {
   }
 }
 
+const TEACHING_VP_REWARD = 15;
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+
+/**
+ * Handle "Claim VP" button in proof threads
+ */
+async function handleClaimVP(interaction) {
+  try {
+    // customId format: lfg_claim_vp_{partyId}_{teacherUserId}
+    const parts = interaction.customId.replace('lfg_claim_vp_', '').split('_');
+    // partyId is a UUID with dashes, teacherUserId is the last segment (numeric discord ID)
+    const teacherUserId = parts.pop();
+    const partyId = parts.join('_');
+
+    // Only the teacher can claim
+    if (interaction.user.id !== teacherUserId) {
+      return interaction.reply({ content: 'Only the teacher listed can claim this reward.', ephemeral: true });
+    }
+
+    // Check if already claimed
+    const member = await lfgDb.getMember(partyId, teacherUserId);
+    if (!member) {
+      return interaction.reply({ content: 'Could not find your membership in this party.', ephemeral: true });
+    }
+    if (member.vp_claimed) {
+      return interaction.reply({ content: "You've already claimed VP for this teaching session.", ephemeral: true });
+    }
+
+    // Check for image proof in the thread
+    const thread = interaction.channel;
+    const messages = await thread.messages.fetch({ limit: 50 });
+    const proofMessages = messages.filter(msg =>
+      msg.author.id === teacherUserId &&
+      msg.attachments.some(att => IMAGE_TYPES.includes(att.contentType))
+    );
+
+    if (proofMessages.size === 0) {
+      return interaction.reply({
+        content: 'Please upload a screenshot as proof first, then click the button again.',
+        ephemeral: true
+      });
+    }
+
+    await interaction.deferUpdate();
+
+    // Award VP
+    const player = await db.getPlayerByDiscordId(teacherUserId);
+    if (!player) {
+      await interaction.followUp({ content: "Couldn't find your player profile. Make sure you're verified.", ephemeral: true });
+      return;
+    }
+
+    await db.addPoints(player.rsn, TEACHING_VP_REWARD);
+    await lfgDb.markTeacherPaid(partyId, teacherUserId);
+
+    // Disable the button
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(interaction.customId)
+        .setLabel(`${TEACHING_VP_REWARD} VP Claimed!`)
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅')
+        .setDisabled(true)
+    );
+
+    await interaction.editReply({ components: [row] });
+    await thread.send(`✅ <@${teacherUserId}> claimed **${TEACHING_VP_REWARD} VP** for teaching! Thanks for helping the clan.`);
+
+    // Broadcast to payout log channel
+    const payoutChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+    if (payoutChannel) {
+      const proofImage = proofMessages.first()?.attachments.find(att => IMAGE_TYPES.includes(att.contentType))?.url;
+
+      // Get boss name from the thread name (format: "Teaching Proof — Boss Name")
+      const threadName = thread.name || '';
+      const bossName = threadName.replace('Teaching Proof — ', '') || 'Unknown';
+
+      const logEmbed = new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setTitle('🎓 Teaching VP Awarded')
+        .addFields(
+          { name: 'Teacher', value: `<@${teacherUserId}> (${player.rsn})`, inline: true },
+          { name: 'VP Awarded', value: `+${TEACHING_VP_REWARD} VP`, inline: true },
+          { name: 'Activity', value: bossName, inline: true }
+        )
+        .setTimestamp();
+
+      if (proofImage) {
+        logEmbed.setImage(proofImage);
+      }
+
+      await payoutChannel.send({ embeds: [logEmbed] }).catch(err =>
+        console.error('[LFG] Failed to send payout log:', err)
+      );
+    }
+
+    console.log(`[LFG] ${player.rsn} claimed ${TEACHING_VP_REWARD} VP for teaching (party ${partyId})`);
+  } catch (error) {
+    console.error('[LFG] Error handling claim VP:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
 module.exports = {
   postPersistentEmbed,
   handleCreateButton,
@@ -987,6 +1223,8 @@ module.exports = {
   handleNext,
   handleModalSubmit,
   handleVolunteerTeach,
+  handleInvite,
+  handleClaimVP,
   handleJoin,
   handleLeave,
   handleCancel,

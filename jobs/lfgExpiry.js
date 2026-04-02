@@ -5,6 +5,7 @@
  * - Expires old parties and disables their buttons
  */
 
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const bosses = require('../config/bosses.json');
 const db = require('../db/supabase');
 const lfgDb = require('../db/lfg');
@@ -91,30 +92,46 @@ async function checkExpiredParties(client) {
 
         await message.edit({ embeds: [embed], components: [buttons] });
 
-        // Award VP to teacher:
-        // - "teaching" parties: creator is the teacher
-        // - "learner" parties: teacher_id is whoever volunteered
-        const teacherId = party.experience_level === 'teaching'
-          ? party.creator_id
-          : (party.experience_level === 'learner' && party.teacher_id)
-            ? party.teacher_id
-            : null;
+        // Create proof thread for teachers to claim VP
+        const teacherMembers = members.filter(m => m.is_teacher);
+        const teacherIds = teacherMembers.length > 0
+          ? teacherMembers.map(m => m.user_id)
+          : (party.experience_level === 'teaching' ? [party.creator_id] : []);
 
-        if (teacherId) {
+        if (teacherIds.length > 0) {
           const joinedMembers = members.filter(m => m.status === 'joined');
-          const otherMembers = joinedMembers.filter(m => m.user_id !== teacherId);
+          const bossName = bosses[party.boss_key]?.name || party.boss_key;
 
-          if (otherMembers.length > 0) {
+          // Check each teacher has at least 1 other member
+          const eligibleTeachers = teacherIds.filter(tid => {
+            return joinedMembers.some(m => m.user_id !== tid);
+          });
+
+          if (eligibleTeachers.length > 0) {
             try {
-              const player = await db.getPlayerByDiscordId(teacherId);
-              if (player) {
-                await db.addPoints(player.rsn, TEACHING_VP_REWARD);
-                const bossName = bosses[party.boss_key]?.name || party.boss_key;
-                await channel.send(`🎓 <@${teacherId}> earned **${TEACHING_VP_REWARD} VP** for teaching **${bossName}**! Thanks for helping the clan.`);
-                console.log(`[LFG] Awarded ${TEACHING_VP_REWARD} VP to ${player.rsn} for teaching ${bossName}`);
+              const thread = await message.startThread({
+                name: `Teaching Proof — ${bossName}`,
+                autoArchiveDuration: 1440 // 24 hours
+              });
+
+              for (const teacherId of eligibleTeachers) {
+                const row = new ActionRowBuilder().addComponents(
+                  new ButtonBuilder()
+                    .setCustomId(`lfg_claim_vp_${party.id}_${teacherId}`)
+                    .setLabel(`Claim ${TEACHING_VP_REWARD} VP`)
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('🎓')
+                );
+
+                await thread.send({
+                  content: `🎓 <@${teacherId}> — Upload a screenshot as proof of your teaching run, then click the button below to claim your **${TEACHING_VP_REWARD} VP**!`,
+                  components: [row]
+                });
               }
-            } catch (vpError) {
-              console.error(`[LFG] Error awarding teaching VP for party ${party.id}:`, vpError);
+
+              console.log(`[LFG] Created proof thread for party ${party.id} (${bossName}, ${eligibleTeachers.length} teacher(s))`);
+            } catch (threadError) {
+              console.error(`[LFG] Error creating proof thread for party ${party.id}:`, threadError);
             }
           }
         }
