@@ -20,31 +20,31 @@ const MAX_ACTIVE_PARTIES = 3;
 // Map common timezone abbreviations to IANA zones so DST is handled correctly.
 // "EST" is always UTC-5, but users mean "Eastern Time" which is EDT (UTC-4) in summer.
 const TIMEZONE_ALIASES = {
-  'EST':  'America/New_York',
-  'EDT':  'America/New_York',
-  'ET':   'America/New_York',
+  'EST': 'America/New_York',
+  'EDT': 'America/New_York',
+  'ET': 'America/New_York',
   'EASTERN': 'America/New_York',
-  'CST':  'America/Chicago',
-  'CDT':  'America/Chicago',
-  'CT':   'America/Chicago',
+  'CST': 'America/Chicago',
+  'CDT': 'America/Chicago',
+  'CT': 'America/Chicago',
   'CENTRAL': 'America/Chicago',
-  'MST':  'America/Denver',
-  'MDT':  'America/Denver',
-  'MT':   'America/Denver',
+  'MST': 'America/Denver',
+  'MDT': 'America/Denver',
+  'MT': 'America/Denver',
   'MOUNTAIN': 'America/Denver',
-  'PST':  'America/Los_Angeles',
-  'PDT':  'America/Los_Angeles',
-  'PT':   'America/Los_Angeles',
+  'PST': 'America/Los_Angeles',
+  'PDT': 'America/Los_Angeles',
+  'PT': 'America/Los_Angeles',
   'PACIFIC': 'America/Los_Angeles',
   'AKST': 'America/Anchorage',
   'AKDT': 'America/Anchorage',
-  'HST':  'Pacific/Honolulu',
-  'GMT':  'Etc/GMT',
-  'UTC':  'Etc/UTC',
-  'BST':  'Europe/London',
-  'CET':  'Europe/Berlin',
+  'HST': 'Pacific/Honolulu',
+  'GMT': 'Etc/GMT',
+  'UTC': 'Etc/UTC',
+  'BST': 'Europe/London',
+  'CET': 'Europe/Berlin',
   'CEST': 'Europe/Berlin',
-  'EET':  'Europe/Helsinki',
+  'EET': 'Europe/Helsinki',
   'EEST': 'Europe/Helsinki',
   'AEST': 'Australia/Sydney',
   'AEDT': 'Australia/Sydney',
@@ -53,12 +53,12 @@ const TIMEZONE_ALIASES = {
   'AWST': 'Australia/Perth',
   'NZST': 'Pacific/Auckland',
   'NZDT': 'Pacific/Auckland',
-  'IST':  'Asia/Kolkata',
-  'JST':  'Asia/Tokyo',
-  'KST':  'Asia/Seoul',
-  'SGT':  'Asia/Singapore',
-  'HKT':  'Asia/Hong_Kong',
-  'SWE':  'Europe/Stockholm',
+  'IST': 'Asia/Kolkata',
+  'JST': 'Asia/Tokyo',
+  'KST': 'Asia/Seoul',
+  'SGT': 'Asia/Singapore',
+  'HKT': 'Asia/Hong_Kong',
+  'SWE': 'Europe/Stockholm',
   'SWEDISH': 'Europe/Stockholm'
 };
 
@@ -66,7 +66,7 @@ const TIMEZONE_ALIASES = {
  * Parse a time string with a timezone abbreviation into a Date.
  * Uses IANA timezone lookup to handle DST correctly.
  */
-function parseCustomTime(rawTime, rawTz) {
+function parseCustomTime (rawTime, rawTz) {
   const tzKey = rawTz.trim().toUpperCase();
   const ianaZone = TIMEZONE_ALIASES[tzKey];
 
@@ -99,37 +99,37 @@ const pendingParties = new Map();
 
 // Time options for the select menu (value → { label, description, offsetMs, expiryMs })
 const TIME_OPTIONS = [
-  { value: 'now',     label: 'Right now',       description: 'Starting immediately',            offsetMs: 0,                expiryMs: 5 * 60 * 1000 }, // TODO: change back to 2 * 60 * 60 * 1000 after testing
-  { value: '15min',   label: 'In 15 minutes',   description: 'Starting in about 15 min',        offsetMs: 15 * 60 * 1000,   expiryMs: 2.25 * 60 * 60 * 1000 },
-  { value: '30min',   label: 'In 30 minutes',   description: 'Starting in about 30 min',        offsetMs: 30 * 60 * 1000,   expiryMs: 2.5 * 60 * 60 * 1000 },
-  { value: '1hr',     label: 'In 1 hour',       description: 'Starting in about 1 hour',        offsetMs: 60 * 60 * 1000,   expiryMs: 3 * 60 * 60 * 1000 },
-  { value: '2hr',     label: 'In 2 hours',      description: 'Starting in about 2 hours',       offsetMs: 2 * 60 * 60 * 1000, expiryMs: 4 * 60 * 60 * 1000 },
-  { value: '3hr',     label: 'In 3 hours',      description: 'Starting in about 3 hours',       offsetMs: 3 * 60 * 60 * 1000, expiryMs: 5 * 60 * 60 * 1000 },
-  { value: '4hr',     label: 'In 4 hours',      description: 'Starting in about 4 hours',       offsetMs: 4 * 60 * 60 * 1000, expiryMs: 6 * 60 * 60 * 1000 },
-  { value: 'flexible', label: 'Flexible',       description: "No set time — whenever we're ready", offsetMs: 0,              expiryMs: 8 * 60 * 60 * 1000 },
-  { value: 'custom',   label: 'Custom time...',  description: 'Type a specific date/time (e.g. tomorrow 8pm EST)', offsetMs: 0,  expiryMs: 0 }
+  { value: 'now', label: 'Right now', description: 'Starting immediately', offsetMs: 0, expiryMs: 5 * 60 * 1000 }, // TODO: change back to 2 * 60 * 60 * 1000 after testing
+  { value: '15min', label: 'In 15 minutes', description: 'Starting in about 15 min', offsetMs: 15 * 60 * 1000, expiryMs: 2.25 * 60 * 60 * 1000 },
+  { value: '30min', label: 'In 30 minutes', description: 'Starting in about 30 min', offsetMs: 30 * 60 * 1000, expiryMs: 2.5 * 60 * 60 * 1000 },
+  { value: '1hr', label: 'In 1 hour', description: 'Starting in about 1 hour', offsetMs: 60 * 60 * 1000, expiryMs: 3 * 60 * 60 * 1000 },
+  { value: '2hr', label: 'In 2 hours', description: 'Starting in about 2 hours', offsetMs: 2 * 60 * 60 * 1000, expiryMs: 4 * 60 * 60 * 1000 },
+  { value: '3hr', label: 'In 3 hours', description: 'Starting in about 3 hours', offsetMs: 3 * 60 * 60 * 1000, expiryMs: 5 * 60 * 60 * 1000 },
+  { value: '4hr', label: 'In 4 hours', description: 'Starting in about 4 hours', offsetMs: 4 * 60 * 60 * 1000, expiryMs: 6 * 60 * 60 * 1000 },
+  { value: 'flexible', label: 'Flexible', description: "No set time — whenever we're ready", offsetMs: 0, expiryMs: 8 * 60 * 60 * 1000 },
+  { value: 'custom', label: 'Custom time...', description: 'Type a specific date/time (e.g. tomorrow 8pm EST)', offsetMs: 0, expiryMs: 0 }
 ];
 
 // Experience options for the select menu
 const EXPERIENCE_OPTIONS = [
-  { value: 'any',         label: 'All welcome',                   description: 'Any experience level can join',                         emoji: '🟢' },
-  { value: 'learner',     label: 'I need a teacher',              description: "I'm new to this boss and looking for someone to teach me", emoji: '📚' },
-  { value: 'teaching',    label: "I'll teach — learners welcome",  description: "I'm experienced and happy to guide newer players",        emoji: '🎓' },
-  { value: 'experienced', label: 'Experienced only',              description: 'Looking for players who already know the boss',          emoji: '⚡' }
+  { value: 'any', label: 'All welcome', description: 'Any experience level can join', emoji: '🟢' },
+  { value: 'learner', label: 'I need a teacher', description: "I'm new to this boss and looking for someone to teach me", emoji: '📚' },
+  { value: 'teaching', label: "I'll teach — learners welcome", description: "I'm experienced and happy to guide newer players", emoji: '🎓' },
+  { value: 'experienced', label: 'Experienced only', description: 'Looking for players who already know the boss', emoji: '⚡' }
 ];
 
 // Experience level display mapping (for embeds)
 const EXPERIENCE_DISPLAY = {
-  any:         { emoji: '🟢', label: 'All welcome', detail: 'Any experience level' },
-  learner:     { emoji: '📚', label: 'Looking for a teacher', detail: 'New to this boss — need someone to show the ropes', detailNoTeacher: 'Volunteer to teach and earn **15 VP**!' },
-  teaching:    { emoji: '🎓', label: 'Teaching run', detail: 'Experienced player offering to teach — Earn **15 VP** for teaching!' },
+  any: { emoji: '🟢', label: 'All welcome', detail: 'Any experience level' },
+  learner: { emoji: '📚', label: 'Looking for a teacher', detail: 'New to this boss — need someone to show the ropes', detailNoTeacher: 'Volunteer to teach and earn **15 VP**!' },
+  teaching: { emoji: '🎓', label: 'Teaching run', detail: 'Experienced player offering to teach — Earn **15 VP** for teaching!' },
   experienced: { emoji: '⚡', label: 'Experienced only', detail: 'Know the boss already' }
 };
 
 /**
  * Format experience level for party embed
  */
-function formatExperience(level) {
+function formatExperience (level) {
   const exp = EXPERIENCE_DISPLAY[level] || EXPERIENCE_DISPLAY.any;
   return `${exp.emoji} **${exp.label}**\n${exp.detail}`;
 }
@@ -143,7 +143,7 @@ function formatExperience(level) {
  * Preset values like "now", "1hr" show their label.
  * ISO date strings (from custom input) show as Discord timestamps.
  */
-function formatTimeDisplay(timeValue) {
+function formatTimeDisplay (timeValue) {
   if (!timeValue) return 'Flexible';
 
   // Check if it's an ISO date string (custom time)
@@ -161,7 +161,7 @@ function formatTimeDisplay(timeValue) {
  * Calculate expiry timestamp from a time option value
  * For custom times, expire 2 hours after the scheduled time.
  */
-function calculateExpiry(timeValue, customTimestamp) {
+function calculateExpiry (timeValue, customTimestamp) {
   if (timeValue === 'custom' && customTimestamp) {
     const scheduledMs = new Date(customTimestamp).getTime();
     return new Date(scheduledMs + 2 * 60 * 60 * 1000);
@@ -177,7 +177,7 @@ function calculateExpiry(timeValue, customTimestamp) {
  * Calculate the event start time from a time option.
  * Returns null for "flexible" (no specific start time → no ping).
  */
-function calculateStartsAt(timeValue, customTimestamp) {
+function calculateStartsAt (timeValue, customTimestamp) {
   if (timeValue === 'custom' && customTimestamp) {
     return new Date(customTimestamp);
   }
@@ -193,7 +193,7 @@ function calculateStartsAt(timeValue, customTimestamp) {
 /**
  * Clean up stale pending party entries (older than 10 min)
  */
-function cleanupPending() {
+function cleanupPending () {
   const cutoff = Date.now() - 10 * 60 * 1000;
   for (const [userId, data] of pendingParties) {
     if (data.createdAt < cutoff) {
@@ -206,7 +206,7 @@ function cleanupPending() {
 // Persistent embed (posted once by admin)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildPersistentEmbed() {
+function buildPersistentEmbed () {
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
     .setTitle('Party Finder')
@@ -228,7 +228,7 @@ function buildPersistentEmbed() {
   return { embed, row };
 }
 
-async function postPersistentEmbed(channel) {
+async function postPersistentEmbed (channel) {
   const { embed, row } = buildPersistentEmbed();
   return channel.send({ embeds: [embed], components: [row] });
 }
@@ -237,7 +237,7 @@ async function postPersistentEmbed(channel) {
 // Step 1: Boss select menu
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildBossSelectMenu() {
+function buildBossSelectMenu () {
   const categories = {};
   for (const [key, boss] of Object.entries(bosses)) {
     if (!categories[boss.category]) categories[boss.category] = [];
@@ -267,7 +267,7 @@ function buildBossSelectMenu() {
 // Step 2: Experience + Time selects with Next button
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildOptionsMessage(bossKey, selectedExp = null, selectedTime = null) {
+function buildOptionsMessage (bossKey, selectedExp = null, selectedTime = null) {
   const boss = bosses[bossKey];
 
   const experienceSelect = new StringSelectMenuBuilder()
@@ -316,7 +316,7 @@ function buildOptionsMessage(bossKey, selectedExp = null, selectedTime = null) {
 // Step 3: Modal (party size + notes only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildPartyModal(bossKey, { includeCustomTime = false, isLearner = false } = {}) {
+function buildPartyModal (bossKey, { includeCustomTime = false, isLearner = false } = {}) {
   const boss = bosses[bossKey];
 
   const modal = new ModalBuilder()
@@ -387,7 +387,7 @@ function buildPartyModal(bossKey, { includeCustomTime = false, isLearner = false
 // Party listing embed + buttons
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildPartyEmbed(party, members) {
+function buildPartyEmbed (party, members) {
   const boss = bosses[party.boss_key];
   const joinedMembers = members.filter(m => m.status === 'joined');
   const waitlistedMembers = members.filter(m => m.status === 'waitlisted');
@@ -502,7 +502,7 @@ function buildPartyEmbed(party, members) {
   return embed;
 }
 
-function buildPartyButtons(party, members) {
+function buildPartyButtons (party, members) {
   const joinedMembers = members.filter(m => m.status === 'joined');
   const isFull = joinedMembers.length >= party.group_size;
   const isEnded = party.status === 'expired' || party.status === 'cancelled';
@@ -568,7 +568,7 @@ function buildPartyButtons(party, members) {
 /**
  * Handle the "Create Party" button click → show boss select
  */
-async function handleCreateButton(interaction) {
+async function handleCreateButton (interaction) {
   try {
     const activeParties = await lfgDb.getActivePartiesByUser(interaction.user.id);
     if (activeParties.length >= MAX_ACTIVE_PARTIES) {
@@ -586,14 +586,14 @@ async function handleCreateButton(interaction) {
     });
   } catch (error) {
     console.error('[LFG] Error handling create button:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle boss selection → show experience + time selects
  */
-async function handleBossSelect(interaction) {
+async function handleBossSelect (interaction) {
   try {
     const bossKey = interaction.values[0];
     if (!bosses[bossKey]) {
@@ -614,14 +614,14 @@ async function handleBossSelect(interaction) {
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling boss select:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle experience select menu
  */
-async function handleExpSelect(interaction) {
+async function handleExpSelect (interaction) {
   try {
     const pending = pendingParties.get(interaction.user.id);
     if (!pending) {
@@ -643,14 +643,14 @@ async function handleExpSelect(interaction) {
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling exp select:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle time select menu
  */
-async function handleTimeSelect(interaction) {
+async function handleTimeSelect (interaction) {
   try {
     const pending = pendingParties.get(interaction.user.id);
     if (!pending) {
@@ -674,14 +674,14 @@ async function handleTimeSelect(interaction) {
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling time select:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle "Next" button → validate selects and open modal
  */
-async function handleNext(interaction) {
+async function handleNext (interaction) {
   try {
     const bossKey = interaction.customId.replace('lfg_next_', '');
     const pending = pendingParties.get(interaction.user.id);
@@ -705,14 +705,14 @@ async function handleNext(interaction) {
     await interaction.showModal(modal);
   } catch (error) {
     console.error('[LFG] Error handling next button:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle modal submission → create the party
  */
-async function handleModalSubmit(interaction) {
+async function handleModalSubmit (interaction) {
   try {
     const bossKey = interaction.customId.replace('lfg_modal_', '');
     const boss = bosses[bossKey];
@@ -860,14 +860,14 @@ async function handleModalSubmit(interaction) {
     console.log(`[LFG] Party created by ${interaction.user.tag} for ${boss.name} (${groupSize} players, ${experienceLevel})`);
   } catch (error) {
     console.error('[LFG] Error handling modal submit:', error);
-    await interaction.reply({ content: 'Something went wrong creating your party. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong creating your party. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle "Volunteer to Teach" button on learner parties
  */
-async function handleVolunteerTeach(interaction) {
+async function handleVolunteerTeach (interaction) {
   try {
     const messageId = interaction.customId.replace('lfg_teach_', '');
     const party = await lfgDb.getPartyByMessageId(messageId);
@@ -920,14 +920,14 @@ async function handleVolunteerTeach(interaction) {
     console.log(`[LFG] ${interaction.user.tag} volunteered to teach party ${party.id}`);
   } catch (error) {
     console.error('[LFG] Error handling volunteer teach:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle invite user select menu
  */
-async function handleInvite(interaction) {
+async function handleInvite (interaction) {
   try {
     const messageId = interaction.customId.replace('lfg_invite_', '');
     const party = await lfgDb.getPartyByMessageId(messageId);
@@ -988,14 +988,14 @@ async function handleInvite(interaction) {
     console.log(`[LFG] ${interaction.user.tag} invited ${added} player(s) to party ${party.id}`);
   } catch (error) {
     console.error('[LFG] Error handling invite:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle "Join" / "Join Waitlist" button
  */
-async function handleJoin(interaction) {
+async function handleJoin (interaction) {
   try {
     const messageId = interaction.customId.replace('lfg_join_', '');
     const party = await lfgDb.getPartyByMessageId(messageId);
@@ -1050,14 +1050,14 @@ async function handleJoin(interaction) {
     console.log(`[LFG] ${interaction.user.tag} joined party ${party.id} (${isFull ? 'waitlisted' : 'joined'})`);
   } catch (error) {
     console.error('[LFG] Error handling join:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle "Leave" button
  */
-async function handleLeave(interaction) {
+async function handleLeave (interaction) {
   try {
     const messageId = interaction.customId.replace('lfg_leave_', '');
     const party = await lfgDb.getPartyByMessageId(messageId);
@@ -1103,14 +1103,14 @@ async function handleLeave(interaction) {
     console.log(`[LFG] ${interaction.user.tag} left party ${party.id}`);
   } catch (error) {
     console.error('[LFG] Error handling leave:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
 /**
  * Handle "Cancel Party" button
  */
-async function handleCancel(interaction) {
+async function handleCancel (interaction) {
   try {
     const messageId = interaction.customId.replace('lfg_cancel_', '');
     const party = await lfgDb.getPartyByMessageId(messageId);
@@ -1140,7 +1140,7 @@ async function handleCancel(interaction) {
     console.log(`[LFG] Party ${party.id} cancelled by ${interaction.user.tag}`);
   } catch (error) {
     console.error('[LFG] Error handling cancel:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 
@@ -1150,7 +1150,7 @@ const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image
 /**
  * Handle "Claim VP" button in proof threads
  */
-async function handleClaimVP(interaction) {
+async function handleClaimVP (interaction) {
   try {
     // customId format: lfg_claim_vp_{partyId}_{teacherUserId}
     const parts = interaction.customId.replace('lfg_claim_vp_', '').split('_');
@@ -1182,7 +1182,7 @@ async function handleClaimVP(interaction) {
 
     if (proofMessages.size === 0) {
       return interaction.reply({
-        content: 'Please upload a screenshot as proof first, then click the button again.',
+        content: 'Please upload a screenshot into this thread as proof first, then click the button again.',
         ephemeral: true
       });
     }
@@ -1243,7 +1243,7 @@ async function handleClaimVP(interaction) {
     console.log(`[LFG] ${player.rsn} claimed ${TEACHING_VP_REWARD} VP for teaching (party ${partyId})`);
   } catch (error) {
     console.error('[LFG] Error handling claim VP:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
   }
 }
 

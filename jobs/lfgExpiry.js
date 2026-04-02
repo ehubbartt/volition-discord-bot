@@ -16,7 +16,7 @@ const TEACHING_VP_REWARD = 15;
 /**
  * Send start notifications for parties whose start time has arrived
  */
-async function sendStartNotifications(client) {
+async function sendStartNotifications (client) {
   try {
     const parties = await lfgDb.getPartiesNeedingStartNotification();
 
@@ -51,7 +51,7 @@ async function sendStartNotifications(client) {
       } catch (error) {
         console.error(`[LFG] Error sending start notification for party ${party.id}:`, error);
         // Still mark as notified to avoid spam on repeated failures
-        await lfgDb.markStartNotified(party.id).catch(() => {});
+        await lfgDb.markStartNotified(party.id).catch(() => { });
       }
     }
   } catch (error) {
@@ -62,7 +62,7 @@ async function sendStartNotifications(client) {
 /**
  * Check for and expire old parties
  */
-async function checkExpiredParties(client) {
+async function checkExpiredParties (client) {
   try {
     const expiredParties = await lfgDb.getExpiredParties();
 
@@ -124,7 +124,7 @@ async function checkExpiredParties(client) {
                 );
 
                 await thread.send({
-                  content: `🎓 <@${teacherId}> — Upload a screenshot as proof of your teaching run, then click the button below to claim your **${TEACHING_VP_REWARD} VP**!`,
+                  content: `🎓 <@${teacherId}> — Upload a screenshot into this thread as proof of your teaching run, then click the button below to claim your **${TEACHING_VP_REWARD} VP**!`,
                   components: [row]
                 });
               }
@@ -149,7 +149,7 @@ async function checkExpiredParties(client) {
 /**
  * Run both checks
  */
-async function runLfgChecks(client) {
+async function runLfgChecks (client) {
   await sendStartNotifications(client);
   await checkExpiredParties(client);
 }
@@ -157,7 +157,7 @@ async function runLfgChecks(client) {
 /**
  * Start the job
  */
-function startLfgExpiryChecker(client) {
+function startLfgExpiryChecker (client) {
   console.log('[LFG] Starting party checker (start notifications + expiry)...');
 
   setTimeout(() => {
