@@ -20,89 +20,19 @@
     "defaultSize": 4,
     "maxSize": 8
   },
-  "colosseum": {
-    "name": "Fortis Colosseum",
-    "category": "Raids",
-    "image": "https://oldschool.runescape.wiki/images/Fortis_Colosseum_logo.png",
-    "defaultSize": 1,
-    "maxSize": 1
-  },
-  "graardor": {
-    "name": "General Graardor",
-    "category": "God Wars",
-    "image": "https://oldschool.runescape.wiki/images/General_Graardor.png",
-    "defaultSize": 3,
-    "maxSize": 10
-  },
-  "zilyana": {
-    "name": "Commander Zilyana",
-    "category": "God Wars",
-    "image": "https://oldschool.runescape.wiki/images/Commander_Zilyana.png",
-    "defaultSize": 3,
-    "maxSize": 10
-  },
-  "kril": {
-    "name": "K'ril Tsutsaroth",
-    "category": "God Wars",
-    "image": "https://oldschool.runescape.wiki/images/K%27ril_Tsutsaroth.png",
-    "defaultSize": 3,
-    "maxSize": 10
-  },
-  "kreearra": {
-    "name": "Kree'arra",
-    "category": "God Wars",
-    "image": "https://oldschool.runescape.wiki/images/Kree%27arra.png",
-    "defaultSize": 3,
-    "maxSize": 10
-  },
   "nex": {
     "name": "Nex",
-    "category": "God Wars",
+    "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/Nex.png",
     "defaultSize": 5,
     "maxSize": 60
   },
-  "corp": {
-    "name": "Corporeal Beast",
-    "category": "Group PvM",
-    "image": "https://oldschool.runescape.wiki/images/Corporeal_Beast.png",
-    "defaultSize": 4,
-    "maxSize": 20
-  },
   "nightmare": {
     "name": "The Nightmare",
-    "category": "Group PvM",
+    "category": "Bosses",
     "image": "https://oldschool.runescape.wiki/images/The_Nightmare.png",
     "defaultSize": 5,
     "maxSize": 80
-  },
-  "phosani": {
-    "name": "Phosani's Nightmare",
-    "category": "Group PvM",
-    "image": "https://oldschool.runescape.wiki/images/Phosani%27s_Nightmare.png",
-    "defaultSize": 1,
-    "maxSize": 1
-  },
-  "zalcano": {
-    "name": "Zalcano",
-    "category": "Group PvM",
-    "image": "https://oldschool.runescape.wiki/images/Zalcano.png",
-    "defaultSize": 4,
-    "maxSize": 20
-  },
-  "tempoross": {
-    "name": "Tempoross",
-    "category": "Group PvM",
-    "image": "https://oldschool.runescape.wiki/images/Tempoross.png",
-    "defaultSize": 4,
-    "maxSize": 20
-  },
-  "moons": {
-    "name": "Moons of Peril",
-    "category": "Group PvM",
-    "image": "https://oldschool.runescape.wiki/images/Blue_Moon.png",
-    "defaultSize": 3,
-    "maxSize": 3
   },
   "callisto": {
     "name": "Callisto",
@@ -125,32 +55,39 @@
     "defaultSize": 3,
     "maxSize": 10
   },
-  "scorpia": {
-    "name": "Scorpia",
-    "category": "Wilderness",
-    "image": "https://oldschool.runescape.wiki/images/Scorpia.png",
+  "hueycoatl": {
+    "name": "Hueycoatl",
+    "category": "Bosses",
+    "image": "https://oldschool.runescape.wiki/images/Hueycoatl.png",
     "defaultSize": 3,
     "maxSize": 10
   },
-  "dks": {
-    "name": "Dagannoth Kings",
-    "category": "Other",
-    "image": "https://oldschool.runescape.wiki/images/Dagannoth_Rex.png",
-    "defaultSize": 3,
+  "royal_titans": {
+    "name": "Royal Titans",
+    "category": "Bosses",
+    "image": "https://oldschool.runescape.wiki/images/Royal_Titans.png",
+    "defaultSize": 5,
     "maxSize": 10
   },
-  "kbd": {
-    "name": "King Black Dragon",
-    "category": "Other",
-    "image": "https://oldschool.runescape.wiki/images/King_Black_Dragon.png",
-    "defaultSize": 2,
+  "yama": {
+    "name": "Yama",
+    "category": "Bosses",
+    "image": "https://oldschool.runescape.wiki/images/Yama.png",
+    "defaultSize": 5,
     "maxSize": 10
   },
-  "kq": {
-    "name": "Kalphite Queen",
-    "category": "Other",
-    "image": "https://oldschool.runescape.wiki/images/Kalphite_Queen_%28second_form%29.png",
-    "defaultSize": 2,
-    "maxSize": 10
+  "ba": {
+    "name": "Barbarian Assault",
+    "category": "Minigames",
+    "image": "https://oldschool.runescape.wiki/images/Barbarian_Assault_logo.png",
+    "defaultSize": 5,
+    "maxSize": 5
+  },
+  "zalcano": {
+    "name": "Zalcano",
+    "category": "Bosses",
+    "image": "https://oldschool.runescape.wiki/images/Zalcano.png",
+    "defaultSize": 4,
+    "maxSize": 20
   }
 }
