@@ -11,6 +11,7 @@ const walletHandler = require('../handlers/wallet');
 const forceVerifyHandler = require('../handlers/forceVerify');
 const transcriptHandler = require('../handlers/transcript');
 const restoreVpHandler = require('../handlers/restoreVp');
+const lfgHandler = require('../handlers/lfg');
 
 // Per-user spin lock to prevent race conditions from rapid button clicks across multiple messages
 const spinLocks = new Set();
@@ -58,6 +59,15 @@ module.exports = {
         if (interaction.replied || interaction.deferred) await interaction.followUp(msg);
         else await interaction.reply(msg);
       }
+    }
+
+    // LFG boss select menu
+    if (interaction.isStringSelectMenu() && interaction.customId === 'lfg_boss_select') {
+      if (!await features.isEnabled('gamification.partyFinder')) {
+        return interaction.reply({ content: '⚠️ Party Finder is currently disabled.', ephemeral: true });
+      }
+      try { return await lfgHandler.handleBossSelect(interaction); }
+      catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId === 'shop_menu') {
@@ -585,6 +595,23 @@ module.exports = {
           interaction.customId === 'wallet_cashout_cancel' || interaction.customId.startsWith('wallet_mark_paid_')) {
         return walletHandler.handleButton(interaction);
       }
+
+      // LFG Party Finder buttons
+      if (interaction.customId === 'lfg_create') {
+        if (!await features.isEnabled('gamification.partyFinder')) {
+          return interaction.reply({ content: '⚠️ Party Finder is currently disabled.', ephemeral: true });
+        }
+        return lfgHandler.handleCreateButton(interaction);
+      }
+      if (interaction.customId.startsWith('lfg_join_')) {
+        return lfgHandler.handleJoin(interaction);
+      }
+      if (interaction.customId.startsWith('lfg_leave_')) {
+        return lfgHandler.handleLeave(interaction);
+      }
+      if (interaction.customId.startsWith('lfg_cancel_')) {
+        return lfgHandler.handleCancel(interaction);
+      }
     }
 
     if (interaction.isModalSubmit()) {
@@ -636,6 +663,11 @@ module.exports = {
       // Handle transcript modal submission
       if (interaction.customId === 'transcript_modal') {
         return transcriptHandler.handleModal(interaction);
+      }
+
+      // LFG party creation modal
+      if (interaction.customId.startsWith('lfg_modal_')) {
+        return lfgHandler.handleModalSubmit(interaction);
       }
     }
   },

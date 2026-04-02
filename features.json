@@ -46,7 +46,8 @@
     "duels": true,
     "weeklyTasks": true,
     "eventRewards": true,
-    "voiceTracking": true
+    "voiceTracking": true,
+    "partyFinder": true
   },
   "commands": {
     "verification": {
@@ -78,7 +79,8 @@
       "updateconfig": true,
       "syncconfig": true,
       "sendweeklytask": true,
-      "senddailywordle": true
+      "senddailywordle": true,
+      "lfg-setup": true
     },
     "fun": {
       "lootcrate": true,

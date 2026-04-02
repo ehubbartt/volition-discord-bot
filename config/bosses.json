@@ -1,0 +1,156 @@
+{
+  "cox": {
+    "name": "Chambers of Xeric",
+    "category": "Raids",
+    "image": "https://oldschool.runescape.wiki/images/Chambers_of_Xeric_logo.png",
+    "defaultSize": 4,
+    "maxSize": 100
+  },
+  "tob": {
+    "name": "Theatre of Blood",
+    "category": "Raids",
+    "image": "https://oldschool.runescape.wiki/images/Theatre_of_Blood_logo.png",
+    "defaultSize": 4,
+    "maxSize": 5
+  },
+  "toa": {
+    "name": "Tombs of Amascut",
+    "category": "Raids",
+    "image": "https://oldschool.runescape.wiki/images/Tombs_of_Amascut_logo.png",
+    "defaultSize": 4,
+    "maxSize": 8
+  },
+  "colosseum": {
+    "name": "Fortis Colosseum",
+    "category": "Raids",
+    "image": "https://oldschool.runescape.wiki/images/Fortis_Colosseum_logo.png",
+    "defaultSize": 1,
+    "maxSize": 1
+  },
+  "graardor": {
+    "name": "General Graardor",
+    "category": "God Wars",
+    "image": "https://oldschool.runescape.wiki/images/General_Graardor.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "zilyana": {
+    "name": "Commander Zilyana",
+    "category": "God Wars",
+    "image": "https://oldschool.runescape.wiki/images/Commander_Zilyana.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "kril": {
+    "name": "K'ril Tsutsaroth",
+    "category": "God Wars",
+    "image": "https://oldschool.runescape.wiki/images/K%27ril_Tsutsaroth.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "kreearra": {
+    "name": "Kree'arra",
+    "category": "God Wars",
+    "image": "https://oldschool.runescape.wiki/images/Kree%27arra.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "nex": {
+    "name": "Nex",
+    "category": "God Wars",
+    "image": "https://oldschool.runescape.wiki/images/Nex.png",
+    "defaultSize": 5,
+    "maxSize": 60
+  },
+  "corp": {
+    "name": "Corporeal Beast",
+    "category": "Group PvM",
+    "image": "https://oldschool.runescape.wiki/images/Corporeal_Beast.png",
+    "defaultSize": 4,
+    "maxSize": 20
+  },
+  "nightmare": {
+    "name": "The Nightmare",
+    "category": "Group PvM",
+    "image": "https://oldschool.runescape.wiki/images/The_Nightmare.png",
+    "defaultSize": 5,
+    "maxSize": 80
+  },
+  "phosani": {
+    "name": "Phosani's Nightmare",
+    "category": "Group PvM",
+    "image": "https://oldschool.runescape.wiki/images/Phosani%27s_Nightmare.png",
+    "defaultSize": 1,
+    "maxSize": 1
+  },
+  "zalcano": {
+    "name": "Zalcano",
+    "category": "Group PvM",
+    "image": "https://oldschool.runescape.wiki/images/Zalcano.png",
+    "defaultSize": 4,
+    "maxSize": 20
+  },
+  "tempoross": {
+    "name": "Tempoross",
+    "category": "Group PvM",
+    "image": "https://oldschool.runescape.wiki/images/Tempoross.png",
+    "defaultSize": 4,
+    "maxSize": 20
+  },
+  "moons": {
+    "name": "Moons of Peril",
+    "category": "Group PvM",
+    "image": "https://oldschool.runescape.wiki/images/Blue_Moon.png",
+    "defaultSize": 3,
+    "maxSize": 3
+  },
+  "callisto": {
+    "name": "Callisto",
+    "category": "Wilderness",
+    "image": "https://oldschool.runescape.wiki/images/Callisto.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "venenatis": {
+    "name": "Venenatis",
+    "category": "Wilderness",
+    "image": "https://oldschool.runescape.wiki/images/Venenatis.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "vetion": {
+    "name": "Vet'ion",
+    "category": "Wilderness",
+    "image": "https://oldschool.runescape.wiki/images/Vet%27ion.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "scorpia": {
+    "name": "Scorpia",
+    "category": "Wilderness",
+    "image": "https://oldschool.runescape.wiki/images/Scorpia.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "dks": {
+    "name": "Dagannoth Kings",
+    "category": "Other",
+    "image": "https://oldschool.runescape.wiki/images/Dagannoth_Rex.png",
+    "defaultSize": 3,
+    "maxSize": 10
+  },
+  "kbd": {
+    "name": "King Black Dragon",
+    "category": "Other",
+    "image": "https://oldschool.runescape.wiki/images/King_Black_Dragon.png",
+    "defaultSize": 2,
+    "maxSize": 10
+  },
+  "kq": {
+    "name": "Kalphite Queen",
+    "category": "Other",
+    "image": "https://oldschool.runescape.wiki/images/Kalphite_Queen_%28second_form%29.png",
+    "defaultSize": 2,
+    "maxSize": 10
+  }
+}
