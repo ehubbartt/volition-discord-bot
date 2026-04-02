@@ -614,6 +614,9 @@ module.exports = {
       if (interaction.customId.startsWith('lfg_next_')) {
         return lfgHandler.handleNext(interaction);
       }
+      if (interaction.customId.startsWith('lfg_teach_')) {
+        return lfgHandler.handleVolunteerTeach(interaction);
+      }
       if (interaction.customId.startsWith('lfg_join_')) {
         return lfgHandler.handleJoin(interaction);
       }

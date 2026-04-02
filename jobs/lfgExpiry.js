@@ -91,18 +91,26 @@ async function checkExpiredParties(client) {
 
         await message.edit({ embeds: [embed], components: [buttons] });
 
-        // Award VP to teacher if this was a teaching party with at least 1 other member
-        if (party.experience_level === 'teaching') {
+        // Award VP to teacher:
+        // - "teaching" parties: creator is the teacher
+        // - "learner" parties: teacher_id is whoever volunteered
+        const teacherId = party.experience_level === 'teaching'
+          ? party.creator_id
+          : (party.experience_level === 'learner' && party.teacher_id)
+            ? party.teacher_id
+            : null;
+
+        if (teacherId) {
           const joinedMembers = members.filter(m => m.status === 'joined');
-          const otherMembers = joinedMembers.filter(m => m.user_id !== party.creator_id);
+          const otherMembers = joinedMembers.filter(m => m.user_id !== teacherId);
 
           if (otherMembers.length > 0) {
             try {
-              const player = await db.getPlayerByDiscordId(party.creator_id);
+              const player = await db.getPlayerByDiscordId(teacherId);
               if (player) {
                 await db.addPoints(player.rsn, TEACHING_VP_REWARD);
                 const bossName = bosses[party.boss_key]?.name || party.boss_key;
-                await channel.send(`🎓 <@${party.creator_id}> earned **${TEACHING_VP_REWARD} VP** for teaching **${bossName}**! Thanks for helping the clan.`);
+                await channel.send(`🎓 <@${teacherId}> earned **${TEACHING_VP_REWARD} VP** for teaching **${bossName}**! Thanks for helping the clan.`);
                 console.log(`[LFG] Awarded ${TEACHING_VP_REWARD} VP to ${player.rsn} for teaching ${bossName}`);
               }
             } catch (vpError) {

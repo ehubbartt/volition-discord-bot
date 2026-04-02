@@ -119,7 +119,7 @@ const EXPERIENCE_OPTIONS = [
 // Experience level display mapping (for embeds)
 const EXPERIENCE_DISPLAY = {
   any:         { emoji: '🟢', label: 'All welcome', detail: 'Any experience level' },
-  learner:     { emoji: '📚', label: 'Looking for a teacher', detail: 'New to this boss — need someone to show the ropes' },
+  learner:     { emoji: '📚', label: 'Looking for a teacher', detail: 'New to this boss — need someone to show the ropes', detailNoTeacher: 'Volunteer to teach and earn **15 VP**!' },
   teaching:    { emoji: '🎓', label: 'Teaching run', detail: 'Experienced player offering to teach — Earn **15 VP** for teaching!' },
   experienced: { emoji: '⚡', label: 'Experienced only', detail: 'Know the boss already' }
 };
@@ -418,7 +418,21 @@ function buildPartyEmbed(party, members) {
   embed.addFields({ name: 'Time', value: formatTimeDisplay(party.scheduled_time), inline: true });
 
   // Experience
-  embed.addFields({ name: 'Experience', value: formatExperience(party.experience_level) });
+  if (party.experience_level === 'learner' && !party.teacher_id && party.status !== 'expired' && party.status !== 'cancelled') {
+    // Learner party with no teacher yet — show VP incentive
+    embed.addFields({ name: 'Experience', value: `📚 **Looking for a teacher**\n${EXPERIENCE_DISPLAY.learner.detailNoTeacher}` });
+  } else {
+    embed.addFields({ name: 'Experience', value: formatExperience(party.experience_level) });
+  }
+
+  // Teacher field for learner parties
+  if (party.experience_level === 'learner') {
+    if (party.teacher_id) {
+      embed.addFields({ name: 'Teacher', value: `🎓 <@${party.teacher_id}>`, inline: true });
+    } else if (party.status !== 'expired' && party.status !== 'cancelled') {
+      embed.addFields({ name: 'Teacher', value: 'Waiting for a volunteer...', inline: true });
+    }
+  }
 
   // Notes
   if (party.notes) {
@@ -480,6 +494,17 @@ function buildPartyButtons(party, members) {
       .setStyle(ButtonStyle.Danger)
       .setDisabled(isEnded)
   );
+
+  // "Volunteer to Teach" button for learner parties without a teacher
+  if (party.experience_level === 'learner' && !party.teacher_id && !isEnded) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`lfg_teach_${party.message_id}`)
+        .setLabel('Volunteer to Teach (15 VP)')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('🎓')
+    );
+  }
 
   return row;
 }
@@ -762,6 +787,58 @@ async function handleModalSubmit(interaction) {
 }
 
 /**
+ * Handle "Volunteer to Teach" button on learner parties
+ */
+async function handleVolunteerTeach(interaction) {
+  try {
+    const messageId = interaction.customId.replace('lfg_teach_', '');
+    const party = await lfgDb.getPartyByMessageId(messageId);
+
+    if (!party || party.status === 'expired' || party.status === 'cancelled') {
+      return interaction.reply({ content: 'This party is no longer active.', ephemeral: true });
+    }
+
+    if (party.experience_level !== 'learner') {
+      return interaction.reply({ content: 'This party is not looking for a teacher.', ephemeral: true });
+    }
+
+    if (party.teacher_id) {
+      return interaction.reply({ content: 'This party already has a teacher.', ephemeral: true });
+    }
+
+    // Can't teach your own party
+    if (interaction.user.id === party.creator_id) {
+      return interaction.reply({ content: "You can't volunteer as teacher for your own party.", ephemeral: true });
+    }
+
+    await interaction.deferUpdate();
+
+    // Set as teacher
+    const updatedParty = await lfgDb.setTeacher(party.id, interaction.user.id);
+
+    // Auto-join the party if not already a member
+    const existingMember = await lfgDb.getMember(party.id, interaction.user.id);
+    if (!existingMember) {
+      const members = await lfgDb.getMembers(party.id);
+      const joinedCount = members.filter(m => m.status === 'joined').length;
+      const isFull = joinedCount >= party.group_size;
+      await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined');
+    }
+
+    const members = await lfgDb.getMembers(party.id);
+    const embed = buildPartyEmbed(updatedParty, members);
+    const buttons = buildPartyButtons(updatedParty, members);
+
+    await interaction.editReply({ embeds: [embed], components: [buttons] });
+
+    console.log(`[LFG] ${interaction.user.tag} volunteered to teach party ${party.id}`);
+  } catch (error) {
+    console.error('[LFG] Error handling volunteer teach:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
  * Handle "Join" / "Join Waitlist" button
  */
 async function handleJoin(interaction) {
@@ -909,6 +986,7 @@ module.exports = {
   handleTimeSelect,
   handleNext,
   handleModalSubmit,
+  handleVolunteerTeach,
   handleJoin,
   handleLeave,
   handleCancel,

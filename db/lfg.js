@@ -21,7 +21,8 @@ async function createParty({ creatorId, bossKey, groupSize, experienceLevel, sch
       message_id: messageId,
       channel_id: channelId,
       expires_at: expiresAt,
-      starts_at: startsAt || null
+      starts_at: startsAt || null,
+      teacher_id: experienceLevel === 'teaching' ? creatorId : null
     })
     .select()
     .single();
@@ -196,6 +197,21 @@ async function getPartiesNeedingStartNotification() {
 }
 
 /**
+ * Set the teacher for a learner party
+ */
+async function setTeacher(partyId, userId) {
+  const { data, error } = await supabase
+    .from('lfg_parties')
+    .update({ teacher_id: userId })
+    .eq('id', partyId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Mark a party as start-notified
  */
 async function markStartNotified(partyId) {
@@ -219,5 +235,6 @@ module.exports = {
   updatePartyStatus,
   getExpiredParties,
   getPartiesNeedingStartNotification,
-  markStartNotified
+  markStartNotified,
+  setTeacher
 };
