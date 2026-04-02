@@ -90,25 +90,25 @@
       "ban": true
     },
     "bingoEvent": {
-      "bingosubmit": true,
-      "bingoprogress": true,
-      "bingoleaderboard": true,
-      "initbingoboard": true,
-      "adminbingo": true
+      "bingosubmit": false,
+      "bingoprogress": false,
+      "bingoleaderboard": false,
+      "initbingoboard": false,
+      "adminbingo": false
     },
     "tileEvent": {
-      "addplayer": true,
-      "initboard": true,
-      "updateboard": true,
-      "roll": true,
-      "reroll": true,
-      "submit": true,
-      "submitpet": true,
-      "admintile": true,
-      "checkprogress": true,
-      "sabotage": true,
-      "checksabotage": true,
-      "tileleaderboard": true
+      "addplayer": false,
+      "initboard": false,
+      "updateboard": false,
+      "roll": false,
+      "reroll": false,
+      "submit": false,
+      "submitpet": false,
+      "admintile": false,
+      "checkprogress": false,
+      "sabotage": false,
+      "checksabotage": false,
+      "tileleaderboard": false
     },
     "utility": {
       "allset": true,
