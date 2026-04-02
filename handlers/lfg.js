@@ -15,6 +15,82 @@ const lfgDb = require('../db/lfg');
 
 const MAX_ACTIVE_PARTIES = 3;
 
+// Map common timezone abbreviations to IANA zones so DST is handled correctly.
+// "EST" is always UTC-5, but users mean "Eastern Time" which is EDT (UTC-4) in summer.
+const TIMEZONE_ALIASES = {
+  'EST':  'America/New_York',
+  'EDT':  'America/New_York',
+  'ET':   'America/New_York',
+  'EASTERN': 'America/New_York',
+  'CST':  'America/Chicago',
+  'CDT':  'America/Chicago',
+  'CT':   'America/Chicago',
+  'CENTRAL': 'America/Chicago',
+  'MST':  'America/Denver',
+  'MDT':  'America/Denver',
+  'MT':   'America/Denver',
+  'MOUNTAIN': 'America/Denver',
+  'PST':  'America/Los_Angeles',
+  'PDT':  'America/Los_Angeles',
+  'PT':   'America/Los_Angeles',
+  'PACIFIC': 'America/Los_Angeles',
+  'AKST': 'America/Anchorage',
+  'AKDT': 'America/Anchorage',
+  'HST':  'Pacific/Honolulu',
+  'GMT':  'Etc/GMT',
+  'UTC':  'Etc/UTC',
+  'BST':  'Europe/London',
+  'CET':  'Europe/Berlin',
+  'CEST': 'Europe/Berlin',
+  'EET':  'Europe/Helsinki',
+  'EEST': 'Europe/Helsinki',
+  'AEST': 'Australia/Sydney',
+  'AEDT': 'Australia/Sydney',
+  'ACST': 'Australia/Adelaide',
+  'ACDT': 'Australia/Adelaide',
+  'AWST': 'Australia/Perth',
+  'NZST': 'Pacific/Auckland',
+  'NZDT': 'Pacific/Auckland',
+  'IST':  'Asia/Kolkata',
+  'JST':  'Asia/Tokyo',
+  'KST':  'Asia/Seoul',
+  'SGT':  'Asia/Singapore',
+  'HKT':  'Asia/Hong_Kong',
+  'SWE':  'Europe/Stockholm',
+  'SWEDISH': 'Europe/Stockholm'
+};
+
+/**
+ * Parse a time string with a timezone abbreviation into a Date.
+ * Uses IANA timezone lookup to handle DST correctly.
+ */
+function parseCustomTime(rawTime, rawTz) {
+  const tzKey = rawTz.trim().toUpperCase();
+  const ianaZone = TIMEZONE_ALIASES[tzKey];
+
+  if (ianaZone) {
+    // Get the current UTC offset for this IANA zone (DST-aware)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaZone,
+      timeZoneName: 'shortOffset'
+    });
+    // Extract offset like "GMT-4" or "GMT+10"
+    const parts = formatter.formatToParts(now);
+    const tzPart = parts.find(p => p.type === 'timeZoneName');
+    // tzPart.value is like "GMT-4" or "GMT+5:30"
+    const offsetStr = tzPart ? tzPart.value.replace('GMT', 'GMT') : rawTz;
+
+    // Replace the user's abbreviation with the numeric offset for chrono
+    const combined = `${rawTime} ${offsetStr}`;
+    return chrono.parseDate(combined, now, { forwardDate: true });
+  }
+
+  // If not in our alias map, pass through as-is (chrono may still understand it)
+  const combined = `${rawTime} ${rawTz}`;
+  return chrono.parseDate(combined, new Date(), { forwardDate: true });
+}
+
 // Pending party creation state (userId → { bossKey, experience, time, timeLabel })
 // Entries are cleaned up after modal submit or after 10 minutes
 const pendingParties = new Map();
@@ -218,7 +294,7 @@ function buildOptionsMessage(bossKey) {
 // Step 3: Modal (party size + notes only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildPartyModal(bossKey) {
+function buildPartyModal(bossKey, includeCustomTime = false) {
   const boss = bosses[bossKey];
 
   const modal = new ModalBuilder()
@@ -233,6 +309,29 @@ function buildPartyModal(bossKey) {
     .setRequired(true)
     .setMaxLength(3);
 
+  const rows = [new ActionRowBuilder().addComponents(sizeInput)];
+
+  if (includeCustomTime) {
+    const timeInput = new TextInputBuilder()
+      .setCustomId('lfg_custom_time')
+      .setLabel('When is the event?')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. tomorrow 8pm, Saturday 3pm, April 10 7:30pm')
+      .setRequired(true)
+      .setMaxLength(60);
+
+    const tzInput = new TextInputBuilder()
+      .setCustomId('lfg_custom_tz')
+      .setLabel('Your timezone')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. EST, CST, PST, GMT, CET, AEST')
+      .setRequired(true)
+      .setMaxLength(10);
+
+    rows.push(new ActionRowBuilder().addComponents(timeInput));
+    rows.push(new ActionRowBuilder().addComponents(tzInput));
+  }
+
   const notesInput = new TextInputBuilder()
     .setCustomId('lfg_notes')
     .setLabel('Notes (optional)')
@@ -241,10 +340,9 @@ function buildPartyModal(bossKey) {
     .setRequired(false)
     .setMaxLength(200);
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(sizeInput),
-    new ActionRowBuilder().addComponents(notesInput)
-  );
+  rows.push(new ActionRowBuilder().addComponents(notesInput));
+
+  modal.addComponents(...rows);
 
   return modal;
 }
@@ -464,35 +562,6 @@ async function handleTimeSelect(interaction) {
 
     const selected = interaction.values[0];
 
-    // If "Custom time" selected, show a modal for text input
-    if (selected === 'custom') {
-      const modal = new ModalBuilder()
-        .setCustomId('lfg_custom_time_modal')
-        .setTitle('Custom Time');
-
-      const timeInput = new TextInputBuilder()
-        .setCustomId('lfg_custom_time')
-        .setLabel('When is the event?')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. tomorrow 8pm, Saturday 3pm, April 10 7:30pm')
-        .setRequired(true)
-        .setMaxLength(60);
-
-      const tzInput = new TextInputBuilder()
-        .setCustomId('lfg_custom_tz')
-        .setLabel('Your timezone')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. EST, CST, PST, GMT, CET, AEST')
-        .setRequired(true)
-        .setMaxLength(10);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(timeInput),
-        new ActionRowBuilder().addComponents(tzInput)
-      );
-      return interaction.showModal(modal);
-    }
-
     pending.time = selected;
     pending.customTimestamp = null;
     const timeOption = TIME_OPTIONS.find(t => t.value === pending.time);
@@ -508,58 +577,6 @@ async function handleTimeSelect(interaction) {
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling time select:', error);
-    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
-  }
-}
-
-/**
- * Handle custom time modal submission
- */
-async function handleCustomTimeModal(interaction) {
-  try {
-    const pending = pendingParties.get(interaction.user.id);
-    if (!pending) {
-      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
-    }
-
-    const rawInput = interaction.fields.getTextInputValue('lfg_custom_time');
-    const rawTz = interaction.fields.getTextInputValue('lfg_custom_tz').trim().toUpperCase();
-
-    // Combine the time and timezone for chrono to parse together
-    const combined = `${rawInput} ${rawTz}`;
-    const parsed = chrono.parseDate(combined, new Date(), { forwardDate: true });
-
-    if (!parsed) {
-      return interaction.reply({
-        content: `Couldn't understand "${rawInput}" in timezone **${rawTz}**. Try something like **tomorrow 8pm** with timezone **EST**, or **Saturday 3pm** with **PST**.`,
-        ephemeral: true
-      });
-    }
-
-    // Don't allow times in the past
-    if (parsed.getTime() < Date.now() - 5 * 60 * 1000) {
-      return interaction.reply({
-        content: 'That time is in the past. Please pick a future time.',
-        ephemeral: true
-      });
-    }
-
-    pending.time = 'custom';
-    pending.customTimestamp = parsed.toISOString();
-
-    const unix = Math.floor(parsed.getTime() / 1000);
-    const expOption = pending.experience ? EXPERIENCE_OPTIONS.find(o => o.value === pending.experience) : null;
-
-    let status = `**${bosses[pending.bossKey].name}** — Set up your party details:\n\n`;
-    status += expOption ? `> Group type: ${expOption.emoji} **${expOption.label}**\n` : '> Group type: *not selected yet*\n';
-    status += `> Time: <t:${unix}:F> (<t:${unix}:R>)`;
-
-    const msg = buildOptionsMessage(pending.bossKey);
-    msg.content = status;
-
-    await interaction.update(msg);
-  } catch (error) {
-    console.error('[LFG] Error handling custom time modal:', error);
     await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
   }
 }
@@ -584,7 +601,7 @@ async function handleNext(interaction) {
       return interaction.reply({ content: 'Please select a **time** before continuing.', ephemeral: true });
     }
 
-    const modal = buildPartyModal(bossKey);
+    const modal = buildPartyModal(bossKey, pending.time === 'custom');
     await interaction.showModal(modal);
   } catch (error) {
     console.error('[LFG] Error handling next button:', error);
@@ -611,6 +628,30 @@ async function handleModalSubmit(interaction) {
     // Parse modal fields
     const sizeRaw = interaction.fields.getTextInputValue('lfg_party_size');
     const notes = interaction.fields.getTextInputValue('lfg_notes') || null;
+
+    // If custom time was selected, parse the time + timezone from the modal
+    if (pending.time === 'custom') {
+      const rawTime = interaction.fields.getTextInputValue('lfg_custom_time');
+      const rawTz = interaction.fields.getTextInputValue('lfg_custom_tz').trim();
+
+      const parsed = parseCustomTime(rawTime, rawTz);
+
+      if (!parsed) {
+        return interaction.reply({
+          content: `Couldn't understand "${rawTime}" in timezone **${rawTz}**. Try something like **tomorrow 8pm** with **EST**, or **Saturday 3pm** with **PST**.`,
+          ephemeral: true
+        });
+      }
+
+      if (parsed.getTime() < Date.now() - 5 * 60 * 1000) {
+        return interaction.reply({
+          content: 'That time is in the past. Please pick a future time.',
+          ephemeral: true
+        });
+      }
+
+      pending.customTimestamp = parsed.toISOString();
+    }
 
     // Validate party size
     const groupSize = parseInt(sizeRaw, 10);
@@ -847,7 +888,6 @@ module.exports = {
   handleBossSelect,
   handleExpSelect,
   handleTimeSelect,
-  handleCustomTimeModal,
   handleNext,
   handleModalSubmit,
   handleJoin,
