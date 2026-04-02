@@ -14,7 +14,8 @@ module.exports = {
                 '**How to set up:**\n' +
                 '1. Click the button below to get the config URL\n' +
                 '2. In RuneLite, open the **Dink** plugin settings\n' +
-                '3. Go to **Advanced Settings** and paste it into **Dynamic Config URL**'
+                '3. Scroll to the bottom and reset your plugin settings' +
+                '4. Go to **Advanced Settings** and paste it into **Dynamic Config URL**'
             )
             .setFooter({ text: 'Requires the Dink plugin installed in RuneLite' });
 
