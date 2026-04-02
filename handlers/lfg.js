@@ -247,7 +247,7 @@ function buildBossSelectMenu() {
 // Step 2: Experience + Time selects with Next button
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildOptionsMessage(bossKey) {
+function buildOptionsMessage(bossKey, selectedExp = null, selectedTime = null) {
   const boss = bosses[bossKey];
 
   const experienceSelect = new StringSelectMenuBuilder()
@@ -258,7 +258,8 @@ function buildOptionsMessage(bossKey) {
         label: opt.label,
         description: opt.description,
         value: opt.value,
-        emoji: opt.emoji
+        emoji: opt.emoji,
+        default: opt.value === selectedExp
       }))
     );
 
@@ -269,7 +270,8 @@ function buildOptionsMessage(bossKey) {
       TIME_OPTIONS.map(opt => ({
         label: opt.label,
         description: opt.description,
-        value: opt.value
+        value: opt.value,
+        default: opt.value === selectedTime
       }))
     );
 
@@ -513,7 +515,7 @@ async function handleBossSelect(interaction) {
       createdAt: Date.now()
     });
 
-    const msg = buildOptionsMessage(bossKey);
+    const msg = buildOptionsMessage(bossKey, null, null);
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling boss select:', error);
@@ -540,7 +542,7 @@ async function handleExpSelect(interaction) {
     status += `> Group type: ${expOption.emoji} **${expOption.label}**\n`;
     status += timeOption ? `> Time: **${timeOption.label}**` : '> Time: *not selected yet*';
 
-    const msg = buildOptionsMessage(pending.bossKey);
+    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time);
     msg.content = status;
 
     await interaction.update(msg);
@@ -571,7 +573,7 @@ async function handleTimeSelect(interaction) {
     status += expOption ? `> Group type: ${expOption.emoji} **${expOption.label}**\n` : '> Group type: *not selected yet*\n';
     status += `> Time: **${timeOption.label}**`;
 
-    const msg = buildOptionsMessage(pending.bossKey);
+    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time);
     msg.content = status;
 
     await interaction.update(msg);
