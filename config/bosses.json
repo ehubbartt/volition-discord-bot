@@ -16,7 +16,7 @@
   "toa": {
     "name": "Tombs of Amascut",
     "category": "Raids",
-    "image": "https://oldschool.runescape.wiki/images/Tombs_of_Amascut_logo.png",
+    "image": "https://oldschool.runescape.wiki/images/Tombs_of_Amascut.png",
     "defaultSize": 4,
     "maxSize": 8
   },
@@ -58,14 +58,14 @@
   "hueycoatl": {
     "name": "Hueycoatl",
     "category": "Bosses",
-    "image": "https://oldschool.runescape.wiki/images/Hueycoatl.png",
+    "image": "https://oldschool.runescape.wiki/images/The_Hueycoatl.png",
     "defaultSize": 3,
     "maxSize": 10
   },
   "royal_titans": {
     "name": "Royal Titans",
     "category": "Bosses",
-    "image": "https://oldschool.runescape.wiki/images/Royal_Titans.png",
+    "image": "https://oldschool.runescape.wiki/images/Fighting_Royal_Titans.png",
     "defaultSize": 5,
     "maxSize": 10
   },
