@@ -120,7 +120,7 @@ const EXPERIENCE_OPTIONS = [
 const EXPERIENCE_DISPLAY = {
   any:         { emoji: '🟢', label: 'All welcome', detail: 'Any experience level' },
   learner:     { emoji: '📚', label: 'Looking for a teacher', detail: 'New to this boss — need someone to show the ropes' },
-  teaching:    { emoji: '🎓', label: 'Teaching run', detail: 'Experienced player offering to teach' },
+  teaching:    { emoji: '🎓', label: 'Teaching run', detail: 'Experienced player offering to teach — Earn **15 VP** for teaching!' },
   experienced: { emoji: '⚡', label: 'Experienced only', detail: 'Know the boss already' }
 };
 
@@ -172,6 +172,23 @@ function calculateExpiry(timeValue, customTimestamp) {
 }
 
 /**
+ * Calculate the event start time from a time option.
+ * Returns null for "flexible" (no specific start time → no ping).
+ */
+function calculateStartsAt(timeValue, customTimestamp) {
+  if (timeValue === 'custom' && customTimestamp) {
+    return new Date(customTimestamp);
+  }
+  if (timeValue === 'flexible') return null;
+  if (timeValue === 'now') return new Date();
+  const option = TIME_OPTIONS.find(t => t.value === timeValue);
+  if (option && option.offsetMs > 0) {
+    return new Date(Date.now() + option.offsetMs);
+  }
+  return null;
+}
+
+/**
  * Clean up stale pending party entries (older than 10 min)
  */
 function cleanupPending() {
@@ -193,6 +210,7 @@ function buildPersistentEmbed() {
     .setTitle('Party Finder')
     .setDescription(
       'Looking for a group to raid or boss with? Create a party and find clanmates to join you!\n\n' +
+      'Earn **15 VP** for teaching a group — select **"I\'ll teach"** when creating your party!\n\n' +
       'Click the button below to get started.'
     )
     .setThumbnail(config.CLAN_ICON_URL);
@@ -673,12 +691,11 @@ async function handleModalSubmit(interaction) {
       });
     }
 
-    await interaction.deferReply();
-
     const experienceLevel = pending.experience;
     const timeValue = pending.time;
     const customTimestamp = pending.customTimestamp || null;
     const expiresAt = calculateExpiry(timeValue, customTimestamp);
+    const startsAt = calculateStartsAt(timeValue, customTimestamp);
 
     // Clean up pending state
     pendingParties.delete(interaction.user.id);
@@ -703,10 +720,14 @@ async function handleModalSubmit(interaction) {
     const tempEmbed = buildPartyEmbed(partyData, [{ user_id: interaction.user.id, status: 'joined' }]);
     const tempButtons = buildPartyButtons(partyData, [{ user_id: interaction.user.id, status: 'joined' }]);
 
-    const message = await interaction.editReply({
+    // Send as a standalone message in the channel (not a reply)
+    const message = await interaction.channel.send({
       embeds: [tempEmbed],
       components: [tempButtons]
     });
+
+    // Acknowledge the modal with an ephemeral confirmation
+    await interaction.reply({ content: `✅ Party created for **${boss.name}**!`, ephemeral: true });
 
     // Create party in DB
     const party = await lfgDb.createParty({
@@ -718,7 +739,8 @@ async function handleModalSubmit(interaction) {
       notes,
       messageId: message.id,
       channelId: interaction.channelId,
-      expiresAt: expiresAt.toISOString()
+      expiresAt: expiresAt.toISOString(),
+      startsAt: startsAt ? startsAt.toISOString() : null
     });
 
     // Add creator as first member
@@ -730,17 +752,12 @@ async function handleModalSubmit(interaction) {
     const embed = buildPartyEmbed(updatedParty, members);
     const buttons = buildPartyButtons(updatedParty, members);
 
-    await interaction.editReply({ embeds: [embed], components: [buttons] });
+    await message.edit({ embeds: [embed], components: [buttons] });
 
     console.log(`[LFG] Party created by ${interaction.user.tag} for ${boss.name} (${groupSize} players, ${experienceLevel})`);
   } catch (error) {
     console.error('[LFG] Error handling modal submit:', error);
-    const msg = { content: 'Something went wrong creating your party. Please try again.' };
-    if (interaction.deferred) {
-      await interaction.editReply(msg).catch(() => {});
-    } else {
-      await interaction.reply({ ...msg, ephemeral: true }).catch(() => {});
-    }
+    await interaction.reply({ content: 'Something went wrong creating your party. Please try again.', ephemeral: true }).catch(() => {});
   }
 }
 

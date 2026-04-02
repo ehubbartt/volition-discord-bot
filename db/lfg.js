@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 /**
  * Create a new LFG party
  */
-async function createParty({ creatorId, bossKey, groupSize, experienceLevel, scheduledTime, notes, messageId, channelId, expiresAt }) {
+async function createParty({ creatorId, bossKey, groupSize, experienceLevel, scheduledTime, notes, messageId, channelId, expiresAt, startsAt }) {
   const { data, error } = await supabase
     .from('lfg_parties')
     .insert({
@@ -20,7 +20,8 @@ async function createParty({ creatorId, bossKey, groupSize, experienceLevel, sch
       notes: notes || null,
       message_id: messageId,
       channel_id: channelId,
-      expires_at: expiresAt
+      expires_at: expiresAt,
+      starts_at: startsAt || null
     })
     .select()
     .single();
@@ -178,6 +179,34 @@ async function getExpiredParties() {
   return data || [];
 }
 
+/**
+ * Get active parties whose start time has passed but haven't been notified yet
+ */
+async function getPartiesNeedingStartNotification() {
+  const { data, error } = await supabase
+    .from('lfg_parties')
+    .select('*')
+    .in('status', ['active', 'full'])
+    .eq('start_notified', false)
+    .not('starts_at', 'is', null)
+    .lt('starts_at', new Date().toISOString());
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Mark a party as start-notified
+ */
+async function markStartNotified(partyId) {
+  const { error } = await supabase
+    .from('lfg_parties')
+    .update({ start_notified: true })
+    .eq('id', partyId);
+
+  if (error) throw error;
+}
+
 module.exports = {
   createParty,
   getPartyByMessageId,
@@ -188,5 +217,7 @@ module.exports = {
   getMember,
   promoteFirstWaitlisted,
   updatePartyStatus,
-  getExpiredParties
+  getExpiredParties,
+  getPartiesNeedingStartNotification,
+  markStartNotified
 };
