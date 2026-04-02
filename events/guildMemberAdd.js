@@ -111,7 +111,7 @@ module.exports = {
                     `If you have a friend or main account in the clan, click **Join as Guest** instead!\n\n` +
                     `An admin will be with you shortly if you have any questions!`
                 )
-                .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+                .setThumbnail(config.CLAN_ICON_URL)
                 .setFooter({ text: 'Use /close to close this ticket' })
                 .setTimestamp();
 

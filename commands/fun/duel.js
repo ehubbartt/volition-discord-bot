@@ -79,7 +79,7 @@ module.exports = {
                     `**Type:** 50/50 chance\n\n` +
                     `<@${opponent.id}>, do you accept?`
                 )
-                .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+                .setThumbnail(config.CLAN_ICON_URL)
                 .setTimestamp();
 
             const response = await interaction.editReply({
@@ -173,7 +173,7 @@ module.exports = {
                             `<@${winner.id}>: **${winnerNewPoints}** VP\n` +
                             `<@${loser.id}>: **${loserNewPoints}** VP`
                         )
-                        .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+                        .setThumbnail(config.CLAN_ICON_URL)
                         .setTimestamp();
 
                     await interaction.editReply({ embeds: [resultEmbed], components: [] });

@@ -3,7 +3,7 @@
 
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../../utils/api');
 const db = require('../../db/supabase');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
@@ -33,8 +33,7 @@ module.exports = {
       const clanId = config.clanId;
 
       // Fetch clan data from WOM API
-      const womApiUrl = `https://api.wiseoldman.net/v2/groups/${clanId}`;
-      const womResponse = await axios.get(womApiUrl);
+      const womResponse = await womApi.get(`/groups/${clanId}`);
       const clanData = womResponse.data;
 
       if (!clanData || !clanData.memberships) {

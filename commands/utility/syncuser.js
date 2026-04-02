@@ -5,7 +5,7 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../../utils/api');
 const db = require('../../db/supabase');
 const clanLeavers = require('../../db/clanLeavers');
 const config = require('../../config.json');
@@ -52,7 +52,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         });
 
         // Fetch clan data
-        const womResponse = await axios.get(`https://api.wiseoldman.net/v2/groups/${clanId}`);
+        const womResponse = await womApi.get(`/groups/${clanId}`);
         const clanData = womResponse.data;
 
         if (!clanData || !clanData.memberships) {
@@ -147,7 +147,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         });
 
         // Fetch detailed player stats
-        const playerDetailsResponse = await axios.get(`https://api.wiseoldman.net/v2/players/${encodeURIComponent(actualRsn)}`);
+        const playerDetailsResponse = await womApi.get(`/players/${encodeURIComponent(actualRsn)}`);
         const playerData = playerDetailsResponse.data;
 
         // Get total level
@@ -281,7 +281,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         }
 
         successEmbed.addFields({ name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false });
-        successEmbed.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
+        successEmbed.setThumbnail(config.CLAN_ICON_URL);
         successEmbed.setTimestamp();
 
         await interaction.editReply({

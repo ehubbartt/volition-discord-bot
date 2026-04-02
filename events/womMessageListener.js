@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../utils/api');
 const db = require('../db/supabase');
 const clanLeavers = require('../db/clanLeavers');
 const config = require('../config.json');
@@ -284,15 +284,8 @@ async function processMemberJoin (rsn, originalMessage) {
 
     try {
         // Fetch player stats from WOM
-        const playerResponse = await axios.get(
-            `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`,
-            {
-                headers: {
-                    'User-Agent': 'Volition-Discord-Bot',
-                    'Accept': 'application/json'
-                },
-                timeout: 10000 // 10 second timeout
-            }
+        const playerResponse = await womApi.get(
+            `/players/${encodeURIComponent(rsn)}`
         );
 
         console.log(`[JOIN] ✅ WOM API Response Status: ${playerResponse.status}`);
@@ -308,7 +301,7 @@ async function processMemberJoin (rsn, originalMessage) {
         const clanId = config.clanId;
         let clanJoinedAt = null;
         try {
-            const clanResponse = await axios.get(`https://api.wiseoldman.net/v2/groups/${clanId}`);
+            const clanResponse = await womApi.get(`/groups/${clanId}`);
             const membershipData = clanResponse.data.memberships?.find(m => m.player.id.toString() === womId);
             if (membershipData) {
                 clanJoinedAt = membershipData.createdAt;
@@ -489,8 +482,8 @@ async function processNameChange (oldRsn, newRsn, originalMessage) {
 
             // Try to fetch from WOM API using new RSN to get WOM ID
             try {
-                const playerResponse = await axios.get(
-                    `https://api.wiseoldman.net/v2/players/${encodeURIComponent(newRsn)}`
+                const playerResponse = await womApi.get(
+                    `/players/${encodeURIComponent(newRsn)}`
                 );
                 const womId = playerResponse.data.id.toString();
 
@@ -555,8 +548,8 @@ async function processMemberLeave (rsn, originalMessage) {
         let existingPlayer = null;
 
         try {
-            const playerResponse = await axios.get(
-                `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`
+            const playerResponse = await womApi.get(
+                `/players/${encodeURIComponent(rsn)}`
             );
             womId = playerResponse.data.id.toString();
             existingPlayer = await db.getPlayerByWomId(womId);
@@ -645,7 +638,7 @@ async function sendJoinNotification (rsn, totalLevel, ehb, ehp, rankIndex, womId
                 { name: 'Assigned Rank', value: formatRank(originalMessage.guild, rankIndex), inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )
-            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setThumbnail(config.CLAN_ICON_URL)
             .setTimestamp();
 
         if (!hasDiscordLink || !rankAssigned) {

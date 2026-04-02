@@ -5,7 +5,7 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../../utils/api');
 const db = require('../../db/supabase');
 const clanLeavers = require('../../db/clanLeavers');
 const config = require('../../config.json');
@@ -42,7 +42,7 @@ async function fullClanSync (interaction, clanId) {
         });
 
         // Fetch clan data from WOM
-        const womResponse = await axios.get(`https://api.wiseoldman.net/v2/groups/${clanId}`);
+        const womResponse = await womApi.get(`/groups/${clanId}`);
         const clanData = womResponse.data;
 
         if (!clanData || !clanData.memberships) {
@@ -273,7 +273,7 @@ async function fullClanSync (interaction, clanId) {
                 { name: 'Failed Updates', value: rankUpdatesFailed.toString(), inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }
             )
-            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setThumbnail(config.CLAN_ICON_URL)
             .setTimestamp();
 
         // Add new members details if any

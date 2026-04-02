@@ -193,7 +193,7 @@ async function runDailyRankUpdate() {
     }
 
     // Import the rank update logic
-    const axios = require('axios');
+    const { womApi } = require('./utils/api');
     const db = require('./db/supabase');
     const {
       formatRank,
@@ -206,8 +206,7 @@ async function runDailyRankUpdate() {
     const clanId = config.clanId;
 
     // Fetch clan data from WOM API
-    const womApiUrl = `https://api.wiseoldman.net/v2/groups/${clanId}`;
-    const womResponse = await axios.get(womApiUrl);
+    const womResponse = await womApi.get(`/groups/${clanId}`);
     const clanData = womResponse.data;
 
     if (!clanData || !clanData.memberships) {
@@ -350,83 +349,20 @@ async function runDailyRankUpdate() {
 // Weekly Voice Chat Rewards
 async function awardWeeklyVoiceRewards() {
   try {
-    const voiceAnalytics = require('./db/voice_analytics');
-    const db = require('./db/supabase');
-    const hybridConfig = require('./utils/hybridConfig');
-    const features = require('./utils/features');
-    const { EmbedBuilder } = require('discord.js');
+    const { calculateAndAwardVoiceRewards } = require('./utils/voiceRewards');
+    const result = await calculateAndAwardVoiceRewards(config);
 
-    // Check if voice tracking is enabled
-    const isEnabled = await features.isEnabled('gamification.voiceTracking');
-    if (!isEnabled) return;
-
-    const vcConfig = await hybridConfig.getConfigGroup('voice_tracking', {});
-    const rewards = vcConfig.weeklyVPRewards || [15, 10, 5];
-
-    // Get top voice chatters for the past 7 days
-    const topUsers = await voiceAnalytics.getWeeklyVoiceLeaderboard(7, rewards.length);
-
-    if (!topUsers || topUsers.length === 0) {
-      console.log('[WeeklyVoiceRewards] No voice activity this week, skipping rewards');
+    if (!result) {
+      console.log('[WeeklyVoiceRewards] No voice activity or not enabled, skipping');
       return;
     }
 
-    const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;
-    const awarded = [];
-
-    for (let i = 0; i < topUsers.length && i < rewards.length; i++) {
-      const user = topUsers[i];
-      const vpAmount = rewards[i];
-      if (!vpAmount || vpAmount <= 0) continue;
-
-      // Find the player by discord ID to award VP
-      const player = await db.getPlayerByDiscordId(user.user_id);
-      if (!player) {
-        console.log(`[WeeklyVoiceRewards] Skipping ${user.username} — not in players database`);
-        continue;
-      }
-
-      try {
-        await db.addPoints(player.rsn, vpAmount);
-        const hours = Math.floor(user.week_minutes / 60);
-        const mins = user.week_minutes % 60;
-        awarded.push({
-          place: i + 1,
-          userId: user.user_id,
-          username: user.username,
-          vp: vpAmount,
-          time: `${hours}h ${mins}m`
-        });
-        console.log(`[WeeklyVoiceRewards] Awarded ${vpAmount} VP to ${user.username} (#${i + 1}, ${user.week_minutes} min)`);
-      } catch (err) {
-        console.error(`[WeeklyVoiceRewards] Failed to award VP to ${user.username}:`, err.message);
-      }
-    }
-
-    if (awarded.length === 0) return;
-
-    // Post results to payouts channel, @ing each user
     const payoutChannel = client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
     if (payoutChannel) {
-      const medals = ['🥇', '🥈', '🥉'];
-      const lines = awarded.map(a =>
-        `${medals[a.place - 1] || '•'} <@${a.userId}> — **${a.time}** in VC → **+${a.vp}** ${vpEmoji}`
-      ).join('\n');
-
-      const mentions = awarded.map(a => `<@${a.userId}>`).join(' ');
-
-      const embed = new EmbedBuilder()
-        .setColor('Blue')
-        .setTitle('🎙️ Weekly Voice Chat Rewards')
-        .setDescription(
-          `Top voice chatters this week have been rewarded!\n\n${lines}`
-        )
-        .setTimestamp();
-
-      await payoutChannel.send({ content: mentions, embeds: [embed] });
+      await payoutChannel.send({ content: result.mentions, embeds: [result.embed] });
     }
 
-    console.log(`[WeeklyVoiceRewards] Awarded VP to ${awarded.length} user(s)`);
+    console.log(`[WeeklyVoiceRewards] Awarded VP to ${result.awarded.length} user(s)`);
   } catch (error) {
     console.error('[WeeklyVoiceRewards] Error:', error);
     const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);

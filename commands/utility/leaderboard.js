@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../../db/supabase');
+const config = require('../../config.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -24,7 +25,7 @@ module.exports = {
 			const embed = new EmbedBuilder()
 				.setColor('White')
 				.setTitle('Volition Point Leaderboard')
-				.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
+				.setThumbnail(config.CLAN_ICON_URL);
 
 			let description = '';
 			top10.forEach((user, index) => {

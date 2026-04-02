@@ -8,7 +8,7 @@ const {
     TextInputBuilder,
     TextInputStyle
 } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../../utils/api');
 const { determineRankIndex, formatRank } = require('../../utils/ranks');
 
 module.exports = {
@@ -72,8 +72,8 @@ async function handleVerifySubmit(interaction) {
 
         try {
             console.log(`[Verify] Looking up WOM player: ${rsn}`);
-            const directResponse = await axios.get(
-                `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`
+            const directResponse = await womApi.get(
+                `/players/${encodeURIComponent(rsn)}`
             );
 
             playerData = directResponse.data;
@@ -147,7 +147,7 @@ async function handleVerifySubmit(interaction) {
                 { name: 'Discord Nickname', value: nicknameChanged ? `✅ Updated to ${actualRsn}` : `⚠️ ${nicknameError || 'Could not update'}`, inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )
-            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setThumbnail(config.CLAN_ICON_URL)
             .setTimestamp();
 
         if (meetsRequirements) {

@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../../utils/api');
 const db = require('../../db/supabase');
 const config = require('../../utils/config');
 const { isAdmin } = require('../../utils/permissions');
@@ -58,7 +58,7 @@ module.exports = {
                 customPoints3 ?? defaultPoints[2]
             ];
 
-            const womResponse = await axios.get(`https://api.wiseoldman.net/v2/competitions/${competitionId}`);
+            const womResponse = await womApi.get(`/competitions/${competitionId}`);
             const competitionData = womResponse.data;
             const competitionTitle = competitionData.title;
 
@@ -78,7 +78,7 @@ module.exports = {
                 .setColor('White')
                 .setTitle('Volition Points Awarded')
                 .setDescription(`Volition Points successfully awarded to the top 3 participants of competition: **${competitionTitle}** with ID: ${competitionId}.`)
-                .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
+                .setThumbnail(config.CLAN_ICON_URL);
 
             for (let i = 0; i < topParticipants.length; i++) {
                 const participant = topParticipants[i];

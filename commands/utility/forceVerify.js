@@ -94,7 +94,7 @@ module.exports = {
                     `## You've been verified! ${vpEmoji}\n\n` +
                     `We ask you kindly that __your discord name on this server matches your in game name__.\n\n` +
                     `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
-                    `* Use the button below to send an introductory message in <#1350979144950743161>.\n\n` +
+                    `* Use the button below to send an introductory message in ${`<#${config.INTRO_THREAD_ID}>`}.\n\n` +
                     `Once this is done we will help you join the clan in game.`;
 
                 const introButton = new ButtonBuilder()

@@ -8,7 +8,7 @@ const {
     TextInputBuilder,
     TextInputStyle
 } = require('discord.js');
-const axios = require('axios');
+const { womApi } = require('../../utils/api');
 const config = require('../../config.json');
 const { determineRankIndex, formatRank } = require('../../utils/ranks');
 const { isAdmin } = require('../../utils/permissions');
@@ -35,7 +35,7 @@ module.exports = {
                 '• 2000+ Total Level AND 150+ EHB\n\n' +
                 'Your stats will be checked via Wise Old Man.'
             )
-            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setThumbnail(config.CLAN_ICON_URL)
             .setFooter({ text: 'Volition Clan Verification' })
             .setTimestamp();
 
@@ -180,8 +180,8 @@ async function handleVerifySubmit (interaction) {
 
         try {
             console.log(`[CreateVerify] Looking up WOM player: ${rsn}`);
-            const directResponse = await axios.get(
-                `https://api.wiseoldman.net/v2/players/${encodeURIComponent(rsn)}`
+            const directResponse = await womApi.get(
+                `/players/${encodeURIComponent(rsn)}`
             );
 
             playerData = directResponse.data;
@@ -384,7 +384,7 @@ async function handleVerifySubmit (interaction) {
         }
 
         statsEmbed.addFields({ name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false });
-        statsEmbed.setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless');
+        statsEmbed.setThumbnail(config.CLAN_ICON_URL);
         statsEmbed.setTimestamp();
 
         // Build reply options
@@ -449,7 +449,7 @@ async function handleVerifySubmit (interaction) {
                 `## You meet the requirements! ${vpEmoji}\n\n` +
                 `We ask you kindly that __your discord name on this server matches your in game name__, the clan bot will have already adjusted this for you.\n\n` +
                 `* Make sure you can see all channels by clicking ''Volition'' in the top left corner and then ticking the ''Show All Channels'' box!\n` +
-                `* Use the button below to send an introductory message in <#1350979144950743161>.\n\n` +
+                `* Use the button below to send an introductory message in ${`<#${config.INTRO_THREAD_ID}>`}.\n\n` +
                 `Once this is done we will help you join the clan in game.`;
 
             // Check if intro modal is enabled
@@ -583,7 +583,7 @@ async function handleGuestJoinSubmit (interaction) {
 
         // Fetch clan data from WOM
         const clanId = config.clanId;
-        const clanResponse = await axios.get(`https://api.wiseoldman.net/v2/groups/${clanId}`);
+        const clanResponse = await womApi.get(`/groups/${clanId}`);
         const clanData = clanResponse.data;
 
         if (!clanData || !clanData.memberships) {
@@ -675,7 +675,7 @@ async function handleGuestJoinSubmit (interaction) {
                 { name: '⚔️ Clan Connection', value: actualRsn, inline: true },
                 { name: '✅ Verified Role', value: roleAdded ? 'Added' : `⚠️ ${roleError || 'Failed'}`, inline: true }
             )
-            .setThumbnail('https://cdn.discordapp.com/icons/571389228806570005/ff45546375fe88eb358088dc1fd4c28b.png?size=480&quality=lossless')
+            .setThumbnail(config.CLAN_ICON_URL)
             .setFooter({ text: 'Welcome to the Volition family!' })
             .setTimestamp();
 
