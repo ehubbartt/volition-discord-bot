@@ -49,6 +49,7 @@
   "tradeMinValue": 0,
   "externalSendImage": "REQUESTED",
   "slayerPointThreshold": 0,
+  "lootItemAllowlist": "Leviathan's lure\nSiren's staff\nExecutioner's axe head\nEye of the duke\nMagus vestige\nUltor vestige\nBellator vestige\nVenator vestige",
   "petSendImage": true,
   "groupStorageMinValue": 0,
   "embedFooterIcon": "https://github.com/pajlads/DinkPlugin/raw/master/icon.png",
