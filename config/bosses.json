@@ -5,7 +5,8 @@
     "image": "https://oldschool.runescape.wiki/images/Chambers_of_Xeric_logo.png",
     "defaultSize": 4,
     "maxSize": 100,
-    "roleId": "1343281849501356102"
+    "roleId": "1343281849501356102",
+    "roles": ["setter", "runner", "melee"]
   },
   "tob": {
     "name": "Theatre of Blood",
@@ -13,7 +14,8 @@
     "image": "https://oldschool.runescape.wiki/images/Theatre_of_Blood_logo.png",
     "defaultSize": 4,
     "maxSize": 5,
-    "roleId": "1343281785441878117"
+    "roleId": "1343281785441878117",
+    "roles": ["sfrz", "nfrz", "range", "melee"]
   },
   "toa": {
     "name": "Tombs of Amascut",
@@ -102,5 +104,13 @@
     "defaultSize": 4,
     "maxSize": 20,
     "roleId": "1343283196917452922"
+  },
+  "any": {
+    "name": "Any Content",
+    "category": "Other",
+    "image": null,
+    "defaultSize": 4,
+    "maxSize": 20,
+    "roleId": null
   }
 }

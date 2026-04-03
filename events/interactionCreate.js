@@ -77,6 +77,10 @@ module.exports = {
       try { return await lfgHandler.handleTimeSelect(interaction); }
       catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
     }
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('lfg_role_select_')) {
+      try { return await lfgHandler.handleRoleSelect(interaction); }
+      catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
 
     if (interaction.isStringSelectMenu() && interaction.customId === 'shop_menu') {
       const shopCommand = interaction.client.commands.get('shop');

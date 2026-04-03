@@ -202,6 +202,27 @@ function cleanupPending () {
   }
 }
 
+/**
+ * Check if a party is "full" considering raid roles and flex players.
+ * For role-based parties: full when every role is covered (directly or by flex) AND total >= group_size.
+ * For normal parties: full when joined count >= group_size.
+ */
+function isPartyFull (party, members) {
+  const joinedMembers = members.filter(m => m.status === 'joined');
+  if (joinedMembers.length < party.group_size) return false;
+
+  const partyRoles = party.roles_needed ? JSON.parse(party.roles_needed) : null;
+  if (partyRoles && partyRoles.length > 0) {
+    const flexCount = joinedMembers.filter(m => m.role === 'flex').length;
+    const unfilledRoles = partyRoles.filter(role =>
+      !joinedMembers.some(m => m.role === role)
+    ).length;
+    return unfilledRoles <= flexCount;
+  }
+
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Persistent embed (posted once by admin)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -319,7 +340,7 @@ function buildOptionsMessage (bossKey, selectedExp = null, selectedTime = null) 
 // Step 3: Modal (party size + notes only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildPartyModal (bossKey, { includeCustomTime = false, isLearner = false } = {}) {
+function buildPartyModal (bossKey, { includeCustomTime = false, isLearner = false, hasRaidRoles = false } = {}) {
   const boss = bosses[bossKey];
 
   const modal = new ModalBuilder()
@@ -347,6 +368,20 @@ function buildPartyModal (bossKey, { includeCustomTime = false, isLearner = fals
       .setMaxLength(2);
 
     rows.push(new ActionRowBuilder().addComponents(teachersInput));
+  }
+
+  // Raid roles (for bosses with defined roles like CoX, ToB)
+  if (hasRaidRoles && boss.roles && boss.roles.length > 0) {
+    const rolesInput = new TextInputBuilder()
+      .setCustomId('lfg_roles_needed')
+      .setLabel('Roles needed (optional)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder(boss.roles.join(', '))
+      .setValue(boss.roles.join(', '))
+      .setRequired(false)
+      .setMaxLength(100);
+
+    rows.push(new ActionRowBuilder().addComponents(rolesInput));
   }
 
   if (includeCustomTime) {
@@ -481,7 +516,32 @@ function buildPartyEmbed (party, members) {
   }
 
   // Party members list
-  if (joinedMembers.length > 0) {
+  const partyRoles = party.roles_needed ? JSON.parse(party.roles_needed) : null;
+
+  if (partyRoles && partyRoles.length > 0 && joinedMembers.length > 0) {
+    // Show members grouped by role
+    const roleLines = [];
+    for (const role of partyRoles) {
+      const roleName = role.charAt(0).toUpperCase() + role.slice(1);
+      const inRole = joinedMembers.filter(m => m.role === role);
+      if (inRole.length > 0) {
+        roleLines.push(`**${roleName}:** ${inRole.map(m => `<@${m.user_id}>`).join(', ')}`);
+      } else {
+        roleLines.push(`**${roleName}:** *(open)*`);
+      }
+    }
+    // Flex players
+    const flexMembers = joinedMembers.filter(m => m.role === 'flex');
+    if (flexMembers.length > 0) {
+      roleLines.push(`🔄 **Flex:** ${flexMembers.map(m => `<@${m.user_id}>`).join(', ')}`);
+    }
+    // Members with no role (e.g. creator added before roles existed)
+    const noRoleMembers = joinedMembers.filter(m => !m.role);
+    if (noRoleMembers.length > 0) {
+      roleLines.push(noRoleMembers.map(m => `<@${m.user_id}>`).join(', '));
+    }
+    embed.addFields({ name: `Party (${joinedMembers.length}/${party.group_size})`, value: roleLines.join('\n') });
+  } else if (joinedMembers.length > 0) {
     const memberList = joinedMembers
       .map((m, i) => `${i + 1}. <@${m.user_id}>`)
       .join('\n');
@@ -491,7 +551,7 @@ function buildPartyEmbed (party, members) {
   // Waitlist
   if (waitlistedMembers.length > 0) {
     const waitlist = waitlistedMembers
-      .map((m, i) => `${i + 1}. <@${m.user_id}>`)
+      .map((m, i) => `${i + 1}. <@${m.user_id}>${m.role ? ` (${m.role})` : ''}`)
       .join('\n');
     embed.addFields({ name: `Waitlist (${waitlistedMembers.length})`, value: waitlist });
   }
@@ -507,7 +567,7 @@ function buildPartyEmbed (party, members) {
 
 function buildPartyButtons (party, members) {
   const joinedMembers = members.filter(m => m.status === 'joined');
-  const isFull = joinedMembers.length >= party.group_size;
+  const isFull = isPartyFull(party, members);
   const isEnded = party.status === 'expired' || party.status === 'cancelled';
 
   // Check if non-teacher spots are full (for learner parties with reserved teacher slots)
@@ -701,9 +761,11 @@ async function handleNext (interaction) {
       return interaction.reply({ content: 'Please select a **time** before continuing.', ephemeral: true });
     }
 
+    const bossData = bosses[bossKey];
     const modal = buildPartyModal(bossKey, {
       includeCustomTime: pending.time === 'custom',
-      isLearner: pending.experience === 'learner'
+      isLearner: pending.experience === 'learner',
+      hasRaidRoles: !!(bossData && bossData.roles && bossData.roles.length > 0)
     });
     await interaction.showModal(modal);
   } catch (error) {
@@ -742,6 +804,18 @@ async function handleModalSubmit (interaction) {
           if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) teachersNeeded = parsed;
         }
       } catch { /* field not present, default to 1 */ }
+    }
+
+    // Parse raid roles (if the boss has them)
+    let rolesNeeded = null;
+    const bossRoles = boss.roles;
+    if (bossRoles && bossRoles.length > 0) {
+      try {
+        const raw = interaction.fields.getTextInputValue('lfg_roles_needed');
+        if (raw && raw.trim()) {
+          rolesNeeded = JSON.stringify(raw.split(',').map(r => r.trim().toLowerCase()).filter(r => r));
+        }
+      } catch { /* field not present */ }
     }
 
     // If custom time was selected, parse the time + timezone from the modal
@@ -809,7 +883,8 @@ async function handleModalSubmit (interaction) {
       message_id: 'pending',
       channel_id: interaction.channelId,
       expires_at: expiresAt.toISOString(),
-      status: 'active'
+      status: 'active',
+      roles_needed: rolesNeeded
     };
 
     const tempEmbed = buildPartyEmbed(partyData, [{ user_id: interaction.user.id, status: 'joined' }]);
@@ -875,7 +950,8 @@ async function handleModalSubmit (interaction) {
       channelId: interaction.channelId,
       expiresAt: expiresAt.toISOString(),
       startsAt: startsAt ? startsAt.toISOString() : null,
-      teachersNeeded: experienceLevel === 'learner' ? teachersNeeded : 0
+      teachersNeeded: experienceLevel === 'learner' ? teachersNeeded : 0,
+      rolesNeeded
     });
 
     // Add creator as first member (mark as teacher if they're running a teaching party)
@@ -1039,6 +1115,57 @@ async function handleInvite (interaction) {
 }
 
 /**
+ * Handle role selection when joining a raid party
+ */
+async function handleRoleSelect (interaction) {
+  try {
+    const messageId = interaction.customId.replace('lfg_role_select_', '');
+    const selectedRole = interaction.values[0];
+    const party = await lfgDb.getPartyByMessageId(messageId);
+
+    if (!party || party.status === 'expired' || party.status === 'cancelled') {
+      return interaction.update({ content: 'This party is no longer active.', components: [] });
+    }
+
+    const existingMember = await lfgDb.getMember(party.id, interaction.user.id);
+    if (existingMember) {
+      return interaction.update({ content: "You're already in this party.", components: [] });
+    }
+
+    const members = await lfgDb.getMembers(party.id);
+    const joinedCount = members.filter(m => m.status === 'joined').length;
+    const isFull = joinedCount >= party.group_size;
+
+    await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined', false, selectedRole);
+
+    // Dismiss the ephemeral role select
+    const roleLabel = selectedRole === 'flex' ? 'Flex' : selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
+    await interaction.update({ content: `✅ Joined as **${roleLabel}**!`, components: [] });
+
+    // Update the party embed
+    const channel = interaction.client.channels.cache.get(party.channel_id);
+    if (channel) {
+      const msg = await channel.messages.fetch(messageId).catch(() => null);
+      if (msg) {
+        const updatedMembers = await lfgDb.getMembers(party.id);
+        let updatedParty = party;
+        if (isPartyFull(updatedParty, updatedMembers) && party.status === 'active') {
+          updatedParty = await lfgDb.updatePartyStatus(party.id, 'full');
+        }
+        const embed = buildPartyEmbed(updatedParty, updatedMembers);
+        const buttons = buildPartyButtons(updatedParty, updatedMembers);
+        await msg.edit({ embeds: [embed], components: [buttons] });
+      }
+    }
+
+    console.log(`[LFG] ${interaction.user.tag} joined party ${party.id} as ${selectedRole}`);
+  } catch (error) {
+    console.error('[LFG] Error handling role select:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+  }
+}
+
+/**
  * Handle "Join" / "Join Waitlist" button
  */
 async function handleJoin (interaction) {
@@ -1060,6 +1187,42 @@ async function handleJoin (interaction) {
       });
     }
 
+    // If party has raid roles, show a role select instead of immediately joining
+    const partyRoles = party.roles_needed ? JSON.parse(party.roles_needed) : null;
+    if (partyRoles && partyRoles.length > 0) {
+      const members = await lfgDb.getMembers(party.id);
+      const joinedMembers = members.filter(m => m.status === 'joined');
+
+      const roleOptions = partyRoles.map(role => {
+        const filled = joinedMembers.filter(m => m.role === role).length;
+        return {
+          label: role.charAt(0).toUpperCase() + role.slice(1),
+          description: filled > 0 ? `${filled} player(s) in this role` : 'Open — no one yet',
+          value: role
+        };
+      });
+
+      // Always add Flex option
+      const flexCount = joinedMembers.filter(m => m.role === 'flex').length;
+      roleOptions.push({
+        label: 'Flex',
+        description: flexCount > 0 ? `${flexCount} flex player(s) — can fill any role` : 'Can fill any role',
+        value: 'flex'
+      });
+
+      const roleSelect = new StringSelectMenuBuilder()
+        .setCustomId(`lfg_role_select_${party.message_id}`)
+        .setPlaceholder('Pick your role...')
+        .addOptions(roleOptions);
+
+      return interaction.reply({
+        content: 'Select your role for this party:',
+        components: [new ActionRowBuilder().addComponents(roleSelect)],
+        ephemeral: true
+      });
+    }
+
+    // Standard join (no raid roles)
     await interaction.deferUpdate();
 
     const members = await lfgDb.getMembers(party.id);
@@ -1074,17 +1237,16 @@ async function handleJoin (interaction) {
       const nonTeacherSpots = party.group_size - unfilledTeacherSlots;
       const nonTeacherCount = joinedMembers.filter(m => !m.is_teacher).length;
       if (nonTeacherCount >= nonTeacherSpots) {
-        isFull = true; // Non-teacher spots are full, remaining spots reserved for teachers
+        isFull = true;
       }
     }
 
     await lfgDb.addMember(party.id, interaction.user.id, isFull ? 'waitlisted' : 'joined');
 
     const updatedMembers = await lfgDb.getMembers(party.id);
-    const newJoinedCount = updatedMembers.filter(m => m.status === 'joined').length;
     let updatedParty = party;
 
-    if (newJoinedCount >= party.group_size && party.status === 'active') {
+    if (isPartyFull(updatedParty, updatedMembers) && party.status === 'active') {
       updatedParty = await lfgDb.updatePartyStatus(party.id, 'full');
     }
 
@@ -1304,6 +1466,7 @@ module.exports = {
   handleVolunteerTeach,
   handleInvite,
   handleClaimVP,
+  handleRoleSelect,
   handleJoin,
   handleLeave,
   handleCancel,
