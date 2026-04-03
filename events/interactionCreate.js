@@ -81,6 +81,10 @@ module.exports = {
       try { return await lfgHandler.handleRoleSelect(interaction); }
       catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
     }
+    if (interaction.isStringSelectMenu() && interaction.customId === 'lfg_creator_role_select') {
+      try { return await lfgHandler.handleCreatorRoleSelect(interaction); }
+      catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
 
     if (interaction.isStringSelectMenu() && interaction.customId === 'shop_menu') {
       const shopCommand = interaction.client.commands.get('shop');

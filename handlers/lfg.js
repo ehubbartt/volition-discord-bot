@@ -291,7 +291,25 @@ function buildBossSelectMenu () {
 // Step 2: Experience + Time selects with Next button
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildOptionsMessage (bossKey, selectedExp = null, selectedTime = null) {
+/**
+ * Build the status text showing current selections
+ */
+function buildStatusText (pending) {
+  const boss = bosses[pending.bossKey];
+  const expOption = pending.experience ? EXPERIENCE_OPTIONS.find(o => o.value === pending.experience) : null;
+  const timeOption = pending.time ? TIME_OPTIONS.find(t => t.value === pending.time) : null;
+
+  let status = `**${boss.name}** — Set up your party details:\n\n`;
+  status += expOption ? `> Group type: ${expOption.emoji} **${expOption.label}**\n` : '> Group type: *not selected yet*\n';
+  status += timeOption ? `> Time: **${timeOption.label}**` : '> Time: *not selected yet*';
+  if (pending.creatorRole) {
+    const roleLabel = pending.creatorRole === 'flex' ? 'Flex' : pending.creatorRole.charAt(0).toUpperCase() + pending.creatorRole.slice(1);
+    status += `\n> Your role: **${roleLabel}**`;
+  }
+  return status;
+}
+
+function buildOptionsMessage (bossKey, selectedExp = null, selectedTime = null, selectedRole = null) {
   const boss = bosses[bossKey];
 
   const experienceSelect = new StringSelectMenuBuilder()
@@ -319,20 +337,44 @@ function buildOptionsMessage (bossKey, selectedExp = null, selectedTime = null) 
       }))
     );
 
+  const components = [
+    new ActionRowBuilder().addComponents(experienceSelect),
+    new ActionRowBuilder().addComponents(timeSelect)
+  ];
+
+  // Add raid role select for bosses with defined roles
+  if (boss.roles && boss.roles.length > 0) {
+    const roleOptions = boss.roles.map(role => ({
+      label: role.charAt(0).toUpperCase() + role.slice(1),
+      value: role,
+      default: role === selectedRole
+    }));
+    roleOptions.push({
+      label: 'Flex',
+      description: 'Can fill any role',
+      value: 'flex',
+      default: selectedRole === 'flex'
+    });
+
+    const creatorRoleSelect = new StringSelectMenuBuilder()
+      .setCustomId('lfg_creator_role_select')
+      .setPlaceholder('Your role...')
+      .addOptions(roleOptions);
+
+    components.push(new ActionRowBuilder().addComponents(creatorRoleSelect));
+  }
+
   const nextButton = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`lfg_next_${bossKey}`)
       .setLabel('Next')
       .setStyle(ButtonStyle.Primary)
   );
+  components.push(nextButton);
 
   return {
     content: `**${boss.name}** — Set up your party details:`,
-    components: [
-      new ActionRowBuilder().addComponents(experienceSelect),
-      new ActionRowBuilder().addComponents(timeSelect),
-      nextButton
-    ]
+    components
   };
 }
 
@@ -527,7 +569,7 @@ function buildPartyEmbed (party, members) {
       if (inRole.length > 0) {
         roleLines.push(`**${roleName}:** ${inRole.map(m => `<@${m.user_id}>`).join(', ')}`);
       } else {
-        roleLines.push(`**${roleName}:** *(open)*`);
+        roleLines.push(`**${roleName}:**`);
       }
     }
     // Flex players
@@ -670,10 +712,11 @@ async function handleBossSelect (interaction) {
       bossKey,
       experience: null,
       time: null,
+      creatorRole: null,
       createdAt: Date.now()
     });
 
-    const msg = buildOptionsMessage(bossKey, null, null);
+    const msg = buildOptionsMessage(bossKey, null, null, null);
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling boss select:', error);
@@ -692,16 +735,9 @@ async function handleExpSelect (interaction) {
     }
 
     pending.experience = interaction.values[0];
-    const expOption = EXPERIENCE_OPTIONS.find(o => o.value === pending.experience);
-    const timeOption = pending.time ? TIME_OPTIONS.find(t => t.value === pending.time) : null;
 
-    // Show current selections and keep the menus
-    let status = `**${bosses[pending.bossKey].name}** — Set up your party details:\n\n`;
-    status += `> Group type: ${expOption.emoji} **${expOption.label}**\n`;
-    status += timeOption ? `> Time: **${timeOption.label}**` : '> Time: *not selected yet*';
-
-    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time);
-    msg.content = status;
+    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time, pending.creatorRole);
+    msg.content = buildStatusText(pending);
 
     await interaction.update(msg);
   } catch (error) {
@@ -724,20 +760,36 @@ async function handleTimeSelect (interaction) {
 
     pending.time = selected;
     pending.customTimestamp = null;
-    const timeOption = TIME_OPTIONS.find(t => t.value === pending.time);
-    const expOption = pending.experience ? EXPERIENCE_OPTIONS.find(o => o.value === pending.experience) : null;
 
-    let status = `**${bosses[pending.bossKey].name}** — Set up your party details:\n\n`;
-    status += expOption ? `> Group type: ${expOption.emoji} **${expOption.label}**\n` : '> Group type: *not selected yet*\n';
-    status += `> Time: **${timeOption.label}**`;
-
-    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time);
-    msg.content = status;
+    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time, pending.creatorRole);
+    msg.content = buildStatusText(pending);
 
     await interaction.update(msg);
   } catch (error) {
     console.error('[LFG] Error handling time select:', error);
     await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => { });
+  }
+}
+
+/**
+ * Handle creator raid role select
+ */
+async function handleCreatorRoleSelect (interaction) {
+  try {
+    const pending = pendingParties.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: 'Session expired. Please start over by clicking **Create Party**.', ephemeral: true });
+    }
+
+    pending.creatorRole = interaction.values[0];
+
+    const msg = buildOptionsMessage(pending.bossKey, pending.experience, pending.time, pending.creatorRole);
+    msg.content = buildStatusText(pending);
+
+    await interaction.update(msg);
+  } catch (error) {
+    console.error('[LFG] Error handling creator role select:', error);
+    await interaction.reply({ content: 'Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
   }
 }
 
@@ -865,6 +917,7 @@ async function handleModalSubmit (interaction) {
     const customTimestamp = pending.customTimestamp || null;
     const expiresAt = calculateExpiry(timeValue, customTimestamp);
     const startsAt = calculateStartsAt(timeValue, customTimestamp);
+    const creatorRole = pending.creatorRole || null;
 
     // Clean up pending state
     pendingParties.delete(interaction.user.id);
@@ -955,7 +1008,7 @@ async function handleModalSubmit (interaction) {
     });
 
     // Add creator as first member (mark as teacher if they're running a teaching party)
-    await lfgDb.addMember(party.id, interaction.user.id, 'joined', experienceLevel === 'teaching');
+    await lfgDb.addMember(party.id, interaction.user.id, 'joined', experienceLevel === 'teaching', creatorRole);
 
     // Re-build with correct message ID for button routing
     const members = await lfgDb.getMembers(party.id);
@@ -1467,6 +1520,7 @@ module.exports = {
   handleInvite,
   handleClaimVP,
   handleRoleSelect,
+  handleCreatorRoleSelect,
   handleJoin,
   handleLeave,
   handleCancel,
