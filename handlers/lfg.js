@@ -99,7 +99,7 @@ const pendingParties = new Map();
 
 // Time options for the select menu (value → { label, description, offsetMs, expiryMs })
 const TIME_OPTIONS = [
-  { value: 'now', label: 'Right now', description: 'Starting immediately', offsetMs: 0, expiryMs: 5 * 60 * 1000 }, // TODO: change back to 2 * 60 * 60 * 1000 after testing
+  { value: 'now', label: 'Right now', description: 'Starting immediately', offsetMs: 0, expiryMs: 2 * 60 * 60 * 1000 },
   { value: '15min', label: 'In 15 minutes', description: 'Starting in about 15 min', offsetMs: 15 * 60 * 1000, expiryMs: 2.25 * 60 * 60 * 1000 },
   { value: '30min', label: 'In 30 minutes', description: 'Starting in about 30 min', offsetMs: 30 * 60 * 1000, expiryMs: 2.5 * 60 * 60 * 1000 },
   { value: '1hr', label: 'In 1 hour', description: 'Starting in about 1 hour', offsetMs: 60 * 60 * 1000, expiryMs: 3 * 60 * 60 * 1000 },
@@ -964,19 +964,19 @@ async function handleModalSubmit (interaction) {
       console.error('[LFG] Failed to create discussion thread:', threadErr);
     }
 
-    // Role pings disabled for testing
-    // const pings = [];
-    // if (boss.roleId) pings.push(`<@&${boss.roleId}>`);
-    // if (experienceLevel === 'learner' && config.PVM_TEACHER_ROLE_ID) {
-    //   pings.push(`<@&${config.PVM_TEACHER_ROLE_ID}>`);
-    // } else if (experienceLevel === 'teaching' && config.PVM_LEARNER_ROLE_ID) {
-    //   pings.push(`<@&${config.PVM_LEARNER_ROLE_ID}>`);
-    // }
-    // if (pings.length > 0) {
-    //   await interaction.channel.send(pings.join(' ')).catch(err =>
-    //     console.error('[LFG] Failed to send role pings:', err)
-    //   );
-    // }
+    // Ping relevant roles in a separate message (must be separate for Discord to notify)
+    const pings = [];
+    if (boss.roleId) pings.push(`<@&${boss.roleId}>`);
+    if (experienceLevel === 'learner' && config.PVM_TEACHER_ROLE_ID) {
+      pings.push(`<@&${config.PVM_TEACHER_ROLE_ID}>`);
+    } else if (experienceLevel === 'teaching' && config.PVM_LEARNER_ROLE_ID) {
+      pings.push(`<@&${config.PVM_LEARNER_ROLE_ID}>`);
+    }
+    if (pings.length > 0) {
+      await interaction.channel.send(pings.join(' ')).catch(err =>
+        console.error('[LFG] Failed to send role pings:', err)
+      );
+    }
 
     // Acknowledge the modal with an ephemeral confirmation + invite option
     const inviteSelect = new UserSelectMenuBuilder()
