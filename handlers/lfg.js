@@ -212,8 +212,11 @@ function buildPersistentEmbed () {
     .setTitle('Party Finder')
     .setDescription(
       'Looking for a group to raid or boss with? Create a party and find clanmates to join you!\n\n' +
-      'Earn **15 VP** for teaching a group — select **"I\'ll teach"** when creating your party!\n\n' +
-      'Click the button below to get started.'
+      '**How it works:**\n' +
+      '1. Click **Create Party** below to set up your group\n' +
+      '2. A discussion thread is created — coordinate with your group there\n' +
+      '3. Other players can join your party with one click\n\n' +
+      '🎓 Earn **15 VP** for teaching — select **"I\'ll teach"** when creating your party!'
     )
     .setThumbnail(config.CLAN_ICON_URL);
 
@@ -870,6 +873,35 @@ async function handleModalSubmit (interaction) {
     const buttons = buildPartyButtons(updatedParty, members);
 
     await message.edit({ embeds: [embed], components: [buttons] });
+
+    // Create a discussion thread on the party message
+    try {
+      const displayName = interaction.member?.displayName || interaction.user.username;
+      const thread = await message.startThread({
+        name: `${boss.name} — ${displayName}'s party`,
+        autoArchiveDuration: 1440
+      });
+      await thread.send(
+        `Use this thread to coordinate with your group — party details are in the message above.\n\n` +
+        `**Join the party** by clicking the buttons on the embed, not by posting here.`
+      );
+    } catch (threadErr) {
+      console.error('[LFG] Failed to create discussion thread:', threadErr);
+    }
+
+    // Auto-repost the persistent "Create Party" embed at the bottom of the channel
+    try {
+      const recentMessages = await interaction.channel.messages.fetch({ limit: 50 });
+      const oldPersistent = recentMessages.find(msg =>
+        msg.author.id === interaction.client.user.id &&
+        msg.components?.length > 0 &&
+        msg.components[0]?.components?.some(c => c.customId === 'lfg_create')
+      );
+      if (oldPersistent) await oldPersistent.delete().catch(() => {});
+      await postPersistentEmbed(interaction.channel);
+    } catch (repostErr) {
+      console.error('[LFG] Failed to repost persistent embed:', repostErr);
+    }
 
     console.log(`[LFG] Party created by ${interaction.user.tag} for ${boss.name} (${groupSize} players, ${experienceLevel})`);
   } catch (error) {

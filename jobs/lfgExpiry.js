@@ -25,9 +25,9 @@ async function sendStartNotifications (client) {
         const members = await lfgDb.getMembers(party.id);
         const joinedMembers = members.filter(m => m.status === 'joined');
 
-        if (joinedMembers.length === 0) {
-          await lfgDb.markStartNotified(party.id);
-          continue;
+        // Only notify when the party is full — no point pinging for a half-empty group
+        if (joinedMembers.length < party.group_size) {
+          continue; // Don't mark as notified — re-check next tick in case it fills
         }
 
         const channel = client.channels.cache.get(party.channel_id);
@@ -109,10 +109,19 @@ async function checkExpiredParties (client) {
 
           if (eligibleTeachers.length > 0) {
             try {
-              const thread = await message.startThread({
-                name: `Teaching Proof — ${bossName}`,
-                autoArchiveDuration: 1440 // 24 hours
-              });
+              // Use the existing discussion thread if it exists, otherwise create one
+              let thread = message.thread;
+              if (thread) {
+                // Unarchive if archived
+                if (thread.archived) await thread.setArchived(false);
+              } else {
+                thread = await message.startThread({
+                  name: `Teaching Proof — ${bossName}`,
+                  autoArchiveDuration: 1440
+                });
+              }
+
+              await thread.send('━━━━━━━━━━━━━━━━━━━━\n🎓 **Teaching Proof**\nThe party has ended. Teachers — upload a screenshot and claim your VP below.');
 
               for (const teacherId of eligibleTeachers) {
                 const row = new ActionRowBuilder().addComponents(
@@ -124,14 +133,14 @@ async function checkExpiredParties (client) {
                 );
 
                 await thread.send({
-                  content: `🎓 <@${teacherId}> — Upload a screenshot into this thread as proof of your teaching run, then click the button below to claim your **${TEACHING_VP_REWARD} VP**!`,
+                  content: `🎓 <@${teacherId}> — Upload a screenshot as proof of your teaching run, then click the button below to claim your **${TEACHING_VP_REWARD} VP**!`,
                   components: [row]
                 });
               }
 
-              console.log(`[LFG] Created proof thread for party ${party.id} (${bossName}, ${eligibleTeachers.length} teacher(s))`);
+              console.log(`[LFG] Posted proof prompt for party ${party.id} (${bossName}, ${eligibleTeachers.length} teacher(s))`);
             } catch (threadError) {
-              console.error(`[LFG] Error creating proof thread for party ${party.id}:`, threadError);
+              console.error(`[LFG] Error posting proof prompt for party ${party.id}:`, threadError);
             }
           }
         }

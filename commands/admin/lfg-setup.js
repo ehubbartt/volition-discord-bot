@@ -28,10 +28,15 @@ module.exports = {
         });
       }
 
+      // Set channel topic as a hint for users
+      await channel.setTopic('Create a party with the button below. Use the threads to discuss — no chatting in this channel.').catch(err =>
+        console.error('[LFG Setup] Failed to set channel topic:', err)
+      );
+
       await lfgHandler.postPersistentEmbed(channel);
 
       await interaction.editReply({
-        content: `Party Finder embed posted in <#${channelId}>.`
+        content: `Party Finder embed posted in <#${channelId}> and channel topic set.`
       });
 
       console.log(`[LFG] Persistent embed posted by ${interaction.user.tag} in #${channel.name}`);
