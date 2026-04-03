@@ -821,19 +821,34 @@ async function handleModalSubmit (interaction) {
       components: [tempButtons]
     });
 
-    // Ping relevant roles in a separate message (must be separate for Discord to notify)
-    const pings = [];
-    if (boss.roleId) pings.push(`<@&${boss.roleId}>`);
-    if (experienceLevel === 'learner' && config.PVM_TEACHER_ROLE_ID) {
-      pings.push(`<@&${config.PVM_TEACHER_ROLE_ID}>`);
-    } else if (experienceLevel === 'teaching' && config.PVM_LEARNER_ROLE_ID) {
-      pings.push(`<@&${config.PVM_LEARNER_ROLE_ID}>`);
-    }
-    if (pings.length > 0) {
-      await interaction.channel.send(pings.join(' ')).catch(err =>
-        console.error('[LFG] Failed to send role pings:', err)
+    // Create discussion thread immediately (before any other messages)
+    try {
+      const displayName = interaction.member?.displayName || interaction.user.username;
+      const thread = await message.startThread({
+        name: `${boss.name} — ${displayName}'s party`,
+        autoArchiveDuration: 1440
+      });
+      await thread.send(
+        `Use this thread to coordinate with your group — party details are in the message above.\n\n` +
+        `**Join the party** by clicking the buttons on the embed, not by posting here.`
       );
+    } catch (threadErr) {
+      console.error('[LFG] Failed to create discussion thread:', threadErr);
     }
+
+    // Role pings disabled for testing
+    // const pings = [];
+    // if (boss.roleId) pings.push(`<@&${boss.roleId}>`);
+    // if (experienceLevel === 'learner' && config.PVM_TEACHER_ROLE_ID) {
+    //   pings.push(`<@&${config.PVM_TEACHER_ROLE_ID}>`);
+    // } else if (experienceLevel === 'teaching' && config.PVM_LEARNER_ROLE_ID) {
+    //   pings.push(`<@&${config.PVM_LEARNER_ROLE_ID}>`);
+    // }
+    // if (pings.length > 0) {
+    //   await interaction.channel.send(pings.join(' ')).catch(err =>
+    //     console.error('[LFG] Failed to send role pings:', err)
+    //   );
+    // }
 
     // Acknowledge the modal with an ephemeral confirmation + invite option
     const inviteSelect = new UserSelectMenuBuilder()
@@ -873,21 +888,6 @@ async function handleModalSubmit (interaction) {
     const buttons = buildPartyButtons(updatedParty, members);
 
     await message.edit({ embeds: [embed], components: [buttons] });
-
-    // Create a discussion thread on the party message
-    try {
-      const displayName = interaction.member?.displayName || interaction.user.username;
-      const thread = await message.startThread({
-        name: `${boss.name} — ${displayName}'s party`,
-        autoArchiveDuration: 1440
-      });
-      await thread.send(
-        `Use this thread to coordinate with your group — party details are in the message above.\n\n` +
-        `**Join the party** by clicking the buttons on the embed, not by posting here.`
-      );
-    } catch (threadErr) {
-      console.error('[LFG] Failed to create discussion thread:', threadErr);
-    }
 
     // Auto-repost the persistent "Create Party" embed at the bottom of the channel
     try {
