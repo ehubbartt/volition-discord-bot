@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 /**
  * Create a new LFG party
  */
-async function createParty({ creatorId, bossKey, groupSize, experienceLevel, scheduledTime, notes, messageId, channelId, expiresAt, startsAt, teachersNeeded, rolesNeeded }) {
+async function createParty({ creatorId, bossKey, groupSize, experienceLevel, scheduledTime, notes, messageId, channelId, expiresAt, startsAt, teachersNeeded, rolesNeeded, pingMessageId }) {
   const { data, error } = await supabase
     .from('lfg_parties')
     .insert({
@@ -24,7 +24,8 @@ async function createParty({ creatorId, bossKey, groupSize, experienceLevel, sch
       starts_at: startsAt || null,
       teacher_id: experienceLevel === 'teaching' ? creatorId : null,
       teachers_needed: teachersNeeded || 0,
-      roles_needed: rolesNeeded || null
+      roles_needed: rolesNeeded || null,
+      ping_message_id: pingMessageId || null
     })
     .select()
     .single();

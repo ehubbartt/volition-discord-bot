@@ -972,10 +972,13 @@ async function handleModalSubmit (interaction) {
     } else if (experienceLevel === 'teaching' && config.PVM_LEARNER_ROLE_ID) {
       pings.push(`<@&${config.PVM_LEARNER_ROLE_ID}>`);
     }
+    let pingMessageId = null;
     if (pings.length > 0) {
-      await interaction.channel.send(pings.join(' ')).catch(err =>
-        console.error('[LFG] Failed to send role pings:', err)
-      );
+      const pingMsg = await interaction.channel.send(pings.join(' ')).catch(err => {
+        console.error('[LFG] Failed to send role pings:', err);
+        return null;
+      });
+      if (pingMsg) pingMessageId = pingMsg.id;
     }
 
     // Acknowledge the modal with an ephemeral confirmation + invite option
@@ -1004,7 +1007,8 @@ async function handleModalSubmit (interaction) {
       expiresAt: expiresAt.toISOString(),
       startsAt: startsAt ? startsAt.toISOString() : null,
       teachersNeeded: experienceLevel === 'learner' ? teachersNeeded : 0,
-      rolesNeeded
+      rolesNeeded,
+      pingMessageId
     });
 
     // Add creator as first member (mark as teacher if they're running a teaching party)

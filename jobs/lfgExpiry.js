@@ -166,10 +166,21 @@ async function deleteOldPartyMessages (client) {
       try {
         const channel = client.channels.cache.get(party.channel_id);
         if (channel) {
+          // Delete the party embed message
           const message = await channel.messages.fetch(party.message_id).catch(() => null);
           if (message) {
             await message.delete();
             console.log(`[LFG Cleanup] Deleted message for party ${party.id} (${party.boss_key})`);
+          }
+
+          // Delete the role ping message if there was one
+          if (party.ping_message_id) {
+            const pingMessage = await channel.messages.fetch(party.ping_message_id).catch(() => null);
+            if (pingMessage) {
+              await pingMessage.delete().catch(err =>
+                console.error(`[LFG Cleanup] Failed to delete ping message ${party.ping_message_id}:`, err)
+              );
+            }
           }
         }
         await lfgDb.markMessageDeleted(party.id);
