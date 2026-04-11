@@ -16,6 +16,7 @@ const {
     applyRank,
     getWomRole
 } = require('../../utils/ranks');
+const { broadcastRankUps } = require('../../utils/rankAnnouncements');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -77,6 +78,7 @@ async function fullClanSync (interaction, clanId) {
         const newMembers = [];
         const removedMembers = [];
         const rankMismatches = [];
+        const rankUpAnnouncements = [];
 
         // Process each WOM clan member
         for (const member of clanMembers) {
@@ -197,12 +199,23 @@ async function fullClanSync (interaction, clanId) {
                                 currentRankIndex: discordRankResult.oldRankIndex,
                                 expectedRankIndex: discordRankResult.newRankIndex,
                                 ehb,
-                                daysInClan,
                                 issue: `${action}: ${discordRankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, discordRankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, discordRankResult.newRankIndex)}`
                             });
+
+                            // Track rank-ups for announcement
+                            if (discordRankResult.isUpgrade) {
+                                rankUpAnnouncements.push({
+                                    member: discordMember,
+                                    rsn,
+                                    ehb,
+                                    oldRankIndex: discordRankResult.oldRankIndex,
+                                    newRankIndex: discordRankResult.newRankIndex,
+                                    isInitial: discordRankResult.oldRankIndex === -1
+                                });
+                            }
                         } else if (discordRankResult.error) {
                             rankUpdatesFailed++;
-                            rankMismatches.push({ rsn, currentRankIndex: discordRankResult.oldRankIndex, expectedRankIndex: discordRankResult.newRankIndex, ehb, daysInClan, issue: `Failed: ${discordRankResult.error}` });
+                            rankMismatches.push({ rsn, currentRankIndex: discordRankResult.oldRankIndex, expectedRankIndex: discordRankResult.newRankIndex, ehb, issue: `Failed: ${discordRankResult.error}` });
                             console.error(`[FullSync] Failed to update rank for ${rsn}:`, discordRankResult.error);
                         }
                     } catch (error) {
@@ -305,7 +318,7 @@ async function fullClanSync (interaction, clanId) {
         // Add rank mismatch alerts if any
         if (rankMismatches.length > 0) {
             let mismatchText = rankMismatches.slice(0, 10).map(m =>
-                `• **${m.rsn}**: ${m.currentRankIndex >= 0 ? formatRank(interaction.guild, m.currentRankIndex) : 'None'} -> ${formatRank(interaction.guild, m.expectedRankIndex)} (${m.ehb} EHB, ${m.daysInClan} days)`
+                `• **${m.rsn}**: ${m.currentRankIndex >= 0 ? formatRank(interaction.guild, m.currentRankIndex) : 'None'} -> ${formatRank(interaction.guild, m.expectedRankIndex)} (${m.ehb} EHB)`
             ).join('\n');
 
             if (rankMismatches.length > 10) {
@@ -323,6 +336,9 @@ async function fullClanSync (interaction, clanId) {
             content: null,
             embeds: [summaryEmbed]
         });
+
+        // Broadcast rank-ups to #rank-ups channel
+        await broadcastRankUps(interaction.guild, rankUpAnnouncements, '[FullSync]');
 
     } catch (error) {
         console.error('Error during full clan sync:', error);
