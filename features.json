@@ -6,7 +6,8 @@
     "autoAddUnverifiedRole": true,
     "handleGuildMemberAdd": true,
     "womMessageListener": true,
-    "reactionAwardPoints": true
+    "reactionAwardPoints": false,
+    "eventSubmissions": true
   },
   "verification": {
     "_description": "Player verification system features",
@@ -42,7 +43,7 @@
   "gamification": {
     "_description": "Fun engagement features",
     "lootCrates": true,
-    "dailyWordle": true,
+    "dailyWordle": false,
     "duels": true,
     "weeklyTasks": true,
     "eventRewards": true,
@@ -78,8 +79,9 @@
       "inactive": true,
       "updateconfig": true,
       "syncconfig": true,
-      "sendweeklytask": true,
-      "senddailywordle": true,
+      "sendweeklytask": false,
+      "senddailywordle": false,
+      "event": true,
       "lfg-setup": true
     },
     "fun": {

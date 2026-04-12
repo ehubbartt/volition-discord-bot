@@ -12,6 +12,7 @@ const forceVerifyHandler = require('../handlers/forceVerify');
 const transcriptHandler = require('../handlers/transcript');
 const restoreVpHandler = require('../handlers/restoreVp');
 const lfgHandler = require('../handlers/lfg');
+const eventSubmissionHandler = require('../handlers/eventSubmission');
 
 // Per-user spin lock to prevent race conditions from rapid button clicks across multiple messages
 const spinLocks = new Set();
@@ -84,6 +85,13 @@ module.exports = {
     if (interaction.isStringSelectMenu() && interaction.customId === 'lfg_creator_role_select') {
       try { return await lfgHandler.handleCreatorRoleSelect(interaction); }
       catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
+
+    // Event placement select menu
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('event_place_select_')) {
+      const eventCommand = require('../commands/admin/event');
+      try { return await eventCommand.handlePlacementSelect(interaction); }
+      catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId === 'shop_menu') {
@@ -616,6 +624,23 @@ module.exports = {
       if (interaction.customId === 'wallet_cashout' || interaction.customId === 'wallet_cashout_force' ||
           interaction.customId === 'wallet_cashout_cancel' || interaction.customId.startsWith('wallet_mark_paid_')) {
         return walletHandler.handleButton(interaction);
+      }
+
+      // Event submission approve/reject buttons
+      if (interaction.customId.startsWith('event_approve_')) {
+        try { return await eventSubmissionHandler.handleApprove(interaction); }
+        catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+      if (interaction.customId.startsWith('event_reject_')) {
+        try { return await eventSubmissionHandler.handleReject(interaction); }
+        catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+
+      // Event placement skip button
+      if (interaction.customId.startsWith('event_skip_placements_')) {
+        const eventCommand = require('../commands/admin/event');
+        try { return await eventCommand.handleSkipPlacements(interaction); }
+        catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
       }
 
       // LFG Party Finder buttons
