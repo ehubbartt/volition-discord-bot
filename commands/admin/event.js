@@ -229,11 +229,14 @@ async function handleCreateCompetition(interaction) {
     const typeLabel = type === 'sotw' ? 'Skill of the Week' : 'Boss of the Week';
     const typeEmoji = type === 'sotw' ? '⭐' : '⚔️';
 
+    // Get wiki image for the competition metric
+    const metricImage = getMetricImageUrl(competitionData.metric);
+
     const embed = new EmbedBuilder()
         .setColor(type === 'sotw' ? 'Gold' : 'Red')
         .setTitle(`${typeEmoji} ${title}`)
         .setDescription(`**${typeLabel}**\nTracked via [WiseOldMan Competition](https://wiseoldman.net/competitions/${competitionId})`)
-        .setThumbnail(config.CLAN_ICON_URL)
+        .setThumbnail(metricImage || config.CLAN_ICON_URL)
         .addFields(
             {
                 name: 'Prizes',
@@ -670,6 +673,18 @@ async function handleListEvents(interaction) {
 // ----------------------------------------------------------------------------
 // Build leaderboard text from WOM competition data
 
+// OSRS skills list — used to determine if a WOM metric is a skill (XP) or boss (KC)
+const OSRS_SKILLS = [
+    'overall', 'attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer',
+    'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking',
+    'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving',
+    'slayer', 'farming', 'runecrafting', 'hunter', 'construction'
+];
+
+function isSkillMetric(metric) {
+    return OSRS_SKILLS.includes(metric?.toLowerCase());
+}
+
 function buildLeaderboardText(competitionData) {
     if (!competitionData.participations || competitionData.participations.length === 0) {
         return 'No participants yet.';
@@ -680,20 +695,42 @@ function buildLeaderboardText(competitionData) {
         .slice(0, 10);
 
     const metric = competitionData.metric || '';
-    const isKc = metric.toLowerCase().includes('boss') || competitionData.type === 'boss';
+    const isSkill = isSkillMetric(metric);
 
     return sorted.map((p, i) => {
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
         const gained = p.progress.gained;
-        const displayGained = isKc ? `${gained} KC` : `${gained.toLocaleString()} XP`;
+        const displayGained = isSkill ? `${gained.toLocaleString()} XP` : `${gained} KC`;
         return `${medal} **${p.player.displayName}** — ${displayGained}`;
     }).join('\n');
+}
+
+/**
+ * Build an OSRS wiki image URL for a WOM competition metric.
+ * Skills use "{Skill}_icon.png", bosses use "{Boss}.png" with formatting.
+ */
+function getMetricImageUrl(metric) {
+    if (!metric) return null;
+
+    const formatted = metric
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join('_');
+
+    if (isSkillMetric(metric)) {
+        return `https://oldschool.runescape.wiki/images/${formatted}_icon.png`;
+    }
+
+    // Boss names — encode special characters
+    const encoded = encodeURIComponent(formatted).replace(/%20/g, '_');
+    return `https://oldschool.runescape.wiki/images/${encoded}.png`;
 }
 
 // Export for use in automated task creation and interaction routing
 module.exports.handlePlacementSelect = handlePlacementSelect;
 module.exports.handleSkipPlacements = handleSkipPlacements;
 module.exports.buildLeaderboardText = buildLeaderboardText;
+module.exports.getMetricImageUrl = getMetricImageUrl;
 
 // Export for automated weekly task creation (called from index.js)
 module.exports.createTaskEvent = async function(client, taskText) {
