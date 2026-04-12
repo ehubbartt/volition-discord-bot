@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType } = require('discord.js');
+const axios = require('axios');
 const { isAdmin } = require('../../utils/permissions');
 const config = require('../../utils/config');
 const eventsDb = require('../../db/events');
@@ -230,7 +231,7 @@ async function handleCreateCompetition(interaction) {
     const typeEmoji = type === 'sotw' ? '⭐' : '⚔️';
 
     // Get wiki image for the competition metric
-    const metricImage = getMetricImageUrl(competitionData.metric);
+    const metricImage = await getMetricImageUrl(competitionData.metric);
 
     const embed = new EmbedBuilder()
         .setColor(type === 'sotw' ? 'Gold' : 'Red')
@@ -706,24 +707,48 @@ function buildLeaderboardText(competitionData) {
 }
 
 /**
- * Build an OSRS wiki image URL for a WOM competition metric.
- * Skills use "{Skill}_icon.png", bosses use "{Boss}.png" with formatting.
+ * Fetch the main image for an OSRS wiki page using the MediaWiki API.
+ * Returns the thumbnail URL or null if not found.
  */
-function getMetricImageUrl(metric) {
+async function fetchWikiImage(pageTitle) {
+    try {
+        const res = await axios.get('https://oldschool.runescape.wiki/api.php', {
+            params: {
+                action: 'query',
+                titles: pageTitle,
+                prop: 'pageimages',
+                format: 'json',
+                pithumbsize: 256,
+            },
+            headers: { 'User-Agent': 'Volition-Discord-Bot' },
+            timeout: 5000,
+        });
+
+        const pages = res.data?.query?.pages;
+        if (!pages) return null;
+
+        const page = Object.values(pages)[0];
+        return page?.thumbnail?.source || null;
+    } catch (err) {
+        console.error(`[Wiki] Failed to fetch image for "${pageTitle}":`, err.message);
+        return null;
+    }
+}
+
+/**
+ * Get a wiki image URL for a WOM competition metric.
+ * Formats the metric name into a wiki page title and fetches the real image.
+ */
+async function getMetricImageUrl(metric) {
     if (!metric) return null;
 
-    const formatted = metric
+    // Convert WOM metric (snake_case) to wiki page title (Title Case with spaces)
+    const pageTitle = metric
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join('_');
+        .join(' ');
 
-    if (isSkillMetric(metric)) {
-        return `https://oldschool.runescape.wiki/images/${formatted}_icon.png`;
-    }
-
-    // Boss names — encode special characters
-    const encoded = encodeURIComponent(formatted).replace(/%20/g, '_');
-    return `https://oldschool.runescape.wiki/images/${encoded}.png`;
+    return fetchWikiImage(pageTitle);
 }
 
 // Export for use in automated task creation and interaction routing
