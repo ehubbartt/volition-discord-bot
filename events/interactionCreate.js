@@ -626,6 +626,18 @@ module.exports = {
         return walletHandler.handleButton(interaction);
       }
 
+      // Adjustpoints role payout confirm/cancel
+      if (interaction.customId === 'adjustpoints_role_confirm') {
+        const adjustCmd = require('../commands/utility/adjustPoints');
+        try { return await adjustCmd.handleConfirm(interaction); }
+        catch (error) { console.error('[AdjustPoints]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+      if (interaction.customId === 'adjustpoints_role_cancel') {
+        const adjustCmd = require('../commands/utility/adjustPoints');
+        try { return await adjustCmd.handleCancel(interaction); }
+        catch (error) { console.error('[AdjustPoints]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+
       // Event submission approve/reject buttons
       if (interaction.customId.startsWith('event_approve_')) {
         try { return await eventSubmissionHandler.handleApprove(interaction); }
