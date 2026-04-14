@@ -87,6 +87,13 @@ module.exports = {
       catch (error) { console.error('[LFG]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
     }
 
+    // Event checklist task claim select menu
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('event_task_claim_')) {
+      const eventCommand = require('../commands/admin/event');
+      try { return await eventCommand.handleTaskClaim(interaction); }
+      catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+    }
+
     // Event placement select menu
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith('event_place_select_')) {
       const eventCommand = require('../commands/admin/event');
@@ -636,6 +643,18 @@ module.exports = {
         const adjustCmd = require('../commands/utility/adjustPoints');
         try { return await adjustCmd.handleCancel(interaction); }
         catch (error) { console.error('[AdjustPoints]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+
+      // Event checklist task approve/reject buttons
+      if (interaction.customId.startsWith('event_task_approve_')) {
+        const eventCommand = require('../commands/admin/event');
+        try { return await eventCommand.handleTaskApprove(interaction); }
+        catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+      if (interaction.customId.startsWith('event_task_reject_')) {
+        const eventCommand = require('../commands/admin/event');
+        try { return await eventCommand.handleTaskReject(interaction); }
+        catch (error) { console.error('[Event]', error); return interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
       }
 
       // Event submission approve/reject buttons

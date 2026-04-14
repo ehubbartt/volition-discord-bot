@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // ----------------------------------------------------------------------------
 // Events CRUD
 
-async function createEvent({ type, title, description, created_by, vp_reward, place_rewards, wom_competition_id, message_id, thread_id, channel_id, ends_at }) {
+async function createEvent({ type, title, description, created_by, vp_reward, place_rewards, tasks, wom_competition_id, message_id, thread_id, channel_id, ends_at }) {
     const { data, error } = await supabase
         .from('events')
         .insert({
@@ -23,6 +23,7 @@ async function createEvent({ type, title, description, created_by, vp_reward, pl
             created_by: created_by || null,
             vp_reward: vp_reward ?? 5,
             place_rewards: place_rewards || null,
+            tasks: tasks || null,
             wom_competition_id: wom_competition_id || null,
             message_id: message_id || null,
             thread_id: thread_id || null,

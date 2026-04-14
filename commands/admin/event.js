@@ -23,6 +23,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('Bonus VP for 2nd place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('Bonus VP for 3rd place').setRequired(false))
                 .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
+                .addBooleanOption(opt => opt.setName('checklist').setDescription('Enable checklist mode with individual claimable tasks').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('competition')
@@ -53,6 +54,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('Bonus VP for 2nd place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('Bonus VP for 3rd place').setRequired(false))
                 .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
+                .addBooleanOption(opt => opt.setName('checklist').setDescription('Enable checklist mode with individual claimable tasks').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('end')
@@ -106,6 +108,8 @@ function parseDuration(str) {
 async function showDescriptionModal(interaction, type) {
     const modalId = `event_desc_${type}_${interaction.user.id}_${Date.now()}`;
 
+    const isChecklist = interaction.options.getBoolean('checklist') ?? false;
+
     // Cache the slash command options
     pendingEvents.set(modalId, {
         type,
@@ -116,6 +120,7 @@ async function showDescriptionModal(interaction, type) {
         second: interaction.options.getInteger('second_place'),
         third: interaction.options.getInteger('third_place'),
         isLeagues: interaction.options.getBoolean('leagues') ?? false,
+        isChecklist,
     });
 
     // Auto-clean after 5 minutes
@@ -135,7 +140,78 @@ async function showDescriptionModal(interaction, type) {
 
     modal.addComponents(new ActionRowBuilder().addComponents(descriptionInput));
 
+    if (isChecklist) {
+        const tasksInput = new TextInputBuilder()
+            .setCustomId('event_tasks')
+            .setLabel('Tasks (one per line)')
+            .setPlaceholder('Get a fire cape\nComplete 50 laps of agility\nDefeat Zulrah 10 times')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(4000);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(tasksInput));
+    }
+
     return interaction.showModal(modal);
+}
+
+// ----------------------------------------------------------------------------
+// Checklist helpers
+
+function buildTaskChecklist(tasks) {
+    return tasks.map((task) => {
+        if (task.status === 'complete') {
+            return `~~${task.text}~~ ✅ **${task.claimed_by_name}**`;
+        } else if (task.status === 'pending') {
+            return `🔄 ${task.text} — <@${task.claimed_by}> *(pending)*`;
+        }
+        return `⬜ ${task.text}`;
+    }).join('\n');
+}
+
+function buildTaskSelectMenu(tasks, eventId) {
+    const openTasks = tasks
+        .map((task, i) => ({ ...task, index: i }))
+        .filter(t => t.status === 'open');
+
+    if (openTasks.length === 0) return null;
+
+    const select = new StringSelectMenuBuilder()
+        .setCustomId(`event_task_claim_${eventId}`)
+        .setPlaceholder('Claim a task...')
+        .addOptions(openTasks.map(t => ({
+            label: t.text.length > 100 ? t.text.slice(0, 97) + '...' : t.text,
+            value: String(t.index),
+        })));
+
+    return new ActionRowBuilder().addComponents(select);
+}
+
+// Helper to rebuild and edit the event embed with updated checklist
+async function updateChecklistEmbed(client, event) {
+    const channel = client.channels.cache.get(event.channel_id);
+    if (!channel) return;
+
+    try {
+        const message = await channel.messages.fetch(event.message_id);
+        if (!message) return;
+
+        const embed = EmbedBuilder.from(message.embeds[0]);
+
+        // Update the Tasks field
+        const taskFieldIndex = embed.data.fields.findIndex(f => f.name === 'Tasks');
+        if (taskFieldIndex !== -1) {
+            embed.data.fields[taskFieldIndex].value = buildTaskChecklist(event.tasks);
+        }
+
+        const components = [];
+        const selectRow = buildTaskSelectMenu(event.tasks, event.id);
+        if (selectRow) components.push(selectRow);
+
+        await message.edit({ embeds: [embed], components });
+    } catch (err) {
+        console.error('[Event] Failed to update checklist embed:', err);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -150,8 +226,23 @@ async function handleDescriptionModalSubmit(interaction) {
     }
     pendingEvents.delete(interaction.customId);
 
-    const { type, title, vpReward, durationStr, first, second, third, isLeagues } = opts;
+    const { type, title, vpReward, durationStr, first, second, third, isLeagues, isChecklist } = opts;
     const description = interaction.fields.getTextInputValue('event_description');
+
+    // Parse checklist tasks if in checklist mode
+    let tasks = null;
+    if (isChecklist) {
+        const tasksRaw = interaction.fields.getTextInputValue('event_tasks');
+        tasks = tasksRaw.split('\n').map(line => line.trim()).filter(Boolean)
+            .map(text => ({ text, claimed_by: null, claimed_by_name: null, status: 'open' }));
+
+        if (tasks.length === 0) {
+            return interaction.editReply({ content: '❌ Checklist mode requires at least one task.' });
+        }
+        if (tasks.length > 25) {
+            return interaction.editReply({ content: '❌ Maximum 25 tasks allowed (select menu limit).' });
+        }
+    }
 
     const durationMs = parseDuration(durationStr);
     const endsAt = durationMs ? new Date(Date.now() + durationMs) : null;
@@ -177,7 +268,6 @@ async function handleDescriptionModalSubmit(interaction) {
             { name: 'Reward', value: `${vpReward} ${vpEmoji} VP per completion`, inline: true },
             { name: 'Type', value: type === 'task' ? 'Weekly Task' : 'Custom Event', inline: true },
         )
-        .setFooter({ text: 'Submit your proof in the thread below!' })
         .setTimestamp();
 
     if (endsAt) {
@@ -193,21 +283,39 @@ async function handleDescriptionModalSubmit(interaction) {
         embed.addFields({ name: 'Placement Bonuses', value: placementText.join('\n'), inline: false });
     }
 
+    if (tasks) {
+        // Checklist mode
+        embed.addFields({ name: 'Tasks', value: buildTaskChecklist(tasks), inline: false });
+        embed.setFooter({ text: 'Claim a task from the dropdown below!' });
+    } else {
+        embed.setFooter({ text: 'Submit your proof in the thread below!' });
+    }
+
+    // Select menu for checklist is added after DB insert (need event ID)
+    let selectRow = null;
+
     // Send the embed
     const message = await channel.send({
         embeds: [embed]
     });
 
-    // Create a thread on the embed for submissions
+    // Create a thread for submissions/approvals
     const thread = await message.startThread({
-        name: `${title} — Submissions`,
+        name: tasks ? `${title} — Task Approvals` : `${title} — Submissions`,
         autoArchiveDuration: 10080, // 7 days
     });
 
-    await thread.send({
-        content: '📸 **Post your screenshot proof here!** An admin will review and approve submissions.\n\n' +
-            '> Only messages with image attachments will be tracked as submissions.'
-    });
+    if (tasks) {
+        await thread.send({
+            content: '📋 **Task claims will appear here for admin approval.**\n\n' +
+                '> Claim a task from the dropdown on the event embed. An admin will approve or reject it.'
+        });
+    } else {
+        await thread.send({
+            content: '📸 **Post your screenshot proof here!** An admin will review and approve submissions.\n\n' +
+                '> Only messages with image attachments will be tracked as submissions.'
+        });
+    }
 
     // Save to database
     const event = await eventsDb.createEvent({
@@ -217,11 +325,20 @@ async function handleDescriptionModalSubmit(interaction) {
         created_by: interaction.user.id,
         vp_reward: vpReward,
         place_rewards: placeRewards,
+        tasks,
         message_id: message.id,
         thread_id: thread.id,
         channel_id: channel.id,
         ends_at: endsAt ? endsAt.toISOString() : null,
     });
+
+    // Now that we have the event ID, add the select menu for checklist events
+    if (tasks) {
+        selectRow = buildTaskSelectMenu(tasks, event.id);
+        if (selectRow) {
+            await message.edit({ embeds: [embed], components: [selectRow] });
+        }
+    }
 
     await interaction.editReply({
         content: `✅ Event **${title}** created! (ID: ${event.id})\nEmbed: ${message.url}`
@@ -799,11 +916,219 @@ async function getMetricImageUrl(metric) {
     return fetchWikiImage(pageTitle);
 }
 
+// ----------------------------------------------------------------------------
+// Checklist: Player claims a task via select menu
+
+async function handleTaskClaim(interaction) {
+    const eventId = parseInt(interaction.customId.replace('event_task_claim_', ''));
+    const taskIndex = parseInt(interaction.values[0]);
+
+    const event = await eventsDb.getEvent(eventId);
+    if (!event || event.status !== 'active' || !event.tasks) {
+        return interaction.reply({ content: '❌ Event not found or not active.', ephemeral: true });
+    }
+
+    const tasks = event.tasks;
+    if (taskIndex < 0 || taskIndex >= tasks.length || tasks[taskIndex].status !== 'open') {
+        return interaction.reply({ content: '⚠️ This task is no longer available.', ephemeral: true });
+    }
+
+    // Update task to pending
+    tasks[taskIndex].status = 'pending';
+    tasks[taskIndex].claimed_by = interaction.user.id;
+    tasks[taskIndex].claimed_by_name = interaction.member?.displayName || interaction.user.username;
+
+    await eventsDb.updateEvent(eventId, { tasks });
+
+    // Update the embed
+    await updateChecklistEmbed(interaction.client, { ...event, tasks });
+
+    // Post approve/reject buttons in the thread
+    const thread = interaction.client.channels.cache.get(event.thread_id);
+    if (thread) {
+        const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
+
+        const embed = new EmbedBuilder()
+            .setColor('Yellow')
+            .setDescription(
+                `**Task claim** by <@${interaction.user.id}>\n` +
+                `**Task:** ${tasks[taskIndex].text}\n` +
+                `**Reward:** ${event.vp_reward} ${vpEmoji} VP`
+            )
+            .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
+
+        const approveBtn = new ButtonBuilder()
+            .setCustomId(`event_task_approve_${eventId}_${taskIndex}`)
+            .setLabel('Approve')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅');
+
+        const rejectBtn = new ButtonBuilder()
+            .setCustomId(`event_task_reject_${eventId}_${taskIndex}`)
+            .setLabel('Reject')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌');
+
+        const row = new ActionRowBuilder().addComponents(approveBtn, rejectBtn);
+
+        await thread.send({ embeds: [embed], components: [row] });
+    }
+
+    await interaction.reply({
+        content: `You claimed: **${tasks[taskIndex].text}** — waiting for admin approval.`,
+        ephemeral: true
+    });
+}
+
+// ----------------------------------------------------------------------------
+// Checklist: Admin approves a task claim
+
+async function handleTaskApprove(interaction) {
+    if (!isAdmin(interaction.member)) {
+        return interaction.reply({ content: '❌ Only admins can approve task claims.', ephemeral: true });
+    }
+
+    const parts = interaction.customId.replace('event_task_approve_', '').split('_');
+    const eventId = parseInt(parts[0]);
+    const taskIndex = parseInt(parts[1]);
+
+    const event = await eventsDb.getEvent(eventId);
+    if (!event || !event.tasks) {
+        return interaction.reply({ content: '❌ Event not found.', ephemeral: true });
+    }
+
+    const tasks = event.tasks;
+    if (taskIndex < 0 || taskIndex >= tasks.length) {
+        return interaction.reply({ content: '❌ Invalid task.', ephemeral: true });
+    }
+
+    if (tasks[taskIndex].status !== 'pending') {
+        return interaction.reply({ content: '⚠️ This task is not pending approval.', ephemeral: true });
+    }
+
+    // Award VP
+    const vpReward = event.vp_reward || 0;
+    const claimedBy = tasks[taskIndex].claimed_by;
+    let playerRsn = 'Unknown';
+
+    if (vpReward > 0) {
+        try {
+            const player = await db.getPlayerByDiscordId(claimedBy);
+            if (player) {
+                playerRsn = player.rsn;
+                await db.addPoints(player.rsn, vpReward);
+            } else {
+                return interaction.reply({
+                    content: `⚠️ <@${claimedBy}> is not linked to a player in the database. VP not awarded. Please verify them first.`,
+                    ephemeral: true
+                });
+            }
+        } catch (err) {
+            console.error('[Event] Failed to award VP for task:', err);
+            return interaction.reply({ content: `❌ Failed to award VP: ${err.message}`, ephemeral: true });
+        }
+    }
+
+    // Update task to complete
+    tasks[taskIndex].status = 'complete';
+    await eventsDb.updateEvent(eventId, { tasks });
+
+    // Update the embed
+    await updateChecklistEmbed(interaction.client, { ...event, tasks });
+
+    // Update the approve message
+    const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
+    const embed = new EmbedBuilder()
+        .setColor('Green')
+        .setDescription(
+            `✅ **Approved** — <@${claimedBy}>\n` +
+            `**Task:** ${tasks[taskIndex].text}\n` +
+            `**+${vpReward}** ${vpEmoji} VP awarded by <@${interaction.user.id}>`
+        )
+        .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
+
+    await interaction.update({ embeds: [embed], components: [] });
+
+    // Log to payout channel
+    const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+    if (logChannel && vpReward > 0) {
+        const player = await db.getPlayerByDiscordId(claimedBy);
+        const logEmbed = new EmbedBuilder()
+            .setColor('Green')
+            .setTitle('Event Task Approved')
+            .setDescription(
+                `**Player:** ${playerRsn}\n` +
+                `**Task:** ${tasks[taskIndex].text}\n` +
+                `**Change:** +${vpReward} VP\n` +
+                `**New Total:** ${player ? player.points : '?'} VP\n` +
+                `**Event:** ${event.title}\n` +
+                `**Approved by:** <@${interaction.user.id}>`
+            )
+            .setTimestamp();
+
+        await logChannel.send({ content: `<@${claimedBy}>`, embeds: [logEmbed] });
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Checklist: Admin rejects a task claim
+
+async function handleTaskReject(interaction) {
+    if (!isAdmin(interaction.member)) {
+        return interaction.reply({ content: '❌ Only admins can reject task claims.', ephemeral: true });
+    }
+
+    const parts = interaction.customId.replace('event_task_reject_', '').split('_');
+    const eventId = parseInt(parts[0]);
+    const taskIndex = parseInt(parts[1]);
+
+    const event = await eventsDb.getEvent(eventId);
+    if (!event || !event.tasks) {
+        return interaction.reply({ content: '❌ Event not found.', ephemeral: true });
+    }
+
+    const tasks = event.tasks;
+    if (taskIndex < 0 || taskIndex >= tasks.length) {
+        return interaction.reply({ content: '❌ Invalid task.', ephemeral: true });
+    }
+
+    if (tasks[taskIndex].status !== 'pending') {
+        return interaction.reply({ content: '⚠️ This task is not pending.', ephemeral: true });
+    }
+
+    const claimedBy = tasks[taskIndex].claimed_by;
+
+    // Reset task to open
+    tasks[taskIndex].status = 'open';
+    tasks[taskIndex].claimed_by = null;
+    tasks[taskIndex].claimed_by_name = null;
+
+    await eventsDb.updateEvent(eventId, { tasks });
+
+    // Update the embed (task goes back to dropdown)
+    await updateChecklistEmbed(interaction.client, { ...event, tasks });
+
+    // Update the reject message
+    const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setDescription(
+            `❌ **Rejected** — <@${claimedBy}>\n` +
+            `**Task:** ${tasks[taskIndex].text}\n` +
+            `Rejected by <@${interaction.user.id}>`
+        )
+        .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
+
+    await interaction.update({ embeds: [embed], components: [] });
+}
+
 // Export for use in automated task creation and interaction routing
 module.exports.handlePlacementSelect = handlePlacementSelect;
 module.exports.handleSkipPlacements = handleSkipPlacements;
 module.exports.buildLeaderboardText = buildLeaderboardText;
 module.exports.getMetricImageUrl = getMetricImageUrl;
+module.exports.handleTaskClaim = handleTaskClaim;
+module.exports.handleTaskApprove = handleTaskApprove;
+module.exports.handleTaskReject = handleTaskReject;
 
 // Export for automated weekly task creation (called from index.js)
 module.exports.createTaskEvent = async function(client, taskText) {
