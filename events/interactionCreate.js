@@ -733,6 +733,13 @@ module.exports = {
         return transcriptHandler.handleModal(interaction);
       }
 
+      // Event description modal (task/custom)
+      if (interaction.customId.startsWith('event_desc_')) {
+        const eventCommand = require('../commands/admin/event.js');
+        try { await eventCommand.handleEventDescriptionModal(interaction); }
+        catch (error) { console.error(error); await interaction.reply({ content: 'An error occurred.', ephemeral: true }).catch(() => {}); }
+      }
+
       // LFG party creation modal
       if (interaction.customId.startsWith('lfg_modal_')) {
         return lfgHandler.handleModalSubmit(interaction);

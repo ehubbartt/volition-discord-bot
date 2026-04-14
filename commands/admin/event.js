@@ -1,10 +1,13 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const axios = require('axios');
 const { isAdmin } = require('../../utils/permissions');
 const config = require('../../utils/config');
 const eventsDb = require('../../db/events');
 const db = require('../../db/supabase');
 const { womApi } = require('../../utils/api');
+
+// Temporary cache for slash command options while the modal is open
+const pendingEvents = new Map();
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,7 +17,6 @@ module.exports = {
             sub.setName('task')
                 .setDescription('Create a submission-based task event')
                 .addStringOption(opt => opt.setName('title').setDescription('Event title').setRequired(true))
-                .addStringOption(opt => opt.setName('description').setDescription('Task description / what players need to do').setRequired(true))
                 .addIntegerOption(opt => opt.setName('vp_reward').setDescription('VP per approved submission (default: 5)').setRequired(false))
                 .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 7d, 3d, 24h, 12h)').setRequired(false))
                 .addIntegerOption(opt => opt.setName('first_place').setDescription('Bonus VP for 1st place').setRequired(false))
@@ -45,7 +47,6 @@ module.exports = {
             sub.setName('custom')
                 .setDescription('Create a custom one-off event')
                 .addStringOption(opt => opt.setName('title').setDescription('Event title').setRequired(true))
-                .addStringOption(opt => opt.setName('description').setDescription('Event description / what players need to do').setRequired(true))
                 .addIntegerOption(opt => opt.setName('vp_reward').setDescription('VP per approved submission (default: 5)').setRequired(false))
                 .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 7d, 3d, 24h, 12h)').setRequired(false))
                 .addIntegerOption(opt => opt.setName('first_place').setDescription('Bonus VP for 1st place').setRequired(false))
@@ -71,7 +72,7 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'task' || subcommand === 'custom') {
-            return handleCreateSubmissionEvent(interaction, subcommand);
+            return showDescriptionModal(interaction, subcommand);
         } else if (subcommand === 'competition') {
             return handleCreateCompetition(interaction);
         } else if (subcommand === 'end') {
@@ -79,6 +80,10 @@ module.exports = {
         } else if (subcommand === 'list') {
             return handleListEvents(interaction);
         }
+    },
+
+    async handleEventDescriptionModal(interaction) {
+        return handleDescriptionModalSubmit(interaction);
     },
 };
 
@@ -96,20 +101,57 @@ function parseDuration(str) {
 }
 
 // ----------------------------------------------------------------------------
-// Create a submission-based event (task or custom)
+// Show description modal for task/custom events
 
-async function handleCreateSubmissionEvent(interaction, type) {
+async function showDescriptionModal(interaction, type) {
+    const modalId = `event_desc_${type}_${interaction.user.id}_${Date.now()}`;
+
+    // Cache the slash command options
+    pendingEvents.set(modalId, {
+        type,
+        title: interaction.options.getString('title'),
+        vpReward: interaction.options.getInteger('vp_reward') ?? 5,
+        durationStr: interaction.options.getString('duration'),
+        first: interaction.options.getInteger('first_place'),
+        second: interaction.options.getInteger('second_place'),
+        third: interaction.options.getInteger('third_place'),
+        isLeagues: interaction.options.getBoolean('leagues') ?? false,
+    });
+
+    // Auto-clean after 5 minutes
+    setTimeout(() => pendingEvents.delete(modalId), 5 * 60 * 1000);
+
+    const modal = new ModalBuilder()
+        .setCustomId(modalId)
+        .setTitle(`Create ${type === 'task' ? 'Task' : 'Custom'} Event`);
+
+    const descriptionInput = new TextInputBuilder()
+        .setCustomId('event_description')
+        .setLabel('Event Description')
+        .setPlaceholder('Describe the event... Use line breaks and bullet points freely!')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(4000);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(descriptionInput));
+
+    return interaction.showModal(modal);
+}
+
+// ----------------------------------------------------------------------------
+// Handle description modal submission
+
+async function handleDescriptionModalSubmit(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const title = interaction.options.getString('title');
-    const description = interaction.options.getString('description');
-    const vpReward = interaction.options.getInteger('vp_reward') ?? 5;
-    const durationStr = interaction.options.getString('duration');
-    const first = interaction.options.getInteger('first_place');
-    const second = interaction.options.getInteger('second_place');
-    const third = interaction.options.getInteger('third_place');
+    const opts = pendingEvents.get(interaction.customId);
+    if (!opts) {
+        return interaction.editReply({ content: '❌ Event session expired. Please run the command again.' });
+    }
+    pendingEvents.delete(interaction.customId);
 
-    const isLeagues = interaction.options.getBoolean('leagues') ?? false;
+    const { type, title, vpReward, durationStr, first, second, third, isLeagues } = opts;
+    const description = interaction.fields.getTextInputValue('event_description');
 
     const durationMs = parseDuration(durationStr);
     const endsAt = durationMs ? new Date(Date.now() + durationMs) : null;
