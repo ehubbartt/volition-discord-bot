@@ -20,6 +20,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('first_place').setDescription('Bonus VP for 1st place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('Bonus VP for 2nd place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('Bonus VP for 3rd place').setRequired(false))
+                .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('competition')
@@ -38,6 +39,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('VP for 2nd place (default: 30)').setRequired(false))
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('VP for 3rd place (default: 20)').setRequired(false))
                 .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 7d, 3d) - overrides WOM end date').setRequired(false))
+                .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('custom')
@@ -49,6 +51,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('first_place').setDescription('Bonus VP for 1st place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('Bonus VP for 2nd place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('Bonus VP for 3rd place').setRequired(false))
+                .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('end')
@@ -106,6 +109,8 @@ async function handleCreateSubmissionEvent(interaction, type) {
     const second = interaction.options.getInteger('second_place');
     const third = interaction.options.getInteger('third_place');
 
+    const isLeagues = interaction.options.getBoolean('leagues') ?? false;
+
     const durationMs = parseDuration(durationStr);
     const endsAt = durationMs ? new Date(Date.now() + durationMs) : null;
 
@@ -113,7 +118,7 @@ async function handleCreateSubmissionEvent(interaction, type) {
         ? [first || 0, second || 0, third || 0]
         : null;
 
-    const eventsChannelId = config.EVENTS_CHANNEL_ID;
+    const eventsChannelId = isLeagues ? config.LEAGUES_EVENTS_CHANNEL_ID : config.EVENTS_CHANNEL_ID;
     const channel = interaction.client.channels.cache.get(eventsChannelId);
     if (!channel) {
         return interaction.editReply({ content: '❌ Events channel not found. Make sure `EVENTS_CHANNEL_ID` is configured.' });
@@ -207,6 +212,8 @@ async function handleCreateCompetition(interaction) {
         return interaction.editReply({ content: `❌ Could not find WOM competition with ID ${competitionId}. Check the ID and try again.` });
     }
 
+    const isLeagues = interaction.options.getBoolean('leagues') ?? false;
+
     const durationMs = parseDuration(durationStr);
     let endsAt;
     if (durationMs) {
@@ -217,7 +224,7 @@ async function handleCreateCompetition(interaction) {
         endsAt = null;
     }
 
-    const eventsChannelId = config.EVENTS_CHANNEL_ID;
+    const eventsChannelId = isLeagues ? config.LEAGUES_EVENTS_CHANNEL_ID : config.EVENTS_CHANNEL_ID;
     const channel = interaction.client.channels.cache.get(eventsChannelId);
     if (!channel) {
         return interaction.editReply({ content: '❌ Events channel not found. Make sure `EVENTS_CHANNEL_ID` is configured.' });
