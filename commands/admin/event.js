@@ -189,12 +189,18 @@ function buildTaskSelectMenu(tasks, eventId) {
 
 // Helper to rebuild and edit the event embed with updated checklist
 async function updateChecklistEmbed(client, event) {
-    const channel = client.channels.cache.get(event.channel_id);
-    if (!channel) return;
-
     try {
+        const channel = client.channels.cache.get(event.channel_id) || await client.channels.fetch(event.channel_id);
+        if (!channel) {
+            console.error('[Event] Checklist embed update: channel not found', event.channel_id);
+            return;
+        }
+
         const message = await channel.messages.fetch(event.message_id);
-        if (!message) return;
+        if (!message) {
+            console.error('[Event] Checklist embed update: message not found', event.message_id);
+            return;
+        }
 
         const embed = EmbedBuilder.from(message.embeds[0]);
 
