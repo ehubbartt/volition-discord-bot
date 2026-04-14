@@ -943,36 +943,12 @@ async function handleTaskClaim(interaction) {
     // Update the embed
     await updateChecklistEmbed(interaction.client, { ...event, tasks });
 
-    // Post approve/reject buttons in the thread
+    // Notify in the thread — no approve/reject yet, wait for screenshot proof
     const thread = interaction.client.channels.cache.get(event.thread_id);
     if (thread) {
-        const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
-
-        const embed = new EmbedBuilder()
-            .setColor('Yellow')
-            .setDescription(
-                `**Task claim** by <@${interaction.user.id}>\n` +
-                `**Task:** ${tasks[taskIndex].text}\n` +
-                `**Reward:** ${event.vp_reward} ${vpEmoji} VP\n\n` +
-                `📸 <@${interaction.user.id}>, please post your screenshot proof in this thread.`
-            )
-            .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
-
-        const approveBtn = new ButtonBuilder()
-            .setCustomId(`event_task_approve_${eventId}_${taskIndex}`)
-            .setLabel('Approve')
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('✅');
-
-        const rejectBtn = new ButtonBuilder()
-            .setCustomId(`event_task_reject_${eventId}_${taskIndex}`)
-            .setLabel('Reject')
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji('❌');
-
-        const row = new ActionRowBuilder().addComponents(approveBtn, rejectBtn);
-
-        await thread.send({ embeds: [embed], components: [row] });
+        await thread.send({
+            content: `📋 <@${interaction.user.id}> claimed: **${tasks[taskIndex].text}**\n📸 Please post your screenshot proof below.`
+        });
     }
 
     await interaction.reply({
