@@ -953,7 +953,8 @@ async function handleTaskClaim(interaction) {
             .setDescription(
                 `**Task claim** by <@${interaction.user.id}>\n` +
                 `**Task:** ${tasks[taskIndex].text}\n` +
-                `**Reward:** ${event.vp_reward} ${vpEmoji} VP`
+                `**Reward:** ${event.vp_reward} ${vpEmoji} VP\n\n` +
+                `📸 <@${interaction.user.id}>, please post your screenshot proof in this thread.`
             )
             .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
 
@@ -975,7 +976,7 @@ async function handleTaskClaim(interaction) {
     }
 
     await interaction.reply({
-        content: `You claimed: **${tasks[taskIndex].text}** — waiting for admin approval.`,
+        content: `You claimed: **${tasks[taskIndex].text}** — please post your screenshot proof in the event thread for admin approval.`,
         ephemeral: true
     });
 }
