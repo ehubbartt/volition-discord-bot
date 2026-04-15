@@ -24,6 +24,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('Bonus VP for 3rd place').setRequired(false))
                 .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
                 .addBooleanOption(opt => opt.setName('checklist').setDescription('Enable checklist mode with individual claimable tasks').setRequired(false))
+                .addBooleanOption(opt => opt.setName('shared_checklist').setDescription('Checklist where multiple people can complete each task').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('competition')
@@ -55,6 +56,7 @@ module.exports = {
                 .addIntegerOption(opt => opt.setName('third_place').setDescription('Bonus VP for 3rd place').setRequired(false))
                 .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
                 .addBooleanOption(opt => opt.setName('checklist').setDescription('Enable checklist mode with individual claimable tasks').setRequired(false))
+                .addBooleanOption(opt => opt.setName('shared_checklist').setDescription('Checklist where multiple people can complete each task').setRequired(false))
         )
         .addSubcommand(sub =>
             sub.setName('end')
@@ -109,6 +111,11 @@ async function showDescriptionModal(interaction, type) {
     const modalId = `event_desc_${type}_${interaction.user.id}_${Date.now()}`;
 
     const isChecklist = interaction.options.getBoolean('checklist') ?? false;
+    const isSharedChecklist = interaction.options.getBoolean('shared_checklist') ?? false;
+
+    if (isChecklist && isSharedChecklist) {
+        return interaction.reply({ content: '❌ Cannot use both `checklist` and `shared_checklist` at the same time.', ephemeral: true });
+    }
 
     // Cache the slash command options
     pendingEvents.set(modalId, {
@@ -121,6 +128,7 @@ async function showDescriptionModal(interaction, type) {
         third: interaction.options.getInteger('third_place'),
         isLeagues: interaction.options.getBoolean('leagues') ?? false,
         isChecklist,
+        isSharedChecklist,
     });
 
     // Auto-clean after 5 minutes
@@ -140,7 +148,7 @@ async function showDescriptionModal(interaction, type) {
 
     modal.addComponents(new ActionRowBuilder().addComponents(descriptionInput));
 
-    if (isChecklist) {
+    if (isChecklist || isSharedChecklist) {
         const tasksInput = new TextInputBuilder()
             .setCustomId('event_tasks')
             .setLabel('Tasks (one per line)')
@@ -160,6 +168,19 @@ async function showDescriptionModal(interaction, type) {
 
 function buildTaskChecklist(tasks) {
     return tasks.map((task) => {
+        if (task.shared) {
+            const count = task.completions?.length || 0;
+            const countText = count > 0 ? ` (${count} completed)` : '';
+            if (task.status === 'pending') {
+                return `🔄 ${task.text} — <@${task.claimed_by}> *(pending)*${countText}`;
+            }
+            if (count > 0) {
+                return `✅ ${task.text}${countText}`;
+            }
+            return `⬜ ${task.text}`;
+        }
+
+        // Standard checklist (single claim)
         if (task.status === 'complete') {
             return `~~${task.text}~~ ✅ **${task.claimed_by_name}**`;
         } else if (task.status === 'pending') {
@@ -170,19 +191,25 @@ function buildTaskChecklist(tasks) {
 }
 
 function buildTaskSelectMenu(tasks, eventId) {
-    const openTasks = tasks
+    // For shared tasks: show all tasks that aren't currently pending
+    // For standard tasks: show only open tasks
+    const availableTasks = tasks
         .map((task, i) => ({ ...task, index: i }))
-        .filter(t => t.status === 'open');
+        .filter(t => t.shared ? t.status !== 'pending' : t.status === 'open');
 
-    if (openTasks.length === 0) return null;
+    if (availableTasks.length === 0) return null;
 
     const select = new StringSelectMenuBuilder()
         .setCustomId(`event_task_claim_${eventId}`)
         .setPlaceholder('Claim a task...')
-        .addOptions(openTasks.map(t => ({
-            label: t.text.length > 100 ? t.text.slice(0, 97) + '...' : t.text,
-            value: String(t.index),
-        })));
+        .addOptions(availableTasks.map(t => {
+            const count = t.shared && t.completions?.length ? ` (${t.completions.length} done)` : '';
+            const labelText = `${t.text}${count}`;
+            return {
+                label: labelText.length > 100 ? labelText.slice(0, 97) + '...' : labelText,
+                value: String(t.index),
+            };
+        }));
 
     return new ActionRowBuilder().addComponents(select);
 }
@@ -232,15 +259,21 @@ async function handleDescriptionModalSubmit(interaction) {
     }
     pendingEvents.delete(interaction.customId);
 
-    const { type, title, vpReward, durationStr, first, second, third, isLeagues, isChecklist } = opts;
+    const { type, title, vpReward, durationStr, first, second, third, isLeagues, isChecklist, isSharedChecklist } = opts;
     const description = interaction.fields.getTextInputValue('event_description');
 
-    // Parse checklist tasks if in checklist mode
+    // Parse checklist tasks if in checklist or shared checklist mode
     let tasks = null;
-    if (isChecklist) {
+    if (isChecklist || isSharedChecklist) {
         const tasksRaw = interaction.fields.getTextInputValue('event_tasks');
         tasks = tasksRaw.split('\n').map(line => line.trim()).filter(Boolean)
-            .map(text => ({ text, claimed_by: null, claimed_by_name: null, status: 'open' }));
+            .map(text => ({
+                text,
+                claimed_by: null,
+                claimed_by_name: null,
+                status: 'open',
+                ...(isSharedChecklist ? { shared: true, completions: [] } : {}),
+            }));
 
         if (tasks.length === 0) {
             return interaction.editReply({ content: '❌ Checklist mode requires at least one task.' });
@@ -935,7 +968,27 @@ async function handleTaskClaim(interaction) {
     }
 
     const tasks = event.tasks;
-    if (taskIndex < 0 || taskIndex >= tasks.length || tasks[taskIndex].status !== 'open') {
+    const task = tasks[taskIndex];
+
+    if (taskIndex < 0 || taskIndex >= tasks.length) {
+        return interaction.reply({ content: '⚠️ Invalid task.', ephemeral: true });
+    }
+
+    // Block claiming if this player already has a pending task on this event
+    const existingPending = tasks.find(t => t.status === 'pending' && t.claimed_by === interaction.user.id);
+    if (existingPending) {
+        return interaction.reply({ content: '⚠️ You already have a pending task claim. Submit your proof first before claiming another.', ephemeral: true });
+    }
+
+    // For shared tasks: allow claiming if not currently pending by someone else, check duplicate completions
+    if (task.shared) {
+        if (task.status === 'pending') {
+            return interaction.reply({ content: '⚠️ Someone is already submitting proof for this task. Try again shortly.', ephemeral: true });
+        }
+        if (task.completions?.some(c => c.discord_id === interaction.user.id)) {
+            return interaction.reply({ content: '⚠️ You have already completed this task.', ephemeral: true });
+        }
+    } else if (task.status !== 'open') {
         return interaction.reply({ content: '⚠️ This task is no longer available.', ephemeral: true });
     }
 
@@ -1015,8 +1068,21 @@ async function handleTaskApprove(interaction) {
         }
     }
 
-    // Update task to complete
-    tasks[taskIndex].status = 'complete';
+    // Update task status
+    if (tasks[taskIndex].shared) {
+        // Shared checklist: add to completions, reset to open for others
+        if (!tasks[taskIndex].completions) tasks[taskIndex].completions = [];
+        tasks[taskIndex].completions.push({
+            discord_id: claimedBy,
+            name: tasks[taskIndex].claimed_by_name,
+        });
+        tasks[taskIndex].status = 'open';
+        tasks[taskIndex].claimed_by = null;
+        tasks[taskIndex].claimed_by_name = null;
+    } else {
+        // Standard checklist: mark complete
+        tasks[taskIndex].status = 'complete';
+    }
     await eventsDb.updateEvent(eventId, { tasks });
 
     // Update the event embed checklist
