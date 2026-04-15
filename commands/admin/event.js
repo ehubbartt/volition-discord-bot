@@ -171,13 +171,7 @@ function buildTaskChecklist(tasks) {
         if (task.shared) {
             const count = task.completions?.length || 0;
             const countText = count > 0 ? ` (${count} completed)` : '';
-            if (task.status === 'pending') {
-                return `🔄 ${task.text} — <@${task.claimed_by}> *(pending)*${countText}`;
-            }
-            if (count > 0) {
-                return `✅ ${task.text}${countText}`;
-            }
-            return `⬜ ${task.text}`;
+            return `⬜ ${task.text}${countText}`;
         }
 
         // Standard checklist (single claim)
@@ -191,11 +185,11 @@ function buildTaskChecklist(tasks) {
 }
 
 function buildTaskSelectMenu(tasks, eventId) {
-    // For shared tasks: show all tasks that aren't currently pending
+    // For shared tasks: always show all tasks
     // For standard tasks: show only open tasks
     const availableTasks = tasks
         .map((task, i) => ({ ...task, index: i }))
-        .filter(t => t.shared ? t.status !== 'pending' : t.status === 'open');
+        .filter(t => t.shared ? true : t.status === 'open');
 
     if (availableTasks.length === 0) return null;
 
@@ -272,7 +266,7 @@ async function handleDescriptionModalSubmit(interaction) {
                 claimed_by: null,
                 claimed_by_name: null,
                 status: 'open',
-                ...(isSharedChecklist ? { shared: true, completions: [] } : {}),
+                ...(isSharedChecklist ? { shared: true, completions: [], pending_claims: [] } : {}),
             }));
 
         if (tasks.length === 0) {
@@ -974,33 +968,42 @@ async function handleTaskClaim(interaction) {
         return interaction.reply({ content: '⚠️ Invalid task.', ephemeral: true });
     }
 
-    // Block claiming if this player already has a pending task on this event
-    const existingPending = tasks.find(t => t.status === 'pending' && t.claimed_by === interaction.user.id);
-    if (existingPending) {
-        return interaction.reply({ content: '⚠️ You already have a pending task claim. Submit your proof first before claiming another.', ephemeral: true });
-    }
-
-    // For shared tasks: allow claiming if not currently pending by someone else, check duplicate completions
     if (task.shared) {
-        if (task.status === 'pending') {
-            return interaction.reply({ content: '⚠️ Someone is already submitting proof for this task. Try again shortly.', ephemeral: true });
+        // Shared checklist: multiple people can claim simultaneously
+        if (!task.pending_claims) task.pending_claims = [];
+
+        if (task.pending_claims.some(c => c.discord_id === interaction.user.id)) {
+            return interaction.reply({ content: '⚠️ You already have a pending claim on this task. Submit your proof first.', ephemeral: true });
         }
         if (task.completions?.some(c => c.discord_id === interaction.user.id)) {
             return interaction.reply({ content: '⚠️ You have already completed this task.', ephemeral: true });
         }
-    } else if (task.status !== 'open') {
-        return interaction.reply({ content: '⚠️ This task is no longer available.', ephemeral: true });
-    }
 
-    // Update task to pending
-    tasks[taskIndex].status = 'pending';
-    tasks[taskIndex].claimed_by = interaction.user.id;
-    tasks[taskIndex].claimed_by_name = interaction.member?.displayName || interaction.user.username;
+        task.pending_claims.push({
+            discord_id: interaction.user.id,
+            name: interaction.member?.displayName || interaction.user.username,
+        });
+    } else {
+        // Standard checklist: one person at a time
+        const existingPending = tasks.find(t => t.status === 'pending' && t.claimed_by === interaction.user.id);
+        if (existingPending) {
+            return interaction.reply({ content: '⚠️ You already have a pending task claim. Submit your proof first before claiming another.', ephemeral: true });
+        }
+        if (task.status !== 'open') {
+            return interaction.reply({ content: '⚠️ This task is no longer available.', ephemeral: true });
+        }
+
+        tasks[taskIndex].status = 'pending';
+        tasks[taskIndex].claimed_by = interaction.user.id;
+        tasks[taskIndex].claimed_by_name = interaction.member?.displayName || interaction.user.username;
+    }
 
     await eventsDb.updateEvent(eventId, { tasks });
 
-    // Update the embed
-    await updateChecklistEmbed(interaction.client, { ...event, tasks });
+    // Update the embed (only for standard checklist — shared doesn't change visually on claim)
+    if (!task.shared) {
+        await updateChecklistEmbed(interaction.client, { ...event, tasks });
+    }
 
     // Notify in the thread — no approve/reject yet, wait for screenshot proof
     const thread = interaction.client.channels.cache.get(event.thread_id);
@@ -1027,9 +1030,11 @@ async function handleTaskApprove(interaction) {
     // Defer immediately so Discord doesn't time out during DB/API calls
     await interaction.deferUpdate();
 
+    // Format: event_task_approve_{eventId}_{taskIndex} or event_task_approve_{eventId}_{taskIndex}_{userId}
     const parts = interaction.customId.replace('event_task_approve_', '').split('_');
     const eventId = parseInt(parts[0]);
     const taskIndex = parseInt(parts[1]);
+    const targetUserId = parts[2] || null; // present for shared tasks
 
     const event = await eventsDb.getEvent(eventId);
     if (!event || !event.tasks) {
@@ -1041,13 +1046,27 @@ async function handleTaskApprove(interaction) {
         return interaction.followUp({ content: '❌ Invalid task.', ephemeral: true });
     }
 
-    if (tasks[taskIndex].status !== 'pending') {
-        return interaction.followUp({ content: '⚠️ This task is not pending approval.', ephemeral: true });
+    let claimedBy;
+    let claimedByName;
+
+    if (tasks[taskIndex].shared) {
+        // Shared: find the specific pending claim by user ID
+        const claimIndex = tasks[taskIndex].pending_claims?.findIndex(c => c.discord_id === targetUserId);
+        if (claimIndex === undefined || claimIndex === -1) {
+            return interaction.followUp({ content: '⚠️ This claim is no longer pending.', ephemeral: true });
+        }
+        claimedBy = targetUserId;
+        claimedByName = tasks[taskIndex].pending_claims[claimIndex].name;
+    } else {
+        if (tasks[taskIndex].status !== 'pending') {
+            return interaction.followUp({ content: '⚠️ This task is not pending approval.', ephemeral: true });
+        }
+        claimedBy = tasks[taskIndex].claimed_by;
+        claimedByName = tasks[taskIndex].claimed_by_name;
     }
 
     // Award VP
     const vpReward = event.vp_reward || 0;
-    const claimedBy = tasks[taskIndex].claimed_by;
     let playerRsn = 'Unknown';
 
     if (vpReward > 0) {
@@ -1070,15 +1089,15 @@ async function handleTaskApprove(interaction) {
 
     // Update task status
     if (tasks[taskIndex].shared) {
-        // Shared checklist: add to completions, reset to open for others
+        // Shared checklist: add to completions, remove from pending_claims
         if (!tasks[taskIndex].completions) tasks[taskIndex].completions = [];
         tasks[taskIndex].completions.push({
             discord_id: claimedBy,
-            name: tasks[taskIndex].claimed_by_name,
+            name: claimedByName,
         });
-        tasks[taskIndex].status = 'open';
-        tasks[taskIndex].claimed_by = null;
-        tasks[taskIndex].claimed_by_name = null;
+        tasks[taskIndex].pending_claims = tasks[taskIndex].pending_claims.filter(
+            c => c.discord_id !== claimedBy
+        );
     } else {
         // Standard checklist: mark complete
         tasks[taskIndex].status = 'complete';
@@ -1133,9 +1152,11 @@ async function handleTaskReject(interaction) {
     // Defer immediately so Discord doesn't time out during DB calls
     await interaction.deferUpdate();
 
+    // Format: event_task_reject_{eventId}_{taskIndex} or event_task_reject_{eventId}_{taskIndex}_{userId}
     const parts = interaction.customId.replace('event_task_reject_', '').split('_');
     const eventId = parseInt(parts[0]);
     const taskIndex = parseInt(parts[1]);
+    const targetUserId = parts[2] || null;
 
     const event = await eventsDb.getEvent(eventId);
     if (!event || !event.tasks) {
@@ -1147,20 +1168,31 @@ async function handleTaskReject(interaction) {
         return interaction.followUp({ content: '❌ Invalid task.', ephemeral: true });
     }
 
-    if (tasks[taskIndex].status !== 'pending') {
-        return interaction.followUp({ content: '⚠️ This task is not pending.', ephemeral: true });
+    let claimedBy;
+
+    if (tasks[taskIndex].shared) {
+        // Shared: remove the specific pending claim
+        const claimIndex = tasks[taskIndex].pending_claims?.findIndex(c => c.discord_id === targetUserId);
+        if (claimIndex === undefined || claimIndex === -1) {
+            return interaction.followUp({ content: '⚠️ This claim is no longer pending.', ephemeral: true });
+        }
+        claimedBy = targetUserId;
+        tasks[taskIndex].pending_claims.splice(claimIndex, 1);
+    } else {
+        if (tasks[taskIndex].status !== 'pending') {
+            return interaction.followUp({ content: '⚠️ This task is not pending.', ephemeral: true });
+        }
+        claimedBy = tasks[taskIndex].claimed_by;
+
+        // Reset task to open
+        tasks[taskIndex].status = 'open';
+        tasks[taskIndex].claimed_by = null;
+        tasks[taskIndex].claimed_by_name = null;
     }
-
-    const claimedBy = tasks[taskIndex].claimed_by;
-
-    // Reset task to open
-    tasks[taskIndex].status = 'open';
-    tasks[taskIndex].claimed_by = null;
-    tasks[taskIndex].claimed_by_name = null;
 
     await eventsDb.updateEvent(eventId, { tasks });
 
-    // Update the embed (task goes back to dropdown)
+    // Update the embed
     await updateChecklistEmbed(interaction.client, { ...event, tasks });
 
     // Update the reject message

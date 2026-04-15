@@ -23,9 +23,21 @@ async function handleThreadMessage(message) {
 
     // Checklist mode: match screenshot to pending task claim
     if (event.tasks) {
-        const pendingIndex = event.tasks.findIndex(
-            t => t.status === 'pending' && t.claimed_by === message.author.id
-        );
+        let pendingIndex = -1;
+
+        // Check shared tasks (pending_claims array) and standard tasks (status/claimed_by)
+        for (let i = 0; i < event.tasks.length; i++) {
+            const t = event.tasks[i];
+            if (t.shared) {
+                if (t.pending_claims?.some(c => c.discord_id === message.author.id)) {
+                    pendingIndex = i;
+                    break;
+                }
+            } else if (t.status === 'pending' && t.claimed_by === message.author.id) {
+                pendingIndex = i;
+                break;
+            }
+        }
 
         if (pendingIndex === -1) {
             await message.reply({
@@ -37,14 +49,19 @@ async function handleThreadMessage(message) {
 
         const task = event.tasks[pendingIndex];
 
+        // For shared tasks, encode the user ID in the button so approve/reject knows who
+        const buttonSuffix = task.shared
+            ? `${event.id}_${pendingIndex}_${message.author.id}`
+            : `${event.id}_${pendingIndex}`;
+
         const approveBtn = new ButtonBuilder()
-            .setCustomId(`event_task_approve_${event.id}_${pendingIndex}`)
+            .setCustomId(`event_task_approve_${buttonSuffix}`)
             .setLabel('Approve')
             .setStyle(ButtonStyle.Success)
             .setEmoji('✅');
 
         const rejectBtn = new ButtonBuilder()
-            .setCustomId(`event_task_reject_${event.id}_${pendingIndex}`)
+            .setCustomId(`event_task_reject_${buttonSuffix}`)
             .setLabel('Reject')
             .setStyle(ButtonStyle.Danger)
             .setEmoji('❌');
