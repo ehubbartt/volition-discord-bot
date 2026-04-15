@@ -1,0 +1,726 @@
+{
+  "GEAR_SCORE_CAP": 25450,
+  "gear": [
+    {
+      "name": "Neitiznot Faceguard",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Basilisk jaw" }]
+    },
+    {
+      "name": "Fighter Torso",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Fighter torso" }]
+    },
+    {
+      "name": "Full Bloodmoon",
+      "tier": "low",
+      "points": 100,
+      "items": [
+        { "name": "Blood moon tassets" },
+        { "name": "Blood moon chestplate" },
+        { "name": "Blood moon helm" }
+      ]
+    },
+    {
+      "name": "Fire Cape",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Fire cape" }]
+    },
+    {
+      "name": "Amulet of Fury",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Uncut onyx" }]
+    },
+    {
+      "name": "Berserker Ring",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Berserker ring" }]
+    },
+    {
+      "name": "Dragon Defender",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Dragon defender" }]
+    },
+    {
+      "name": "Zamorakian Hasta",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Zamorakian spear" }]
+    },
+    {
+      "name": "Serpentine Helm",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Serpentine visage" }]
+    },
+    {
+      "name": "Full Elite Void",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Elite void robe" }, { "name": "Elite void top" }]
+    },
+    {
+      "name": "Barrows Tank Set",
+      "tier": "low",
+      "points": 100,
+      "items": [
+        { "name": "Guthan's platebody" },
+        { "name": "Guthan's chainskirt" },
+        { "name": "Dharok's platebody" },
+        { "name": "Dharok's platelegs" },
+        { "name": "Torag's platebody" },
+        { "name": "Torag's platelegs" },
+        { "name": "Verac's brassard" },
+        { "name": "Verac's plateskirt" }
+      ]
+    },
+    {
+      "name": "Toxic Blowpipe",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Tanzanite fang" }]
+    },
+    {
+      "name": "Deadeye Prayer Scroll",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Deadeye prayer scroll" }]
+    },
+    {
+      "name": "Warped Sceptre",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Warped sceptre (uncharged)" }]
+    },
+    {
+      "name": "Zombie Axe",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Broken zombie axe" }]
+    },
+    {
+      "name": "Ahrim/Bluemoon Robe Set",
+      "tier": "low",
+      "points": 100,
+      "items": [
+        { "name": ["Ahrim's robeskirt", "Blue moon chestplate"] },
+        { "name": ["Ahrim's robetop", "Blue moon tassets"] },
+        { "name": ["Ahrim's hood", "Blue moon helm"] }
+      ]
+    },
+    {
+      "name": "Ava's Assembler",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Vorkath's head" }]
+    },
+    {
+      "name": "Trident",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": ["Uncharged trident", "Trident of the seas (full)"] }]
+    },
+    {
+      "name": "Twinflame Staff",
+      "tier": "low",
+      "points": 100,
+      "items": [
+        { "name": ["Ice element staff crown", "Fire element staff crown"] }
+      ]
+    },
+    {
+      "name": "Mystic Vigour Prayer Scroll",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Mystic vigour prayer scroll" }]
+    },
+    {
+      "name": "Ring of the Gods",
+      "tier": "low",
+      "points": 100,
+      "items": [{ "name": "Ring of the gods" }]
+    },
+
+    {
+      "name": "Bandos Chestplate",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Bandos chestplate" }]
+    },
+    {
+      "name": "Bandos Tassets",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Bandos tassets" }]
+    },
+    {
+      "name": "Primordial Boots",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dragon boots" }, { "name": "Primordial crystal" }]
+    },
+    {
+      "name": "Ferocious Gloves",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Hydra leather" }]
+    },
+    {
+      "name": "Avernic Defender",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Avernic defender hilt" }]
+    },
+    {
+      "name": "Blade of Saeldor + Bowfa Seeds",
+      "tier": "middle",
+      "points": 400,
+      "items": [{ "name": "Enhanced crystal weapon seed", "quantity": 2 }]
+    },
+    {
+      "name": "Abyssal Bludgeon",
+      "tier": "middle",
+      "points": 200,
+      "items": [
+        { "name": "Bludgeon axon" },
+        { "name": "Bludgeon claw" },
+        { "name": "Bludgeon spine" }
+      ]
+    },
+    {
+      "name": "Ghrazi Rapier",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Ghrazi rapier" }]
+    },
+    {
+      "name": "Dragon Hunter Lance",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Hydra's claw" }]
+    },
+    {
+      "name": "Osmumten's Fang",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Osmumten's fang" }]
+    },
+    {
+      "name": "Tormented Synapse",
+      "tier": "middle",
+      "points": 600,
+      "items": [{ "name": "Tormented synapse", "quantity": 3 }]
+    },
+    {
+      "name": "Noxious Halberd",
+      "tier": "middle",
+      "points": 200,
+      "items": [
+        { "name": "Noxious point" },
+        { "name": "Noxious pommel" },
+        { "name": "Noxious blade" }
+      ]
+    },
+    {
+      "name": "Pegasian Boots",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Ranger boots" }, { "name": "Pegasian crystal" }]
+    },
+    {
+      "name": "Zenyte Jewelry",
+      "tier": "middle",
+      "points": 800,
+      "items": [{ "name": "Zenyte shard", "quantity": 4 }]
+    },
+    {
+      "name": "Twisted Buckler",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Twisted buckler" }]
+    },
+    {
+      "name": "Armadyl Crossbow",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Armadyl crossbow" }]
+    },
+    {
+      "name": "Dragon Hunter Crossbow",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dragon hunter crossbow" }]
+    },
+    {
+      "name": "Crystal Armour Set",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Crystal armour seed", "quantity": 6 }]
+    },
+    {
+      "name": "Rigour Prayer Scroll",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dexterous prayer scroll" }]
+    },
+    {
+      "name": "Eternal Boots",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Infinity boots" }, { "name": "Eternal crystal" }]
+    },
+    {
+      "name": "Occult Necklace",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Occult necklace" }]
+    },
+    {
+      "name": "Elidinis' Ward",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Elidinis' ward" }]
+    },
+    {
+      "name": "Sanguinesti Staff",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Sanguinesti staff (uncharged)" }]
+    },
+    {
+      "name": "Staff of the Dead",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Staff of the dead" }]
+    },
+    {
+      "name": "Dragon Hunter Wand",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dragon hunter wand" }]
+    },
+    {
+      "name": "Augury Prayer Scroll",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Arcane prayer scroll" }]
+    },
+    {
+      "name": "Dragon Warhammer",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dragon warhammer" }]
+    },
+    {
+      "name": "Dinh's Bulwark",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dinh's bulwark" }]
+    },
+    {
+      "name": "Voidwaker",
+      "tier": "middle",
+      "points": 200,
+      "items": [
+        { "name": "Voidwaker hilt" },
+        { "name": "Voidwaker gem" },
+        { "name": "Voidwaker blade" }
+      ]
+    },
+    {
+      "name": "Dragon Claws",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Dragon claws" }]
+    },
+    {
+      "name": "Burning Claws",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Burning claw", "quantity": 2 }]
+    },
+    {
+      "name": "Bandos Godsword",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Bandos hilt" }]
+    },
+    {
+      "name": "Ancient Godsword",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Ancient hilt" }]
+    },
+    {
+      "name": "Saradomin Godsword",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Saradomin hilt" }]
+    },
+    {
+      "name": "Zamorak Godsword",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Zamorak hilt" }]
+    },
+    {
+      "name": "Lightbearer",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Lightbearer" }]
+    },
+    {
+      "name": "Eye of Ayak",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Eye of ayak (uncharged)" }]
+    },
+    {
+      "name": "Doom Cloth",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Mokhaiotl cloth" }]
+    },
+    {
+      "name": "Bellator Ring",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Bellator vestige" }]
+    },
+    {
+      "name": "Venator Ring",
+      "tier": "middle",
+      "points": 200,
+      "items": [{ "name": "Venator vestige" }]
+    },
+
+    {
+      "name": "Torva Full Helm",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Torva full helm (damaged)" }]
+    },
+    {
+      "name": "Torva Platebody",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Torva platebody (damaged)" }]
+    },
+    {
+      "name": "Torva Platelegs",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Torva platelegs (damaged)" }]
+    },
+    {
+      "name": "Amulet of Rancour",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Araxyte fang" }]
+    },
+    {
+      "name": "Ultor Ring",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Ultor vestige" }]
+    },
+    {
+      "name": "Inquisitor's Mace",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Inquisitor's mace" }]
+    },
+    {
+      "name": "Soulreaper Axe",
+      "tier": "end",
+      "points": 300,
+      "items": [
+        { "name": "Eye of the duke" },
+        { "name": "Leviathan's lure" },
+        { "name": "Executioner's axe head" },
+        { "name": "Siren's staff" }
+      ]
+    },
+    {
+      "name": "Masori Mask",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Masori mask" }]
+    },
+    {
+      "name": "Masori Body",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Masori body" }]
+    },
+    {
+      "name": "Masori Chaps",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Masori chaps" }]
+    },
+    {
+      "name": "Zaryte Vambraces",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Zaryte vambraces" }]
+    },
+    {
+      "name": "Zaryte Crossbow",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Nihil horn" }]
+    },
+    {
+      "name": "Ancestral Hat",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Ancestral hat" }]
+    },
+    {
+      "name": "Ancestral Robe Top",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Ancestral robe top" }]
+    },
+    {
+      "name": "Ancestral Robe Bottom",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Ancestral robe bottom" }]
+    },
+    {
+      "name": "Magus Ring",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Magus vestige" }]
+    },
+    {
+      "name": "Arcane Sigil",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Arcane sigil" }]
+    },
+    {
+      "name": "Kodai Wand",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Kodai insignia" }]
+    },
+    {
+      "name": "Imbued Heart",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Imbued heart" }]
+    },
+    {
+      "name": "Justiciar Faceguard",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Justiciar faceguard" }]
+    },
+    {
+      "name": "Justiciar Chestguard",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Justiciar chestguard" }]
+    },
+    {
+      "name": "Justiciar Legguards",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Justiciar legguards" }]
+    },
+    {
+      "name": "Inquisitor's Great Helm",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Inquisitor's great helm" }]
+    },
+    {
+      "name": "Inquisitor's Hauberk",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Inquisitor's hauberk" }]
+    },
+    {
+      "name": "Inquisitor's Plateskirt",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Inquisitor's plateskirt" }]
+    },
+    {
+      "name": "Oathplate Helm",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Oathplate helm" }]
+    },
+    {
+      "name": "Oathplate Chest",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Oathplate chest" }]
+    },
+    {
+      "name": "Oathplate Legs",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Oathplate legs" }]
+    },
+    {
+      "name": "Elder Maul",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Elder maul" }]
+    },
+    {
+      "name": "Avernic Treads",
+      "tier": "end",
+      "points": 300,
+      "items": [{ "name": "Avernic treads" }]
+    },
+
+    {
+      "name": "Scythe of Vitur",
+      "tier": "side",
+      "points": 500,
+      "items": [{ "name": "Scythe of vitur (uncharged)" }]
+    },
+    {
+      "name": "Tumeken's Shadow",
+      "tier": "side",
+      "points": 500,
+      "items": [{ "name": "Tumeken's shadow (uncharged)" }]
+    },
+    {
+      "name": "Twisted Bow",
+      "tier": "side",
+      "points": 500,
+      "items": [{ "name": "Twisted bow" }]
+    },
+    {
+      "name": "Dizana's Quiver",
+      "tier": "side",
+      "points": 250,
+      "items": [{ "name": "Dizana's quiver (uncharged)" }]
+    },
+    {
+      "name": "Infernal cape",
+      "tier": "side",
+      "points": 250,
+      "items": [{ "name": "Infernal cape" }]
+    },
+    {
+      "name": "Venator Bow",
+      "tier": "side",
+      "points": 200,
+      "items": [{ "name": "Venator shard", "quantity": 5 }]
+    },
+    {
+      "name": "Full Virtus",
+      "tier": "side",
+      "points": 300,
+      "items": [
+        { "name": "Virtus robe top" },
+        { "name": "Virtus mask" },
+        { "name": "Virtus robe bottom" }
+      ]
+    },
+    {
+      "name": "Ancient Wyvern Shield",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Wyvern visage" }]
+    },
+    {
+      "name": "Dragonfire Shield",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Draconic visage" }]
+    },
+    {
+      "name": "Dragonfire Ward",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Skeletal visage" }]
+    },
+    {
+      "name": "Nightmare Staff",
+      "tier": "side",
+      "points": 250,
+      "items": [{ "name": "Nightmare staff" }]
+    },
+    {
+      "name": "Volatile Orb",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Volatile orb" }]
+    },
+    {
+      "name": "Eldritch Orb",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Eldritch orb" }]
+    },
+    {
+      "name": "Harmonised Orb",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Harmonised orb" }]
+    },
+    {
+      "name": "Spectral Spirit Shield",
+      "tier": "side",
+      "points": 250,
+      "items": [{ "name": "Spectral sigil" }]
+    },
+    {
+      "name": "Elysian Spirit Shield",
+      "tier": "side",
+      "points": 250,
+      "items": [{ "name": "Elysian sigil" }]
+    },
+    {
+      "name": "Arcane Spirit Shield",
+      "tier": "side",
+      "points": 250,
+      "items": [{ "name": "Arcane sigil" }]
+    },
+    {
+      "name": "Tonalztics of Ralos",
+      "tier": "side",
+      "points": 200,
+      "items": [{ "name": "Tonalztics of ralos (uncharged)" }]
+    },
+    {
+      "name": "Soulflame Horn",
+      "tier": "side",
+      "points": 100,
+      "items": [{ "name": "Soulflame horn" }]
+    },
+    {
+      "name": "Revenant Weapon - Viggora's",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Viggora's chainmace (u)" }]
+    },
+    {
+      "name": "Revenant Weapon - Craw's",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Craw's bow (u)" }]
+    },
+    {
+      "name": "Revenant Weapon - Thammaron's",
+      "tier": "side",
+      "points": 150,
+      "items": [{ "name": "Thammaron's sceptre (u)" }]
+    }
+  ]
+}
