@@ -19,6 +19,57 @@ async function handleThreadMessage(message) {
     const event = await eventsDb.getEventByThreadId(threadId);
     if (!event) return;
 
+    const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
+
+    // Checklist mode: match screenshot to pending task claim
+    if (event.tasks) {
+        const pendingIndex = event.tasks.findIndex(
+            t => t.status === 'pending' && t.claimed_by === message.author.id
+        );
+
+        if (pendingIndex === -1) {
+            await message.reply({
+                content: '⚠️ You don\'t have a pending task claim. Claim a task from the dropdown on the event embed first.',
+                allowedMentions: { repliedUser: false }
+            });
+            return;
+        }
+
+        const task = event.tasks[pendingIndex];
+
+        const approveBtn = new ButtonBuilder()
+            .setCustomId(`event_task_approve_${event.id}_${pendingIndex}`)
+            .setLabel('Approve')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅');
+
+        const rejectBtn = new ButtonBuilder()
+            .setCustomId(`event_task_reject_${event.id}_${pendingIndex}`)
+            .setLabel('Reject')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌');
+
+        const row = new ActionRowBuilder().addComponents(approveBtn, rejectBtn);
+
+        const embed = new EmbedBuilder()
+            .setColor('Yellow')
+            .setDescription(
+                `**Proof submitted** by <@${message.author.id}>\n` +
+                `**Task:** ${task.text}\n` +
+                `**Reward:** ${event.vp_reward} ${vpEmoji} VP`
+            )
+            .setFooter({ text: `Event: ${event.title} • Task #${pendingIndex + 1}` });
+
+        await message.reply({
+            embeds: [embed],
+            components: [row],
+            allowedMentions: { repliedUser: false }
+        });
+        return;
+    }
+
+    // Standard submission flow (non-checklist events)
+
     // Check for duplicate submission (already approved for this event)
     const existing = await eventsDb.getApprovedSubmission(event.id, message.author.id);
     if (existing) {
@@ -50,8 +101,6 @@ async function handleThreadMessage(message) {
         .setEmoji('❌');
 
     const row = new ActionRowBuilder().addComponents(approveButton, rejectButton);
-
-    const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
 
     const embed = new EmbedBuilder()
         .setColor('Yellow')

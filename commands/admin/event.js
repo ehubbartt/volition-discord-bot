@@ -971,22 +971,25 @@ async function handleTaskApprove(interaction) {
         return interaction.reply({ content: '❌ Only admins can approve task claims.', ephemeral: true });
     }
 
+    // Defer immediately so Discord doesn't time out during DB/API calls
+    await interaction.deferUpdate();
+
     const parts = interaction.customId.replace('event_task_approve_', '').split('_');
     const eventId = parseInt(parts[0]);
     const taskIndex = parseInt(parts[1]);
 
     const event = await eventsDb.getEvent(eventId);
     if (!event || !event.tasks) {
-        return interaction.reply({ content: '❌ Event not found.', ephemeral: true });
+        return interaction.followUp({ content: '❌ Event not found.', ephemeral: true });
     }
 
     const tasks = event.tasks;
     if (taskIndex < 0 || taskIndex >= tasks.length) {
-        return interaction.reply({ content: '❌ Invalid task.', ephemeral: true });
+        return interaction.followUp({ content: '❌ Invalid task.', ephemeral: true });
     }
 
     if (tasks[taskIndex].status !== 'pending') {
-        return interaction.reply({ content: '⚠️ This task is not pending approval.', ephemeral: true });
+        return interaction.followUp({ content: '⚠️ This task is not pending approval.', ephemeral: true });
     }
 
     // Award VP
@@ -1001,14 +1004,14 @@ async function handleTaskApprove(interaction) {
                 playerRsn = player.rsn;
                 await db.addPoints(player.rsn, vpReward);
             } else {
-                return interaction.reply({
+                return interaction.followUp({
                     content: `⚠️ <@${claimedBy}> is not linked to a player in the database. VP not awarded. Please verify them first.`,
                     ephemeral: true
                 });
             }
         } catch (err) {
             console.error('[Event] Failed to award VP for task:', err);
-            return interaction.reply({ content: `❌ Failed to award VP: ${err.message}`, ephemeral: true });
+            return interaction.followUp({ content: `❌ Failed to award VP: ${err.message}`, ephemeral: true });
         }
     }
 
@@ -1016,10 +1019,10 @@ async function handleTaskApprove(interaction) {
     tasks[taskIndex].status = 'complete';
     await eventsDb.updateEvent(eventId, { tasks });
 
-    // Update the embed
+    // Update the event embed checklist
     await updateChecklistEmbed(interaction.client, { ...event, tasks });
 
-    // Update the approve message
+    // Update the approve/reject button message in the thread
     const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
     const embed = new EmbedBuilder()
         .setColor('Green')
@@ -1030,7 +1033,7 @@ async function handleTaskApprove(interaction) {
         )
         .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
 
-    await interaction.update({ embeds: [embed], components: [] });
+    await interaction.editReply({ embeds: [embed], components: [] });
 
     // Log to payout channel
     const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
@@ -1061,22 +1064,25 @@ async function handleTaskReject(interaction) {
         return interaction.reply({ content: '❌ Only admins can reject task claims.', ephemeral: true });
     }
 
+    // Defer immediately so Discord doesn't time out during DB calls
+    await interaction.deferUpdate();
+
     const parts = interaction.customId.replace('event_task_reject_', '').split('_');
     const eventId = parseInt(parts[0]);
     const taskIndex = parseInt(parts[1]);
 
     const event = await eventsDb.getEvent(eventId);
     if (!event || !event.tasks) {
-        return interaction.reply({ content: '❌ Event not found.', ephemeral: true });
+        return interaction.followUp({ content: '❌ Event not found.', ephemeral: true });
     }
 
     const tasks = event.tasks;
     if (taskIndex < 0 || taskIndex >= tasks.length) {
-        return interaction.reply({ content: '❌ Invalid task.', ephemeral: true });
+        return interaction.followUp({ content: '❌ Invalid task.', ephemeral: true });
     }
 
     if (tasks[taskIndex].status !== 'pending') {
-        return interaction.reply({ content: '⚠️ This task is not pending.', ephemeral: true });
+        return interaction.followUp({ content: '⚠️ This task is not pending.', ephemeral: true });
     }
 
     const claimedBy = tasks[taskIndex].claimed_by;
@@ -1101,7 +1107,7 @@ async function handleTaskReject(interaction) {
         )
         .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
 
-    await interaction.update({ embeds: [embed], components: [] });
+    await interaction.editReply({ embeds: [embed], components: [] });
 }
 
 // Export for use in automated task creation and interaction routing
