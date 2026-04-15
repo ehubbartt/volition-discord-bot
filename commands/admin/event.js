@@ -171,7 +171,7 @@ function buildTaskChecklist(tasks) {
         if (task.shared) {
             const count = task.completions?.length || 0;
             const countText = count > 0 ? ` (${count} completed)` : '';
-            return `⬜ ${task.text}${countText}`;
+            return `• ${task.text}${countText}`;
         }
 
         // Standard checklist (single claim)
