@@ -1244,6 +1244,7 @@ module.exports.createTaskEvent = async function(client, taskText) {
         .setTimestamp();
 
     const message = await channel.send({
+        content: config.weeklyTaskRoleID ? `<@&${config.weeklyTaskRoleID}>` : undefined,
         embeds: [embed]
     });
 

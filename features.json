@@ -79,7 +79,7 @@
       "inactive": true,
       "updateconfig": true,
       "syncconfig": true,
-      "sendweeklytask": false,
+      "sendweeklytask": true,
       "senddailywordle": false,
       "event": true,
       "lfg-setup": true
