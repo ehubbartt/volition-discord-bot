@@ -41,7 +41,7 @@ async function runLifecycleCheck(client) {
 
         await eventsDb.closeEvent(event.id);
 
-        const channel = client.channels.cache.get(event.channel_id);
+        const channel = client.channels.cache.get(event.channel_id) || await client.channels.fetch(event.channel_id).catch(() => null);
         if (!channel) continue;
 
         // Lock thread for submission events
@@ -81,7 +81,7 @@ async function runLifecycleCheck(client) {
     for (const event of readyForDeletion) {
         console.log(`[EventLifecycle] Deleting closed event: ${event.title} (ID: ${event.id})`);
 
-        const channel = client.channels.cache.get(event.channel_id);
+        const channel = client.channels.cache.get(event.channel_id) || await client.channels.fetch(event.channel_id).catch(() => null);
         if (channel) {
             // Delete the embed message
             if (event.message_id) {
