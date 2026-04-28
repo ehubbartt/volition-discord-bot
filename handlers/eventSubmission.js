@@ -25,15 +25,15 @@ async function handleThreadMessage(message) {
     if (event.tasks) {
         let pendingIndex = -1;
 
-        // Check shared tasks (pending_claims array) and standard tasks (status/claimed_by)
+        // Check shared tasks (pending_claims array, skip already-submitted) and standard tasks
         for (let i = 0; i < event.tasks.length; i++) {
             const t = event.tasks[i];
             if (t.shared) {
-                if (t.pending_claims?.some(c => c.discord_id === message.author.id)) {
+                if (t.pending_claims?.some(c => c.discord_id === message.author.id && !c.submitted)) {
                     pendingIndex = i;
                     break;
                 }
-            } else if (t.status === 'pending' && t.claimed_by === message.author.id) {
+            } else if (t.status === 'pending' && t.claimed_by === message.author.id && !t.submitted) {
                 pendingIndex = i;
                 break;
             }
@@ -48,6 +48,15 @@ async function handleThreadMessage(message) {
         }
 
         const task = event.tasks[pendingIndex];
+
+        // Mark this claim as submitted so the next image matches the next task
+        if (task.shared) {
+            const claim = task.pending_claims.find(c => c.discord_id === message.author.id && !c.submitted);
+            if (claim) claim.submitted = true;
+        } else {
+            task.submitted = true;
+        }
+        await eventsDb.updateEvent(event.id, { tasks: event.tasks });
 
         // For shared tasks, encode the user ID in the button so approve/reject knows who
         const buttonSuffix = task.shared
@@ -88,13 +97,17 @@ async function handleThreadMessage(message) {
     // Standard submission flow (non-checklist events)
 
     // Check for duplicate submission (already approved for this event)
-    const existing = await eventsDb.getApprovedSubmission(event.id, message.author.id);
-    if (existing) {
-        await message.reply({
-            content: '⚠️ You already have an approved submission for this event.',
-            allowedMentions: { repliedUser: false }
-        });
-        return;
+    // Skip for leagues events — allow multiple submissions per player
+    const isLeaguesEvent = event.channel_id === config.LEAGUES_EVENTS_CHANNEL_ID;
+    if (!isLeaguesEvent) {
+        const existing = await eventsDb.getApprovedSubmission(event.id, message.author.id);
+        if (existing) {
+            await message.reply({
+                content: '⚠️ You already have an approved submission for this event.',
+                allowedMentions: { repliedUser: false }
+            });
+            return;
+        }
     }
 
     // Create submission record
@@ -161,9 +174,13 @@ async function handleApprove(interaction) {
     }
 
     // Check for duplicate approval (another submission by same user already approved)
-    const existingApproval = await eventsDb.getApprovedSubmission(event.id, submission.discord_id);
-    if (existingApproval) {
-        return interaction.reply({ content: '⚠️ This player already has an approved submission for this event.', ephemeral: true });
+    // Skip for leagues events — allow multiple approvals per player
+    const isLeaguesEvent = event.channel_id === config.LEAGUES_EVENTS_CHANNEL_ID;
+    if (!isLeaguesEvent) {
+        const existingApproval = await eventsDb.getApprovedSubmission(event.id, submission.discord_id);
+        if (existingApproval) {
+            return interaction.reply({ content: '⚠️ This player already has an approved submission for this event.', ephemeral: true });
+        }
     }
 
     // Award VP
