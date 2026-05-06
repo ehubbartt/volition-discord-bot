@@ -2,6 +2,8 @@ const { Events, EmbedBuilder } = require('discord.js');
 const { womApi } = require('../utils/api');
 const db = require('../db/supabase');
 const clanLeavers = require('../db/clanLeavers');
+const dinkTokens = require('../db/dinkTokens');
+const dinkProxy = require('../services/dinkProxy');
 const config = require('../config.json');
 const {
     formatRank,
@@ -587,6 +589,17 @@ async function processMemberLeave (rsn, originalMessage) {
                 }
             } catch (error) {
                 console.error(`[LEAVE] ❌ Error removing from database:`, error.message);
+            }
+
+            // Revoke Dink proxy access
+            if (existingPlayer.discord_id) {
+                try {
+                    await dinkTokens.revokeTokensFor(existingPlayer.discord_id);
+                    await dinkProxy.syncWorker();
+                    console.log(`[LEAVE] ✅ Revoked Dink tokens`);
+                } catch (error) {
+                    console.error(`[LEAVE] ❌ Error revoking Dink tokens:`, error.message);
+                }
             }
         } else {
             console.log(`[LEAVE] ℹ️ Not found in database`);

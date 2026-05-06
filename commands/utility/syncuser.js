@@ -8,6 +8,8 @@ const {
 const { womApi } = require('../../utils/api');
 const db = require('../../db/supabase');
 const clanLeavers = require('../../db/clanLeavers');
+const dinkTokens = require('../../db/dinkTokens');
+const dinkProxy = require('../../services/dinkProxy');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
@@ -84,6 +86,15 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                     // Archive player data before deletion
                     await clanLeavers.archivePlayer(existingPlayer);
                     await db.deletePlayerByWomId(existingPlayer.wom_id);
+
+                    if (existingPlayer.discord_id) {
+                        try {
+                            await dinkTokens.revokeTokensFor(existingPlayer.discord_id);
+                            await dinkProxy.syncWorker();
+                        } catch (err) {
+                            console.error(`[SyncUser] Dink revoke/sync failed for ${existingPlayer.rsn}:`, err.message);
+                        }
+                    }
 
                     const removedEmbed = new EmbedBuilder()
                         .setColor('Orange')

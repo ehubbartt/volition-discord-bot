@@ -82,7 +82,8 @@
       "sendweeklytask": true,
       "senddailywordle": false,
       "event": true,
-      "lfg-setup": true
+      "lfg-setup": true,
+      "dink-revoke": true
     },
     "fun": {
       "lootcrate": true,
@@ -119,7 +120,8 @@
       "fixarchiveperms": true,
       "age": true,
       "undonicknames": true,
-      "voicestats": true
+      "voicestats": true,
+      "dink": true
     }
   },
   "notifications": {

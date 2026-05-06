@@ -8,6 +8,8 @@ const {
 const { womApi } = require('../../utils/api');
 const db = require('../../db/supabase');
 const clanLeavers = require('../../db/clanLeavers');
+const dinkTokens = require('../../db/dinkTokens');
+const dinkProxy = require('../../services/dinkProxy');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
@@ -253,6 +255,7 @@ async function fullClanSync (interaction, clanId) {
         });
 
         // Remove players who are no longer in the clan (archive first)
+        let dinkRevokesMade = false;
         for (const player of existingPlayers) {
             const womId = player.wom_id?.toString();
             if (womId && !clanMemberWomIds.has(womId)) {
@@ -263,9 +266,27 @@ async function fullClanSync (interaction, clanId) {
                     membersRemoved++;
                     removedMembers.push({ rsn: player.rsn, womId });
                     console.log(`[FullSync] Archived & removed leaver: ${player.rsn} (${womId})`);
+
+                    if (player.discord_id) {
+                        try {
+                            await dinkTokens.revokeTokensFor(player.discord_id);
+                            dinkRevokesMade = true;
+                        } catch (err) {
+                            console.error(`[FullSync] Dink revoke failed for ${player.rsn}:`, err.message);
+                        }
+                    }
                 } catch (error) {
                     console.error(`[FullSync] Failed to remove ${player.rsn}:`, error.message);
                 }
+            }
+        }
+
+        if (dinkRevokesMade) {
+            try {
+                await dinkProxy.syncWorker();
+                console.log('[FullSync] ✅ Synced Dink proxy after batch revoke');
+            } catch (err) {
+                console.error('[FullSync] Dink proxy sync failed:', err.message);
             }
         }
 
