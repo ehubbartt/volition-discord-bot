@@ -27,25 +27,6 @@ module.exports = {
                 .addBooleanOption(opt => opt.setName('shared_checklist').setDescription('Checklist where multiple people can complete each task').setRequired(false))
         )
         .addSubcommand(sub =>
-            sub.setName('competition')
-                .setDescription('Create a SOTW/BOTW competition event (tracked by WOM)')
-                .addStringOption(opt =>
-                    opt.setName('type')
-                        .setDescription('Competition type')
-                        .setRequired(true)
-                        .addChoices(
-                            { name: 'Skill of the Week', value: 'sotw' },
-                            { name: 'Boss of the Week', value: 'botw' }
-                        ))
-                .addStringOption(opt => opt.setName('title').setDescription('Competition title').setRequired(true))
-                .addIntegerOption(opt => opt.setName('competition_id').setDescription('WiseOldMan competition ID').setRequired(true))
-                .addIntegerOption(opt => opt.setName('first_place').setDescription('VP for 1st place (default: 50)').setRequired(false))
-                .addIntegerOption(opt => opt.setName('second_place').setDescription('VP for 2nd place (default: 30)').setRequired(false))
-                .addIntegerOption(opt => opt.setName('third_place').setDescription('VP for 3rd place (default: 20)').setRequired(false))
-                .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 7d, 3d) - overrides WOM end date').setRequired(false))
-                .addBooleanOption(opt => opt.setName('leagues').setDescription('Post to Leagues channel instead').setRequired(false))
-        )
-        .addSubcommand(sub =>
             sub.setName('custom')
                 .setDescription('Create a custom one-off event')
                 .addStringOption(opt => opt.setName('title').setDescription('Event title').setRequired(true))
@@ -77,8 +58,6 @@ module.exports = {
 
         if (subcommand === 'task' || subcommand === 'custom') {
             return showDescriptionModal(interaction, subcommand);
-        } else if (subcommand === 'competition') {
-            return handleCreateCompetition(interaction);
         } else if (subcommand === 'end') {
             return handleEndEvent(interaction);
         } else if (subcommand === 'list') {
@@ -375,101 +354,6 @@ async function handleDescriptionModalSubmit(interaction) {
 
     await interaction.editReply({
         content: `✅ Event **${title}** created! (ID: ${event.id})\nEmbed: ${message.url}`
-    });
-}
-
-// ----------------------------------------------------------------------------
-// Create a WOM competition event (SOTW/BOTW)
-
-async function handleCreateCompetition(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-
-    const type = interaction.options.getString('type');
-    const title = interaction.options.getString('title');
-    const competitionId = interaction.options.getInteger('competition_id');
-    const durationStr = interaction.options.getString('duration');
-    const first = interaction.options.getInteger('first_place') ?? config.pointsAward?.[0] ?? 50;
-    const second = interaction.options.getInteger('second_place') ?? config.pointsAward?.[1] ?? 30;
-    const third = interaction.options.getInteger('third_place') ?? config.pointsAward?.[2] ?? 20;
-
-    const placeRewards = [first, second, third];
-
-    // Verify the competition exists on WOM
-    let competitionData;
-    try {
-        const res = await womApi.get(`/competitions/${competitionId}`);
-        competitionData = res.data;
-    } catch (err) {
-        return interaction.editReply({ content: `❌ Could not find WOM competition with ID ${competitionId}. Check the ID and try again.` });
-    }
-
-    const isLeagues = interaction.options.getBoolean('leagues') ?? false;
-
-    const durationMs = parseDuration(durationStr);
-    let endsAt;
-    if (durationMs) {
-        endsAt = new Date(Date.now() + durationMs);
-    } else if (competitionData.endsAt) {
-        endsAt = new Date(competitionData.endsAt);
-    } else {
-        endsAt = null;
-    }
-
-    const eventsChannelId = isLeagues ? config.LEAGUES_EVENTS_CHANNEL_ID : config.EVENTS_CHANNEL_ID;
-    const channel = interaction.client.channels.cache.get(eventsChannelId);
-    if (!channel) {
-        return interaction.editReply({ content: '❌ Events channel not found. Make sure `EVENTS_CHANNEL_ID` is configured.' });
-    }
-
-    // Build leaderboard from current competition data
-    const leaderboardText = buildLeaderboardText(competitionData);
-
-    const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
-    const typeLabel = type === 'sotw' ? 'Skill of the Week' : 'Boss of the Week';
-    const typeEmoji = type === 'sotw' ? '⭐' : '⚔️';
-
-    // Get wiki image for the competition metric
-    const metricImage = await getMetricImageUrl(competitionData.metric);
-
-    const embed = new EmbedBuilder()
-        .setColor(type === 'sotw' ? 'Gold' : 'Red')
-        .setTitle(`${typeEmoji} ${title}`)
-        .setDescription(`**${typeLabel}**\nTracked via [WiseOldMan Competition](https://wiseoldman.net/competitions/${competitionId})`)
-        .setThumbnail(metricImage || config.CLAN_ICON_URL)
-        .addFields(
-            {
-                name: 'Prizes',
-                value: `🥇 1st: ${placeRewards[0]} ${vpEmoji} VP\n🥈 2nd: ${placeRewards[1]} ${vpEmoji} VP\n🥉 3rd: ${placeRewards[2]} ${vpEmoji} VP`,
-                inline: true
-            },
-        )
-        .setFooter({ text: `WOM Competition #${competitionId} • Updates every 15 min` })
-        .setTimestamp();
-
-    if (endsAt) {
-        const timestamp = Math.floor(endsAt.getTime() / 1000);
-        embed.addFields({ name: 'Ends', value: `<t:${timestamp}:F> (<t:${timestamp}:R>)`, inline: true });
-    }
-
-    embed.addFields({ name: 'Leaderboard', value: leaderboardText || 'No participants yet.', inline: false });
-
-    const message = await channel.send({ embeds: [embed] });
-
-    // Save to database
-    const event = await eventsDb.createEvent({
-        type,
-        title,
-        created_by: interaction.user.id,
-        vp_reward: 0,
-        place_rewards: placeRewards,
-        wom_competition_id: competitionId,
-        message_id: message.id,
-        channel_id: channel.id,
-        ends_at: endsAt ? endsAt.toISOString() : null,
-    });
-
-    await interaction.editReply({
-        content: `✅ Competition **${title}** created! (ID: ${event.id})\nEmbed: ${message.url}`
     });
 }
 
@@ -1213,6 +1097,7 @@ module.exports.handlePlacementSelect = handlePlacementSelect;
 module.exports.handleSkipPlacements = handleSkipPlacements;
 module.exports.buildLeaderboardText = buildLeaderboardText;
 module.exports.getMetricImageUrl = getMetricImageUrl;
+module.exports.isSkillMetric = isSkillMetric;
 module.exports.handleTaskClaim = handleTaskClaim;
 module.exports.handleTaskApprove = handleTaskApprove;
 module.exports.handleTaskReject = handleTaskReject;

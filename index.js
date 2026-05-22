@@ -81,12 +81,14 @@ const { startSoftCloseChecker } = require('./jobs/softCloseChecker.js');
 const { startVoiceTracker } = require('./jobs/voiceTracker.js');
 const { startLfgExpiryChecker } = require('./jobs/lfgExpiry.js');
 const { startEventLifecycle } = require('./jobs/eventLifecycle.js');
+const { postWeeklySokCompetitions } = require('./jobs/sokScheduler.js');
 const { createTaskEvent } = require('./commands/admin/event.js');
 
 const TEST_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
 let lastTaskSentDate = null;
 let lastRankUpdateDate = null;
+let lastSokRunDate = null;
 
 client.once(Events.ClientReady, async () => {
   console.log(`${client.user.tag} is online.`);
@@ -122,11 +124,36 @@ client.once(Events.ClientReady, async () => {
       await runDailyRankUpdate();
       lastRankUpdateDate = today;
     }
+
+    // Sunday 23:00 UTC — post the new week's Skill or Kill competitions
+    const isSundayElevenUtc = now.getUTCDay() === 0 && now.getUTCHours() === 23 && now.getUTCMinutes() === 0;
+    if (isSundayElevenUtc && lastSokRunDate !== today) {
+      await runSokScheduler();
+      lastSokRunDate = today;
+    }
   }, 60000);
 });
 
 // ----------------------------------------------------------------------------
 // Helpers
+
+// Sunday 23:00 UTC — post this week's SoK competitions
+async function runSokScheduler() {
+  try {
+    const result = await postWeeklySokCompetitions(client);
+    const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
+    if (testChannel) {
+      const summary = `posted=${result.posted.length}, skipped=${result.skipped.length}, errors=${result.errors.length}`;
+      await testChannel.send(`✅ **[Auto-Run]** SoK scheduler ran at ${new Date().toUTCString()} — ${summary}`);
+    }
+  } catch (err) {
+    console.error('[SoK] Scheduler error:', err);
+    const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
+    if (testChannel) {
+      await testChannel.send(`❌ **[Auto-Run]** SoK scheduler failed: ${err.message}`);
+    }
+  }
+}
 
 // Weekly task — creates an event in the unified events channel
 async function sendWeeklyTask() {
