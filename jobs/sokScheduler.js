@@ -30,6 +30,21 @@ function getThisSunday23UTC(now = new Date()) {
     ));
 }
 
+async function isMessageAlive(client, channelId, messageId) {
+    if (!channelId || !messageId) return false;
+    const ch = client.channels.cache.get(channelId);
+    if (!ch) return false;
+    try {
+        await ch.messages.fetch(messageId);
+        return true;
+    } catch (err) {
+        // 10008 Unknown Message, 10003 Unknown Channel — treat as gone.
+        if (err?.code === 10008 || err?.code === 10003) return false;
+        // Any other error: assume alive to avoid accidental duplicate posts.
+        return true;
+    }
+}
+
 async function postWeeklySokCompetitions(client) {
     const target = getThisSunday23UTC();
     const targetMs = target.getTime();
@@ -43,7 +58,7 @@ async function postWeeklySokCompetitions(client) {
     );
 
     const active = await eventsDb.getActiveCompetitionEvents();
-    const activeWomIds = new Set(active.map(e => e.wom_competition_id));
+    const activeByWomId = new Map(active.map(e => [e.wom_competition_id, e]));
 
     const placeRewards = await hybridConfig.getConfigGroup(
         'sok_place_rewards',
@@ -58,9 +73,19 @@ async function postWeeklySokCompetitions(client) {
     const errors = [];
 
     for (const comp of matches) {
-        if (activeWomIds.has(comp.id)) {
-            skipped.push(comp.id);
-            continue;
+        const existing = activeByWomId.get(comp.id);
+        if (existing) {
+            const stillThere = await isMessageAlive(client, existing.channel_id, existing.message_id);
+            if (stillThere) {
+                skipped.push(comp.id);
+                continue;
+            }
+            // Message was deleted out from under us — mark the stale row deleted and repost.
+            try {
+                await eventsDb.markEventDeleted(existing.id);
+            } catch (err) {
+                console.error(`[SoK] Failed to mark stale event ${existing.id} as deleted:`, err);
+            }
         }
 
         try {
