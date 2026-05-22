@@ -82,6 +82,10 @@ const { startVoiceTracker } = require('./jobs/voiceTracker.js');
 const { startLfgExpiryChecker } = require('./jobs/lfgExpiry.js');
 const { startEventLifecycle } = require('./jobs/eventLifecycle.js');
 const { postWeeklySokCompetitions } = require('./jobs/sokScheduler.js');
+const {
+  postWeeklyVoiceLeaderboard,
+  startVoiceLeaderboardRefresh,
+} = require('./jobs/voiceLeaderboard.js');
 const { createTaskEvent } = require('./commands/admin/event.js');
 
 const TEST_CHANNEL_ID = config.TEST_CHANNEL_ID;
@@ -106,15 +110,19 @@ client.once(Events.ClientReady, async () => {
   // Start event lifecycle checker (close expired events, update leaderboards)
   startEventLifecycle(client);
 
+  // Start weekly voice leaderboard refresh (runs on startup + every 15 minutes)
+  startVoiceLeaderboardRefresh(client);
+
   setInterval(async () => {
     const now = new Date();
     const today = now.toDateString();
 
-    // 02:00 SWE — Weekly task + voice rewards
+    // 02:00 SWE — Weekly task + voice rewards + voice leaderboard reset
     const isMondayMidnight = now.getDay() === 1 && now.getHours() === 0 && now.getMinutes() === 0;
     if (isMondayMidnight && lastTaskSentDate !== today) {
       await sendWeeklyTask();
       await awardWeeklyVoiceRewards();
+      await resetVoiceLeaderboard();
       lastTaskSentDate = today;
     }
 
@@ -136,6 +144,23 @@ client.once(Events.ClientReady, async () => {
 
 // ----------------------------------------------------------------------------
 // Helpers
+
+// Monday 02:00 SWE — close last week's voice leaderboard and post a fresh one
+async function resetVoiceLeaderboard() {
+  try {
+    const { messageUrl } = await postWeeklyVoiceLeaderboard(client);
+    const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
+    if (testChannel) {
+      await testChannel.send(`✅ **[Auto-Run]** Voice leaderboard reset at ${new Date().toLocaleString()} — ${messageUrl}`);
+    }
+  } catch (err) {
+    console.error('[VoiceLeaderboard] Reset error:', err);
+    const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
+    if (testChannel) {
+      await testChannel.send(`❌ **[Auto-Run]** Voice leaderboard reset failed: ${err.message}`);
+    }
+  }
+}
 
 // Sunday 23:00 UTC — post this week's SoK competitions
 async function runSokScheduler() {

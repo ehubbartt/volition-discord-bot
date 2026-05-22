@@ -1,4 +1,4 @@
-// Posts the new week's Skill or Kill (SoK) competitions to SOK_EVENTS_CHANNEL_ID
+// Posts the new week's Skill or Kill (SoK) competitions to COMPETITIONS_CHANNEL_ID
 // every Sunday at 23:00 UTC as a single combined embed (skill + boss). The
 // 15-min updater in jobs/eventLifecycle.js groups events by message_id and
 // refreshes the combined leaderboard in place; runLifecycleCheck closes them
@@ -134,8 +134,8 @@ async function postWeeklySokCompetitions(client) {
         config.pointsAward || [50, 30, 20]
     );
 
-    const channel = client.channels.cache.get(config.SOK_EVENTS_CHANNEL_ID);
-    if (!channel) throw new Error('SOK_EVENTS_CHANNEL_ID channel not found in cache');
+    const channel = client.channels.cache.get(config.COMPETITIONS_CHANNEL_ID);
+    if (!channel) throw new Error('COMPETITIONS_CHANNEL_ID channel not found in cache');
 
     const details = [];
     for (const comp of toPost) {

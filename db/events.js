@@ -89,6 +89,20 @@ async function getActiveCompetitionEvents() {
     return data || [];
 }
 
+async function getActiveVoiceWeeklyEvent() {
+    const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('status', 'active')
+        .eq('type', 'voice_weekly')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data || null;
+}
+
 async function getExpiredActiveEvents() {
     const { data, error } = await supabase
         .from('events')
@@ -233,6 +247,7 @@ module.exports = {
     getEventByThreadId,
     getActiveEvents,
     getActiveCompetitionEvents,
+    getActiveVoiceWeeklyEvent,
     getExpiredActiveEvents,
     getClosedEventsReadyForDeletion,
     updateEvent,
