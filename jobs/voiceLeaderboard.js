@@ -36,16 +36,32 @@ async function isMessageAlive(client, channelId, messageId) {
     }
 }
 
-async function buildLeaderboardEmbed() {
+async function resolveDisplayNames(client, userIds) {
+    const map = new Map();
+    if (!client || userIds.length === 0) return map;
+    try {
+        const guild = client.guilds.cache.get(config.guildId);
+        if (!guild) return map;
+        const members = await guild.members.fetch({ user: userIds });
+        for (const [id, member] of members) map.set(id, member.displayName);
+    } catch (err) {
+        console.error('[VoiceLeaderboard] Failed to resolve nicknames:', err.message);
+    }
+    return map;
+}
+
+async function buildLeaderboardEmbed(client) {
     const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
     const vc = await hybridConfig.getConfigGroup('voice_tracking', {});
     const rewards = vc.weeklyVPRewards || [15, 10, 5];
 
     const top = await voiceAnalytics.getWeeklyVoiceLeaderboard(ROLLING_DAYS, TOP_N);
+    const nameById = await resolveDisplayNames(client, (top || []).map(u => u.user_id));
 
     const rows = (top || []).map((u, i) => {
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
-        return `${medal} **${u.username}** — ${formatTime(u.week_minutes)}`;
+        const name = nameById.get(u.user_id) || u.username;
+        return `${medal} **${name}** — ${formatTime(u.week_minutes)}`;
     });
 
     const description = `Top 3 win ${rewards[0]} / ${rewards[1]} / ${rewards[2]} ${vpEmoji} VP at the end of the week.`;
@@ -94,7 +110,7 @@ async function postWeeklyVoiceLeaderboard(client) {
         await eventsDb.closeEvent(existing.id);
     }
 
-    const embed = await buildLeaderboardEmbed();
+    const embed = await buildLeaderboardEmbed(client);
     const message = await channel.send({ embeds: [embed] });
 
     const endsAt = new Date(Date.now() + ROLLING_DAYS * 24 * 60 * 60 * 1000);
@@ -130,7 +146,7 @@ async function refreshWeeklyVoiceLeaderboard(client) {
     const message = await channel.messages.fetch(existing.message_id);
     const oldEmbed = message.embeds[0];
 
-    const fresh = await buildLeaderboardEmbed();
+    const fresh = await buildLeaderboardEmbed(client);
     const embed = oldEmbed ? EmbedBuilder.from(oldEmbed) : fresh;
     embed.setDescription(fresh.data.description || null);
     embed.setFields(fresh.data.fields || []);
