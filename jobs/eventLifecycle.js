@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const eventsDb = require('../db/events');
 const { womApi } = require('../utils/api');
 const { buildLeaderboardText } = require('../commands/admin/event');
+const { buildSokLeaderboardFields } = require('./sokScheduler');
 const config = require('../utils/config');
 
 let lifecycleInterval = null;
@@ -117,48 +118,69 @@ async function runLifecycleCheck(client) {
 
 /**
  * Update leaderboard embeds for active WOM competition events.
+ * Groups events by message_id so a single combined SoK message gets one edit
+ * that renders both the skill and boss leaderboards together.
  */
 async function updateCompetitionLeaderboards(client) {
-    const competitions = await eventsDb.getActiveCompetitionEvents();
+    const events = await eventsDb.getActiveCompetitionEvents();
 
-    for (const event of competitions) {
+    const groups = new Map();
+    for (const event of events) {
         if (!event.wom_competition_id || !event.message_id || !event.channel_id) continue;
+        const key = `${event.channel_id}:${event.message_id}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(event);
+    }
 
+    for (const group of groups.values()) {
+        const head = group[0];
         try {
-            const res = await womApi.get(`/competitions/${event.wom_competition_id}`);
-            const competitionData = res.data;
-
-            const channel = client.channels.cache.get(event.channel_id);
+            const channel = client.channels.cache.get(head.channel_id);
             if (!channel) continue;
 
-            const message = await channel.messages.fetch(event.message_id);
+            const message = await channel.messages.fetch(head.message_id);
             if (!message) continue;
 
             const oldEmbed = message.embeds[0];
             if (!oldEmbed) continue;
 
-            // Rebuild the leaderboard field
-            const leaderboardText = buildLeaderboardText(competitionData);
+            const comps = [];
+            for (const event of group) {
+                try {
+                    const res = await womApi.get(`/competitions/${event.wom_competition_id}`);
+                    comps.push(res.data);
+                } catch (err) {
+                    console.error(`[EventLifecycle] WOM fetch failed for competition ${event.wom_competition_id}:`, err.message);
+                }
+            }
+            if (comps.length === 0) continue;
 
-            // Clone embed and update leaderboard
             const embed = EmbedBuilder.from(oldEmbed);
+            const existingFields = oldEmbed.fields ? [...oldEmbed.fields] : [];
 
-            // Find and replace the Leaderboard field
-            const fields = oldEmbed.fields ? [...oldEmbed.fields] : [];
-            const leaderboardIdx = fields.findIndex(f => f.name === 'Leaderboard');
-
-            if (leaderboardIdx >= 0) {
-                fields[leaderboardIdx] = { name: 'Leaderboard', value: leaderboardText || 'No participants yet.', inline: false };
+            let nextFields;
+            if (comps.length > 1) {
+                // Combined SoK embed: drop existing skill/boss leaderboard fields and re-add fresh ones.
+                const preserved = existingFields.filter(f => !f.name.startsWith('⭐ ') && !f.name.startsWith('⚔️ '));
+                nextFields = [...preserved, ...buildSokLeaderboardFields(comps)];
             } else {
-                fields.push({ name: 'Leaderboard', value: leaderboardText || 'No participants yet.', inline: false });
+                // Legacy single-event embed: replace the 'Leaderboard' field in place.
+                const leaderboardText = buildLeaderboardText(comps[0]) || 'No participants yet.';
+                const leaderboardIdx = existingFields.findIndex(f => f.name === 'Leaderboard');
+                if (leaderboardIdx >= 0) {
+                    existingFields[leaderboardIdx] = { name: 'Leaderboard', value: leaderboardText, inline: false };
+                } else {
+                    existingFields.push({ name: 'Leaderboard', value: leaderboardText, inline: false });
+                }
+                nextFields = existingFields;
             }
 
-            embed.setFields(fields);
+            embed.setFields(nextFields);
             embed.setTimestamp(new Date());
 
             await message.edit({ embeds: [embed] });
         } catch (err) {
-            console.error(`[EventLifecycle] Failed to update leaderboard for event ${event.id}:`, err.message);
+            console.error(`[EventLifecycle] Failed to update leaderboard for group ${group.map(e => e.id).join(',')}:`, err.message);
         }
     }
 }
