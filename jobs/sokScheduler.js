@@ -50,8 +50,8 @@ async function postWeeklySokCompetitions(client) {
         config.pointsAward || [50, 30, 20]
     );
 
-    const channel = client.channels.cache.get(config.EVENTS_CHANNEL_ID);
-    if (!channel) throw new Error('EVENTS_CHANNEL_ID channel not found in cache');
+    const channel = client.channels.cache.get(config.SOK_EVENTS_CHANNEL_ID);
+    if (!channel) throw new Error('SOK_EVENTS_CHANNEL_ID channel not found in cache');
 
     const posted = [];
     const skipped = [];
