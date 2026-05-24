@@ -16,7 +16,7 @@ async function calculateAndAwardVoiceRewards(config) {
     const vcConfig = await hybridConfig.getConfigGroup('voice_tracking', {});
     const rewards = vcConfig.weeklyVPRewards || [15, 10, 5];
 
-    const topUsers = await voiceAnalytics.getWeeklyVoiceLeaderboard(7, rewards.length);
+    const topUsers = await voiceAnalytics.getWeeklyVoiceLeaderboard({ days: 7, limit: rewards.length });
     if (!topUsers || topUsers.length === 0) return null;
 
     const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;

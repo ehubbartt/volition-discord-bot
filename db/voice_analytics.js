@@ -105,11 +105,14 @@ async function getDailyMetrics(startDate, endDate) {
 }
 
 /**
- * Get weekly voice leaderboard (top users by minutes in last N days)
- * Aggregates directly from voice_activity_log
+ * Get weekly voice leaderboard (top users by minutes).
+ * Pass `{ since: Date }` for an absolute anchor, or `{ days: N }` for a rolling window.
+ * Aggregates directly from voice_activity_log.
  */
-async function getWeeklyVoiceLeaderboard(days = 7, limit = 3) {
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+async function getWeeklyVoiceLeaderboard({ since, days, limit = 3 } = {}) {
+    const sinceIso = since
+        ? new Date(since).toISOString()
+        : new Date(Date.now() - (days ?? 7) * 24 * 60 * 60 * 1000).toISOString();
 
     // Paginate through all rows to avoid Supabase's default 1000-row limit
     const totals = {};
@@ -120,7 +123,7 @@ async function getWeeklyVoiceLeaderboard(days = 7, limit = 3) {
         const { data, error } = await supabase
             .from('voice_activity_log')
             .select('user_id, username, minutes_awarded')
-            .gte('created_at', since)
+            .gte('created_at', sinceIso)
             .range(from, from + PAGE_SIZE - 1);
 
         if (error) throw error;

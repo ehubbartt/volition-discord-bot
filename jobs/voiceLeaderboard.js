@@ -11,9 +11,9 @@ const eventsDb = require('../db/events');
 const voiceAnalytics = require('../db/voice_analytics');
 const hybridConfig = require('../utils/hybridConfig');
 const config = require('../utils/config');
+const { getThisSunday23UTC } = require('./sokScheduler');
 
 const TOP_N = 10;
-const ROLLING_DAYS = 7;
 
 let refreshInterval = null;
 
@@ -55,7 +55,7 @@ async function buildLeaderboardEmbed(client) {
     const vc = await hybridConfig.getConfigGroup('voice_tracking', {});
     const rewards = vc.weeklyVPRewards || [15, 10, 5];
 
-    const top = await voiceAnalytics.getWeeklyVoiceLeaderboard(ROLLING_DAYS, TOP_N);
+    const top = await voiceAnalytics.getWeeklyVoiceLeaderboard({ since: getThisSunday23UTC(), limit: TOP_N });
     const nameById = await resolveDisplayNames(client, (top || []).map(u => u.user_id));
 
     const rows = (top || []).map((u, i) => {
@@ -113,7 +113,7 @@ async function postWeeklyVoiceLeaderboard(client) {
     const embed = await buildLeaderboardEmbed(client);
     const message = await channel.send({ embeds: [embed] });
 
-    const endsAt = new Date(Date.now() + ROLLING_DAYS * 24 * 60 * 60 * 1000);
+    const endsAt = new Date(getThisSunday23UTC().getTime() + 7 * 24 * 60 * 60 * 1000);
     const event = await eventsDb.createEvent({
         type: 'voice_weekly',
         title: 'Weekly Voice Leaderboard',
