@@ -87,6 +87,7 @@ const {
   startVoiceLeaderboardRefresh,
 } = require('./jobs/voiceLeaderboard.js');
 const { createTaskEvent } = require('./commands/admin/event.js');
+const { runBridgeBackfill } = require('./handlers/bridge.js');
 
 const TEST_CHANNEL_ID = config.TEST_CHANNEL_ID;
 
@@ -112,6 +113,9 @@ client.once(Events.ClientReady, async () => {
 
   // Start weekly voice leaderboard refresh (runs on startup + every 15 minutes)
   startVoiceLeaderboardRefresh(client);
+
+  // Replay any site→bot bridge messages missed while the bot was offline
+  await runBridgeBackfill(client);
 
   setInterval(async () => {
     const now = new Date();
