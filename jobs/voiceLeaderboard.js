@@ -64,7 +64,7 @@ async function buildLeaderboardEmbed(client) {
         return `${medal} **${name}** — ${formatTime(u.week_minutes)}`;
     });
 
-    const description = `Top 3 win ${rewards[0]} / ${rewards[1]} / ${rewards[2]} ${vpEmoji} VP at the end of the week.`;
+    const description = `Top 3 win ${rewards[0]} / ${rewards[1]} / ${rewards[2]} ${vpEmoji} VP at the end of the week.\n_Time only counts when you're in a voice channel with at least one other member and you're both unmuted (and not deafened)._`;
 
     const embed = new EmbedBuilder()
         .setColor('Blue')
