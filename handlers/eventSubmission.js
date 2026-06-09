@@ -1,6 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const eventsDb = require('../db/events');
 const db = require('../db/supabase');
+const cardPacks = require('../db/cardPacks');
 const config = require('../utils/config');
 const { isAdmin } = require('../utils/permissions');
 
@@ -183,11 +184,24 @@ async function handleApprove(interaction) {
         }
     }
 
-    // Award VP
+    const packRewardName = event.pack_reward_name || null;
     const vpReward = event.vp_reward || 0;
     let playerRsn = 'Unknown';
 
-    if (vpReward > 0) {
+    // Award pack OR VP (pack replaces VP when set).
+    if (packRewardName) {
+        const res = await cardPacks.grantPackToDiscordId(submission.discord_id, packRewardName, 1);
+        if (!res.ok) {
+            const msg = {
+                not_registered: `⚠️ <@${submission.discord_id}> hasn't signed into the Volition site yet — pack not awarded. Ask them to log in once, then re-approve.`,
+                no_pack: `❌ No card pack matching **${packRewardName}** exists. Pack not awarded.`,
+                db_error: `❌ Database error while granting pack. Try again.`,
+            }[res.reason] || `❌ Failed to grant pack: ${res.reason}`;
+            return interaction.reply({ content: msg, ephemeral: true });
+        }
+        const player = await db.getPlayerByDiscordId(submission.discord_id);
+        if (player) playerRsn = player.rsn;
+    } else if (vpReward > 0) {
         try {
             const player = await db.getPlayerByDiscordId(submission.discord_id);
             if (player) {
@@ -210,12 +224,15 @@ async function handleApprove(interaction) {
 
     // Update the button message to show approved state
     const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
+    const awardLine = packRewardName
+        ? `🎴 **1× ${packRewardName}** awarded by <@${interaction.user.id}>`
+        : `**+${vpReward}** ${vpEmoji} VP awarded by <@${interaction.user.id}>`;
 
     const embed = new EmbedBuilder()
         .setColor('Green')
         .setDescription(
             `✅ **Approved** — <@${submission.discord_id}>\n` +
-            `**+${vpReward}** ${vpEmoji} VP awarded by <@${interaction.user.id}>`
+            awardLine
         )
         .setFooter({ text: `Submission #${submissionId} • ${event.title}` });
 
@@ -223,15 +240,17 @@ async function handleApprove(interaction) {
 
     // Log to payout channel
     const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
-    if (logChannel && vpReward > 0) {
+    if (logChannel && (packRewardName || vpReward > 0)) {
         const player = await db.getPlayerByDiscordId(submission.discord_id);
+        const changeLine = packRewardName ? `+1 ${packRewardName}` : `+${vpReward} VP`;
+        const totalLine = packRewardName ? '' : `\n**New Total:** ${player ? player.points : '?'} VP`;
         const logEmbed = new EmbedBuilder()
             .setColor('Green')
             .setTitle('Event Submission Approved')
             .setDescription(
                 `**Player:** ${playerRsn}\n` +
-                `**Change:** +${vpReward} VP\n` +
-                `**New Total:** ${player ? player.points : '?'} VP\n` +
+                `**Change:** ${changeLine}` +
+                `${totalLine}\n` +
                 `**Reason:** ${event.title}\n` +
                 `**Approved by:** <@${interaction.user.id}>`
             )

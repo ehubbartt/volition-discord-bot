@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const eventsDb = require('../db/events');
 const { womApi } = require('../utils/api');
 const { buildLeaderboardText } = require('../commands/admin/event');
-const { buildSokLeaderboardFields } = require('./sokScheduler');
+const { buildSokLeaderboardFields, postWeeklySokCompetitions } = require('./sokScheduler');
 const config = require('../utils/config');
 
 let lifecycleInterval = null;
@@ -120,8 +120,19 @@ async function runLifecycleCheck(client) {
  * Update leaderboard embeds for active WOM competition events.
  * Groups events by message_id so a single combined SoK message gets one edit
  * that renders both the skill and boss leaderboards together.
+ *
+ * Also retries the weekly SoK post — if WOM hadn't published the new
+ * competitions by the time the Sunday 23:00 UTC trigger fired,
+ * postWeeklySokCompetitions is idempotent and will pick them up on the next
+ * 15-min tick instead of requiring a manual /sok-refresh.
  */
 async function updateCompetitionLeaderboards(client) {
+    try {
+        await postWeeklySokCompetitions(client);
+    } catch (err) {
+        console.error('[EventLifecycle] SoK auto-post retry error:', err.message);
+    }
+
     const events = await eventsDb.getActiveCompetitionEvents();
 
     const groups = new Map();

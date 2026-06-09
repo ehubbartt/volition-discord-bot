@@ -4,6 +4,7 @@ const { isAdmin } = require('../../utils/permissions');
 const config = require('../../utils/config');
 const eventsDb = require('../../db/events');
 const db = require('../../db/supabase');
+const cardPacks = require('../../db/cardPacks');
 const { womApi } = require('../../utils/api');
 
 // Temporary cache for slash command options while the modal is open
@@ -18,6 +19,7 @@ module.exports = {
                 .setDescription('Create a submission-based task event')
                 .addStringOption(opt => opt.setName('title').setDescription('Event title').setRequired(true))
                 .addIntegerOption(opt => opt.setName('vp_reward').setDescription('VP per approved submission (default: 5)').setRequired(false))
+                .addStringOption(opt => opt.setName('pack_reward').setDescription('Award a card pack per completion instead of VP (e.g. "White Pack")').setRequired(false))
                 .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 7d, 3d, 24h, 12h)').setRequired(false))
                 .addIntegerOption(opt => opt.setName('first_place').setDescription('Bonus VP for 1st place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('Bonus VP for 2nd place').setRequired(false))
@@ -31,6 +33,7 @@ module.exports = {
                 .setDescription('Create a custom one-off event')
                 .addStringOption(opt => opt.setName('title').setDescription('Event title').setRequired(true))
                 .addIntegerOption(opt => opt.setName('vp_reward').setDescription('VP per approved submission (default: 5)').setRequired(false))
+                .addStringOption(opt => opt.setName('pack_reward').setDescription('Award a card pack per completion instead of VP (e.g. "White Pack")').setRequired(false))
                 .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 7d, 3d, 24h, 12h)').setRequired(false))
                 .addIntegerOption(opt => opt.setName('first_place').setDescription('Bonus VP for 1st place').setRequired(false))
                 .addIntegerOption(opt => opt.setName('second_place').setDescription('Bonus VP for 2nd place').setRequired(false))
@@ -96,11 +99,15 @@ async function showDescriptionModal(interaction, type) {
         return interaction.reply({ content: '❌ Cannot use both `checklist` and `shared_checklist` at the same time.', ephemeral: true });
     }
 
+    const packReward = interaction.options.getString('pack_reward') || null;
+
     // Cache the slash command options
     pendingEvents.set(modalId, {
         type,
         title: interaction.options.getString('title'),
-        vpReward: interaction.options.getInteger('vp_reward') ?? 5,
+        // When a pack is set, VP is suppressed (pack replaces VP per design).
+        vpReward: packReward ? 0 : (interaction.options.getInteger('vp_reward') ?? 5),
+        packReward,
         durationStr: interaction.options.getString('duration'),
         first: interaction.options.getInteger('first_place'),
         second: interaction.options.getInteger('second_place'),
@@ -232,7 +239,7 @@ async function handleDescriptionModalSubmit(interaction) {
     }
     pendingEvents.delete(interaction.customId);
 
-    const { type, title, vpReward, durationStr, first, second, third, isLeagues, isChecklist, isSharedChecklist } = opts;
+    const { type, title, vpReward, packReward, durationStr, first, second, third, isLeagues, isChecklist, isSharedChecklist } = opts;
     const description = interaction.fields.getTextInputValue('event_description');
 
     // Parse checklist tasks if in checklist or shared checklist mode
@@ -277,7 +284,13 @@ async function handleDescriptionModalSubmit(interaction) {
         .setDescription(description)
         .setThumbnail(config.CLAN_ICON_URL)
         .addFields(
-            { name: 'Reward', value: `${vpReward} ${vpEmoji} VP per completion`, inline: true },
+            {
+                name: 'Reward',
+                value: packReward
+                    ? `🎴 1× **${packReward}** per completion`
+                    : `${vpReward} ${vpEmoji} VP per completion`,
+                inline: true,
+            },
             { name: 'Type', value: type === 'task' ? 'Weekly Task' : 'Custom Event', inline: true },
         )
         .setTimestamp();
@@ -342,6 +355,7 @@ async function handleDescriptionModalSubmit(interaction) {
         thread_id: thread.id,
         channel_id: channel.id,
         ends_at: endsAt ? endsAt.toISOString() : null,
+        pack_reward_name: packReward,
     });
 
     // Now that we have the event ID, add the select menu for checklist events
@@ -949,11 +963,24 @@ async function handleTaskApprove(interaction) {
         claimedByName = tasks[taskIndex].claimed_by_name;
     }
 
-    // Award VP
+    // Award pack OR VP (pack replaces VP when set on the event row).
+    const packRewardName = event.pack_reward_name || null;
     const vpReward = event.vp_reward || 0;
     let playerRsn = 'Unknown';
 
-    if (vpReward > 0) {
+    if (packRewardName) {
+        const res = await cardPacks.grantPackToDiscordId(claimedBy, packRewardName, 1);
+        if (!res.ok) {
+            const msg = {
+                not_registered: `⚠️ <@${claimedBy}> hasn't signed into the Volition site yet — pack not awarded. Ask them to log in once, then re-approve.`,
+                no_pack: `❌ No card pack matching **${packRewardName}** exists. Pack not awarded.`,
+                db_error: `❌ Database error while granting pack. Try again.`,
+            }[res.reason] || `❌ Failed to grant pack: ${res.reason}`;
+            return interaction.followUp({ content: msg, ephemeral: true });
+        }
+        const player = await db.getPlayerByDiscordId(claimedBy);
+        if (player) playerRsn = player.rsn;
+    } else if (vpReward > 0) {
         try {
             const player = await db.getPlayerByDiscordId(claimedBy);
             if (player) {
@@ -993,12 +1020,15 @@ async function handleTaskApprove(interaction) {
 
     // Update the approve/reject button message in the thread
     const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
+    const awardLine = packRewardName
+        ? `🎴 **1× ${packRewardName}** awarded by <@${interaction.user.id}>`
+        : `**+${vpReward}** ${vpEmoji} VP awarded by <@${interaction.user.id}>`;
     const embed = new EmbedBuilder()
         .setColor('Green')
         .setDescription(
             `✅ **Approved** — <@${claimedBy}>\n` +
             `**Task:** ${tasks[taskIndex].text}\n` +
-            `**+${vpReward}** ${vpEmoji} VP awarded by <@${interaction.user.id}>`
+            awardLine
         )
         .setFooter({ text: `Event: ${event.title} • Task #${taskIndex + 1}` });
 
@@ -1006,16 +1036,18 @@ async function handleTaskApprove(interaction) {
 
     // Log to payout channel
     const logChannel = interaction.client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
-    if (logChannel && vpReward > 0) {
+    if (logChannel && (packRewardName || vpReward > 0)) {
         const player = await db.getPlayerByDiscordId(claimedBy);
+        const changeLine = packRewardName ? `+1 ${packRewardName}` : `+${vpReward} VP`;
+        const totalLine = packRewardName ? '' : `\n**New Total:** ${player ? player.points : '?'} VP`;
         const logEmbed = new EmbedBuilder()
             .setColor('Green')
             .setTitle('Event Task Approved')
             .setDescription(
                 `**Player:** ${playerRsn}\n` +
                 `**Task:** ${tasks[taskIndex].text}\n` +
-                `**Change:** +${vpReward} VP\n` +
-                `**New Total:** ${player ? player.points : '?'} VP\n` +
+                `**Change:** ${changeLine}` +
+                `${totalLine}\n` +
                 `**Event:** ${event.title}\n` +
                 `**Approved by:** <@${interaction.user.id}>`
             )
@@ -1111,7 +1143,7 @@ module.exports.createTaskEvent = async function(client, taskText) {
         return null;
     }
 
-    const vpEmoji = config.VP_EMOJI_ID ? `<:vp:${config.VP_EMOJI_ID}>` : '🪙';
+    const WEEKLY_TASK_PACK = 'White Pack';
     const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const timestamp = Math.floor(endsAt.getTime() / 1000);
 
@@ -1121,7 +1153,7 @@ module.exports.createTaskEvent = async function(client, taskText) {
         .setDescription(taskText)
         .setThumbnail(config.CLAN_ICON_URL)
         .addFields(
-            { name: 'Reward', value: `5 ${vpEmoji} VP per completion`, inline: true },
+            { name: 'Reward', value: `🎴 1× **${WEEKLY_TASK_PACK}** per completion`, inline: true },
             { name: 'Type', value: 'Weekly Task', inline: true },
             { name: 'Deadline', value: `<t:${timestamp}:F> (<t:${timestamp}:R>)`, inline: false },
         )
@@ -1148,7 +1180,8 @@ module.exports.createTaskEvent = async function(client, taskText) {
         title: 'Weekly Task',
         description: taskText,
         created_by: null,
-        vp_reward: 5,
+        vp_reward: 0,
+        pack_reward_name: WEEKLY_TASK_PACK,
         message_id: message.id,
         thread_id: thread.id,
         channel_id: channel.id,
