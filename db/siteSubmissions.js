@@ -350,7 +350,7 @@ async function markPackAwarded(siteSubmissionId) {
 async function fetchApprovedPendingNotify() {
     const { data, error } = await supabase
         .from('vs_submissions')
-        .select('id, task_id, user_id, discord_id, submitter_name, discord_message_id, discord_channel_id, vs_tasks!task_id(name, vp_reward, pack_reward)')
+        .select('id, task_id, user_id, discord_id, submitter_name, discord_message_id, discord_channel_id, vs_tasks!task_id(name, vp_reward, pack_reward, event_id)')
         .eq('status', 'approved')
         .eq('approval_notified', false)
         .not('task_id', 'is', null);
@@ -381,7 +381,7 @@ async function markApprovalNotified(siteSubmissionId) {
 async function fetchRejectedPendingNotify() {
     const { data, error } = await supabase
         .from('vs_submissions')
-        .select('id, task_id, user_id, discord_id, submitter_name, review_note, discord_message_id, discord_channel_id, vs_tasks!task_id(name)')
+        .select('id, task_id, user_id, discord_id, submitter_name, review_note, discord_message_id, discord_channel_id, vs_tasks!task_id(name, event_id)')
         .eq('status', 'rejected')
         .eq('rejection_notified', false);
     if (error) {

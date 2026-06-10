@@ -135,6 +135,41 @@ async function ensureEventAnnounce(client, ev) {
     return { created: true };
 }
 
+// Get (or lazily create) the "Reviews" thread hanging off an event announcement,
+// where the bot posts approval/rejection notices so they don't clog the main channel.
+// Created on first use (no empty threads). Persists thread_id back onto the bot row.
+async function ensureReviewThread(client, botEvent) {
+    if (botEvent.thread_id) {
+        const t =
+            client.channels.cache.get(botEvent.thread_id) ||
+            (await client.channels.fetch(botEvent.thread_id).catch(() => null));
+        if (t) return t;
+    }
+    if (!botEvent.channel_id || !botEvent.message_id) return null;
+    const ch =
+        client.channels.cache.get(botEvent.channel_id) ||
+        (await client.channels.fetch(botEvent.channel_id).catch(() => null));
+    if (!ch) return null;
+    const msg = await ch.messages.fetch(botEvent.message_id).catch(() => null);
+    if (!msg) return null;
+    try {
+        const thread = await msg.startThread({
+            name: `${botEvent.title || 'Event'} — Reviews`.slice(0, 90),
+            autoArchiveDuration: 10080,
+        });
+        await thread.send({
+            content:
+                '🧵 Approval & rejection notices for this event appear here. ' +
+                '**Submit on the site** using the button above — not in this thread.',
+        });
+        await eventsDb.updateEvent(botEvent.id, { thread_id: thread.id });
+        return thread;
+    } catch (err) {
+        console.warn('[EventAnnounce] review thread create failed:', err.message);
+        return null;
+    }
+}
+
 // A site event left 'open' (closed on the site without its deadline passing — the
 // deadline case is handled by jobs/eventLifecycle.js). Grey the embed, drop the
 // button, and close the bot row so eventLifecycle deletes it after 12h.
@@ -159,4 +194,4 @@ async function closeEventAnnounce(client, row) {
     await eventsDb.closeEvent(row.id).catch((err) => console.warn('[EventAnnounce] closeEvent failed:', err.message));
 }
 
-module.exports = { ensureEventAnnounce, closeEventAnnounce, buildSiteEventEmbed, eventLink, SITE_URL };
+module.exports = { ensureEventAnnounce, ensureReviewThread, closeEventAnnounce, buildSiteEventEmbed, eventLink, SITE_URL };

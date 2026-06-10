@@ -9,14 +9,17 @@
 // Player notices (approval + rejection) are best-effort + exactly-once. Discord
 // "ephemeral" messages need an interaction, so a poller can't send them — instead we
 // reach the player as privately as possible: reply to their original proof message,
-// else @ them in that channel, else @ them in the events channel, else the payout log.
+// else @ them in that channel, else @ them in the event's/task's review THREAD (so
+// notices don't clog the main channel), else the payout log.
 
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db/supabase');
 const cardPacks = require('../db/cardPacks');
 const siteSubs = require('../db/siteSubmissions');
+const eventsDb = require('../db/events');
 const config = require('../utils/config');
 const { SITE_TASKS_URL } = require('../handlers/taskThread');
+const { ensureReviewThread } = require('../handlers/eventAnnounce');
 
 const POLL_INTERVAL_MS = 60 * 1000;
 
@@ -69,12 +72,39 @@ async function resolveDiscordId(row) {
     return null;
 }
 
+// Find the thread to drop a site-only submission's notice into, so notices don't
+// clog the main events channel:
+//   • event objective (task has event_id) → the event announcement's "Reviews" thread
+//     (created lazily on first notice), else
+//   • standalone task (weekly/custom)     → that task's existing submission thread.
+async function resolveReviewThread(client, row) {
+    const eventId = row.vs_tasks?.event_id || null;
+    if (eventId) {
+        const botEvent = await eventsDb.getEventByVsEventId(eventId).catch(() => null);
+        if (botEvent) {
+            const thread = await ensureReviewThread(client, botEvent);
+            if (thread) return thread;
+        }
+    }
+    if (row.task_id) {
+        const botTask = await eventsDb.getEventByVsTaskId(row.task_id).catch(() => null);
+        if (botTask?.thread_id) {
+            return (
+                client.channels.cache.get(botTask.thread_id) ||
+                (await client.channels.fetch(botTask.thread_id).catch(() => null))
+            );
+        }
+    }
+    return null;
+}
+
 // Deliver a per-submitter notice (approval / rejection), @-pinging only that user.
 // True Discord "ephemeral" messages require an interaction, so a background poller
 // can't send them — instead we reach the player as privately as possible:
 //   1. reply to their original proof message (Discord-thread submissions), or
 //   2. @ them in that same channel (if the message is gone), or
-//   3. @ them in the events channel (site submissions have no Discord message), or
+//   3. @ them in the event's / task's review thread (site submissions have no Discord
+//      message) — keeps notices out of the main channel, or
 //   4. the payout log channel as a last resort.
 // Returns true if delivered.
 async function deliverSubmissionNotice(client, row, discordId, embed) {
@@ -103,13 +133,11 @@ async function deliverSubmissionNotice(client, row, discordId, embed) {
         }
     }
 
-    // 3) Site submissions (no Discord proof message) → the events/tasks channel.
+    // 3) Site submissions (no Discord proof message) → the per-event/-task review thread.
     try {
-        const eventsChannel =
-            client.channels.cache.get(config.EVENTS_CHANNEL_ID) ||
-            (await client.channels.fetch(config.EVENTS_CHANNEL_ID).catch(() => null));
-        if (eventsChannel) {
-            await eventsChannel.send({ content: mention, embeds: [embed], allowedMentions });
+        const thread = await resolveReviewThread(client, row);
+        if (thread) {
+            await thread.send({ content: mention, embeds: [embed], allowedMentions });
             return true;
         }
     } catch (_) {
