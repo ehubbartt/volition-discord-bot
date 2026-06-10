@@ -87,6 +87,7 @@ const {
   startVoiceLeaderboardRefresh,
 } = require('./jobs/voiceLeaderboard.js');
 const { startSiteSubmissionPoller } = require('./jobs/siteSubmissionPoller.js');
+const { startTaskSyncPoller } = require('./jobs/taskSyncPoller.js');
 const { createTaskEvent } = require('./commands/admin/event.js');
 const { runBridgeBackfill } = require('./handlers/bridge.js');
 
@@ -117,6 +118,10 @@ client.once(Events.ClientReady, async () => {
 
   // Poll vs_submissions for site-approved rows that still need a VP/pack payout
   startSiteSubmissionPoller(client);
+
+  // Keep Discord task threads in sync with the site's active tasks (post new,
+  // refresh edited) — runs on startup + every 5 minutes
+  startTaskSyncPoller(client);
 
   // Replay any site→bot bridge messages missed while the bot was offline
   await runBridgeBackfill(client);

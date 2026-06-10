@@ -255,7 +255,7 @@ async function listActiveInstancesOfKind(kind) {
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
         .from('vs_tasks')
-        .select('id, name, description, vp_reward, ends_at')
+        .select('id, name, description, kind, vp_reward, pack_reward, ends_at')
         .eq('is_template', false)
         .eq('kind', kind)
         .eq('status', 'open')
@@ -263,6 +263,25 @@ async function listActiveInstancesOfKind(kind) {
         .order('starts_at', { ascending: false });
     if (error) {
         console.error('[SiteSubmissions] listActiveInstancesOfKind failed:', error.message);
+        return [];
+    }
+    return data || [];
+}
+
+// All currently-active (open, deadline not passed) task instances of any task kind.
+// Used by the task-sync poller to ensure each has a Discord thread + stays in sync.
+async function listAllActiveTasks() {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+        .from('vs_tasks')
+        .select('id, name, description, kind, vp_reward, pack_reward, ends_at')
+        .eq('is_template', false)
+        .eq('status', 'open')
+        .in('kind', ['weekly_task', 'daily_task', 'custom_task'])
+        .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+        .order('starts_at', { ascending: false });
+    if (error) {
+        console.error('[SiteSubmissions] listAllActiveTasks failed:', error.message);
         return [];
     }
     return data || [];
@@ -308,6 +327,7 @@ module.exports = {
     createInstanceFromTemplate,
     createStandaloneInstance,
     listActiveInstancesOfKind,
+    listAllActiveTasks,
     fetchApprovedPendingPack,
     markPackAwarded,
 };
