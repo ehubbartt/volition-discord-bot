@@ -235,6 +235,7 @@ class HybridConfig {
         const localFallback = {
             spinCost: 5,
             freeDropItems: true,
+            paidEnabled: true, // set false in bot_config (loot_tables) to disable paid crates
             vpTiers: [
                 { label: 'Junk', chance: 29.7, min: 0, max: 0, color: '808080', title: 'Loot Crate Result', image: 'https://rrnmckaabbvtkkpoeefg.supabase.co/storage/v1/object/public/lootcrate/junk.png' },
                 { label: 'Common (1–3 VP)', chance: 50.0, min: 1, max: 3, color: '808080', title: 'Loot Crate Result', image: 'https://rrnmckaabbvtkkpoeefg.supabase.co/storage/v1/object/public/lootcrate/common.png' },

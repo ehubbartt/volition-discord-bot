@@ -172,14 +172,19 @@ function rollLoot (lootConfig, allowItems = true, allowRole = true) {
   };
 }
 
-function lootButtons () {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('lootcrate_claim_free').setLabel('Free Daily Claim').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('lootcrate_spin_paid').setLabel('Open for 5 VP').setStyle(ButtonStyle.Primary)
+function lootButtons (paidEnabled = true) {
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('lootcrate_claim_free').setLabel('Free Daily Claim').setStyle(ButtonStyle.Success)
   );
+  if (paidEnabled) {
+    row.addComponents(
+      new ButtonBuilder().setCustomId('lootcrate_spin_paid').setLabel('Open for 5 VP').setStyle(ButtonStyle.Primary)
+    );
+  }
+  return row;
 }
 
-async function sendLootEmbed (interaction, title, description, label, chance, color, image, newTotal) {
+async function sendLootEmbed (interaction, title, description, label, chance, color, image, newTotal, paidEnabled = true) {
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(description)
@@ -190,7 +195,7 @@ async function sendLootEmbed (interaction, title, description, label, chance, co
     )
     .setColor(color)
     .setImage(image);
-  await interaction.editReply({ embeds: [embed], components: [lootButtons()] });
+  await interaction.editReply({ embeds: [embed], components: [lootButtons(paidEnabled)] });
 }
 
 async function _handleLootInteraction (interaction, free = false) {
@@ -201,6 +206,9 @@ async function _handleLootInteraction (interaction, free = false) {
   const { kind, amount, chance, label, color, title, image, itemName, roleId } = rollLoot(lootTables, allowItems, !free);
   const today = new Date().toISOString().slice(0, 10);
   const PRICE = lootTables.spinCost || 5;
+  // Paid crates can be turned off via bot_config (loot_tables.paidEnabled = false);
+  // the free daily crate is unaffected. Absent key = enabled (backwards compatible).
+  const paidEnabled = lootTables.paidEnabled !== false;
   const MAX_BUTTON_AGE_MS = 20 * 60 * 60 * 1000; // 20h
   const ageMs = Date.now() - (interaction.message?.createdTimestamp ?? Date.now());
   if (ageMs > MAX_BUTTON_AGE_MS) return interaction.reply({ content: 'This button has expired. Please use the most recent one!', ephemeral: true });
@@ -221,9 +229,10 @@ async function _handleLootInteraction (interaction, free = false) {
     if (free) {
       if (lastLootDate === today) {
         const resetTimestamp = getNextDailyReset();
+        const payHint = paidEnabled ? ` or pay **${PRICE} VP** to open another` : '';
         return await interaction.editReply({
-          content: `${interaction.user} - you already claimed your daily crate. Come back <t:${resetTimestamp}:R> or pay **5 VP** to open another!`,
-          components: [lootButtons()]
+          content: `${interaction.user} - you already claimed your daily crate. Come back <t:${resetTimestamp}:R>${payHint}!`,
+          components: [lootButtons(paidEnabled)]
         });
       }
 
@@ -262,7 +271,7 @@ async function _handleLootInteraction (interaction, free = false) {
 
       // Try to send Discord response - if this fails, player still got their reward
       try {
-        await sendLootEmbed(interaction, title, description, label, chance, color, image, newPoints);
+        await sendLootEmbed(interaction, title, description, label, chance, color, image, newPoints, paidEnabled);
         // Send wallet follow-up if item was won
         if (kind === 'item' && itemName) {
           await sendWalletFollowUp(interaction, itemName, walletDb, walletPrices);
@@ -273,10 +282,18 @@ async function _handleLootInteraction (interaction, free = false) {
       }
       return;
     }
+    // Paid spin. Enforce the toggle server-side too (a stale/cached button could
+    // still send this even with the paid button hidden).
+    if (!paidEnabled) {
+      return await interaction.editReply({
+        content: `${interaction.user} - paid loot crates are currently disabled. Your free daily crate is still available!`,
+        components: [lootButtons(false)]
+      });
+    }
     if (currentPoints < PRICE) {
       return await interaction.editReply({
         content: `${interaction.user} - you need at least **${PRICE} VP** to spin.`,
-        components: [lootButtons()]
+        components: [lootButtons(paidEnabled)]
       });
     }
     // CRITICAL: Save to database FIRST, before any Discord responses
@@ -316,7 +333,7 @@ async function _handleLootInteraction (interaction, free = false) {
 
     // Try to send Discord response - if this fails, player still got their reward
     try {
-      await sendLootEmbed(interaction, title, description, label, chance, color, image, newTotal);
+      await sendLootEmbed(interaction, title, description, label, chance, color, image, newTotal, paidEnabled);
       // Send wallet follow-up if item was won
       if (kind === 'item' && itemName) {
         await sendWalletFollowUp(interaction, itemName, walletDb, walletPrices);

@@ -37,6 +37,7 @@ const DEFAULT_CONFIG = [
         value: {
             spinCost: 5,
             freeDropItems: true,
+            paidEnabled: true, // set false to disable paid (5 VP) crates; free daily stays
             vpTiers: [
                 { label: 'Junk', chance: 29.7, min: 0, max: 0, color: '808080', title: 'Loot Crate Result', image: 'https://rrnmckaabbvtkkpoeefg.supabase.co/storage/v1/object/public/lootcrate/junk.png' },
                 { label: 'Common (1–3 VP)', chance: 50.0, min: 1, max: 3, color: '808080', title: 'Loot Crate Result', image: 'https://rrnmckaabbvtkkpoeefg.supabase.co/storage/v1/object/public/lootcrate/common.png' },
