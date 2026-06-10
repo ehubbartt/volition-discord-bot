@@ -54,30 +54,43 @@ async function getEvent(eventId) {
     return data;
 }
 
+// Return the newest ACTIVE bot row linked to a vs_tasks instance, or null. We do NOT
+// use .maybeSingle() here: if more than one active row ever links to the same id
+// (e.g. a prior cycle double-posted, or the instance was reactivated), maybeSingle
+// errors and the caller would treat that as "none linked" and post AGAIN — snowballing
+// duplicates. Ordering newest-first + limit(1) is robust to that.
 async function getEventByVsTaskId(vsTaskId) {
     const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('vs_task_id', vsTaskId)
-        .maybeSingle();
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1);
     if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw error;
+        console.error('[events] getEventByVsTaskId failed:', error.message);
+        return null;
     }
-    return data || null;
+    return (data && data[0]) || null;
 }
 
+// Same robustness as getEventByVsTaskId — see its note. A site event that is
+// closed-then-reopened leaves an old closed row, so filtering status='active' (rather
+// than matching any row) means a re-opened event posts exactly one fresh announcement
+// and every later cycle finds + refreshes it instead of re-posting.
 async function getEventByVsEventId(vsEventId) {
     const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('vs_event_id', vsEventId)
-        .maybeSingle();
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1);
     if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw error;
+        console.error('[events] getEventByVsEventId failed:', error.message);
+        return null;
     }
-    return data || null;
+    return (data && data[0]) || null;
 }
 
 async function getEventByThreadId(threadId) {
