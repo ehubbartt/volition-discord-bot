@@ -16,6 +16,14 @@ function kindLabel(kind) {
     return 'Weekly Task';
 }
 
+// Role to @ when a task is first posted: weekly tasks ping the weekly role, custom
+// tasks ping the events role. Daily/other don't ping. Returns the content string or undefined.
+function taskPingContent(kind) {
+    if (kind === 'weekly_task' && config.weeklyTaskRoleID) return `<@&${config.weeklyTaskRoleID}>`;
+    if (kind === 'custom_task' && config.eventsRoleID) return `<@&${config.eventsRoleID}>`;
+    return undefined;
+}
+
 function rewardValue(task) {
     const parts = [];
     if (task.pack_reward) parts.push(`🎴 1× **${task.pack_reward}**`);
@@ -101,7 +109,7 @@ async function ensureTaskThread(client, task) {
     if (!channel) return { error: 'events channel not found' };
 
     const message = await channel.send({
-        content: task.kind === 'weekly_task' && config.weeklyTaskRoleID ? `<@&${config.weeklyTaskRoleID}>` : undefined,
+        content: taskPingContent(task.kind),
         embeds: [buildTaskEmbed(task)]
     });
 

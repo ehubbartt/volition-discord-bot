@@ -1,23 +1,20 @@
 // Poll vs_submissions for site-reviewed rows the bot still needs to act on:
 //   • APPROVED rows that need a bot-side pack grant (VP is granted by the site).
+//   • APPROVED rows whose "approved + here's your reward" notice hasn't been sent.
 //   • REJECTED rows whose "your submission was rejected" notice hasn't been sent.
 //
-// For each approved row:
-//   1. find the linked bot event via vs_task_id
-//   2. if it has pack_reward_name set → grant 1 pack, mark pack_awarded=true
-//   3. if no bot event found or no pack reward configured → skip silently
-//      (the row stays pack_awarded=false; the poll re-checks each cycle, but
-//       since rows that go through bingo / non-bot flows have no bot linkage,
-//       this is a tiny, harmless workload.)
+// Pack grant (per approved row): read vs_tasks.pack_reward (joined); if set → grant
+// 1 pack, mark pack_awarded=true; if none → mark awarded so it stops re-polling.
 //
-// For each rejected row: DM the player (with the admin's reason if given); if their
-// DMs are closed, fall back to the task thread (tagging them), else the payout log.
+// Player notices (approval + rejection) are best-effort + exactly-once. Discord
+// "ephemeral" messages need an interaction, so a poller can't send them — instead we
+// reach the player as privately as possible: reply to their original proof message,
+// else @ them in that channel, else @ them in the events channel, else the payout log.
 
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db/supabase');
 const cardPacks = require('../db/cardPacks');
 const siteSubs = require('../db/siteSubmissions');
-const eventsDb = require('../db/events');
 const config = require('../utils/config');
 const { SITE_TASKS_URL } = require('../handlers/taskThread');
 
@@ -65,92 +62,122 @@ async function grantPackForRow(client, row) {
     return { ok: true };
 }
 
-// Tell a player their submission was rejected — posted in the channel (not a DM).
-// Order of preference, best-effort + exactly-once:
-//   1. reply to their original submission message (Discord-thread submissions), or
-//   2. @ them in that same channel (if the message is gone), or
-//   3. @ them in the linked task thread (site submissions have no Discord message), or
-//   4. the payout log channel.
-// Marks the row notified regardless so it isn't retried forever.
-async function notifyRejection(client, row) {
-    let discordId = row.discord_id;
-    if (!discordId && row.user_id) {
-        discordId = await siteSubs.getDiscordIdForUserId(row.user_id);
-    }
-    if (!discordId) {
-        // No way to reach this submitter — stop re-polling it.
-        await siteSubs.markRejectionNotified(row.id);
-        return;
-    }
+// Resolve the submitter's Discord id (site rows store user_id, Discord rows store discord_id).
+async function resolveDiscordId(row) {
+    if (row.discord_id) return row.discord_id;
+    if (row.user_id) return siteSubs.getDiscordIdForUserId(row.user_id);
+    return null;
+}
 
-    const taskName = row.vs_tasks?.name || 'your submission';
-    const reason = (row.review_note || '').trim();
+// Deliver a per-submitter notice (approval / rejection), @-pinging only that user.
+// True Discord "ephemeral" messages require an interaction, so a background poller
+// can't send them — instead we reach the player as privately as possible:
+//   1. reply to their original proof message (Discord-thread submissions), or
+//   2. @ them in that same channel (if the message is gone), or
+//   3. @ them in the events channel (site submissions have no Discord message), or
+//   4. the payout log channel as a last resort.
+// Returns true if delivered.
+async function deliverSubmissionNotice(client, row, discordId, embed) {
     const mention = `<@${discordId}>`;
     const allowedMentions = { users: [discordId] };
-    const embed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('❌ Submission Rejected')
-        .setDescription(
-            `Your submission for **${taskName}** was rejected by an admin.` +
-            (reason ? `\n\n**Reason:** ${reason}` : '') +
-            `\n\nFix the issue and resubmit on the [site](${SITE_TASKS_URL}) or in the task thread.`
-        )
-        .setTimestamp();
 
-    let delivered = false;
-
-    // 1) / 2) The channel the submission was posted in.
+    // 1) / 2) The channel the proof was posted in.
     if (row.discord_channel_id) {
         try {
             const channel =
                 client.channels.cache.get(row.discord_channel_id) ||
                 (await client.channels.fetch(row.discord_channel_id).catch(() => null));
             if (channel) {
-                // Reply to the original message if we can still fetch it...
                 if (row.discord_message_id) {
                     const msg = await channel.messages.fetch(row.discord_message_id).catch(() => null);
                     if (msg) {
                         await msg.reply({ content: mention, embeds: [embed], allowedMentions });
-                        delivered = true;
+                        return true;
                     }
                 }
-                // ...otherwise just @ them in the same channel.
-                if (!delivered) {
-                    await channel.send({ content: mention, embeds: [embed], allowedMentions });
-                    delivered = true;
-                }
+                await channel.send({ content: mention, embeds: [embed], allowedMentions });
+                return true;
             }
         } catch (_) {
             /* fall through */
         }
     }
 
-    // 3) Site submissions (no Discord message) → the linked task thread.
-    if (!delivered && row.task_id) {
-        try {
-            const ev = await eventsDb.getEventByVsTaskId(row.task_id);
-            if (ev?.thread_id) {
-                const thread =
-                    client.channels.cache.get(ev.thread_id) ||
-                    (await client.channels.fetch(ev.thread_id).catch(() => null));
-                if (thread) {
-                    await thread.send({ content: mention, embeds: [embed], allowedMentions });
-                    delivered = true;
-                }
-            }
-        } catch (_) {
-            /* fall through */
+    // 3) Site submissions (no Discord proof message) → the events/tasks channel.
+    try {
+        const eventsChannel =
+            client.channels.cache.get(config.EVENTS_CHANNEL_ID) ||
+            (await client.channels.fetch(config.EVENTS_CHANNEL_ID).catch(() => null));
+        if (eventsChannel) {
+            await eventsChannel.send({ content: mention, embeds: [embed], allowedMentions });
+            return true;
         }
+    } catch (_) {
+        /* fall through */
     }
 
     // 4) Payout log channel as a last resort.
-    if (!delivered) {
-        const logChannel = client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
-        if (logChannel) {
-            await logChannel.send({ content: mention, embeds: [embed], allowedMentions }).catch(() => {});
-        }
+    const logChannel = client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+    if (logChannel) {
+        await logChannel.send({ content: mention, embeds: [embed], allowedMentions }).catch(() => {});
+        return true;
+    }
+    return false;
+}
+
+// Human-readable list of what an approved task awards (from vs_tasks, joined in).
+function rewardLine(task) {
+    const parts = [];
+    if (Number(task?.vp_reward) > 0) parts.push(`**${task.vp_reward} VP**`);
+    if (task?.pack_reward) parts.push(`🎴 1× **${task.pack_reward}**`);
+    return parts.length ? parts.join(' + ') : null;
+}
+
+// Tell a player their submission was approved + what they received. Exactly-once.
+async function notifyApproval(client, row) {
+    const discordId = await resolveDiscordId(row);
+    if (!discordId) {
+        await siteSubs.markApprovalNotified(row.id);
+        return;
     }
 
+    const task = row.vs_tasks || null;
+    const taskName = task?.name || 'your submission';
+    const reward = rewardLine(task);
+    const embed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('✅ Submission Approved')
+        .setDescription(
+            `Your submission for **${taskName}** was approved!` +
+            (reward ? `\n\n**You received:** ${reward}` : '')
+        )
+        .setTimestamp();
+
+    await deliverSubmissionNotice(client, row, discordId, embed);
+    await siteSubs.markApprovalNotified(row.id);
+}
+
+// Tell a player their submission was rejected (with the admin's reason). Exactly-once.
+async function notifyRejection(client, row) {
+    const discordId = await resolveDiscordId(row);
+    if (!discordId) {
+        await siteSubs.markRejectionNotified(row.id);
+        return;
+    }
+
+    const taskName = row.vs_tasks?.name || 'your submission';
+    const reason = (row.review_note || '').trim();
+    const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('❌ Submission Rejected')
+        .setDescription(
+            `Your submission for **${taskName}** was rejected by an admin.` +
+            (reason ? `\n\n**Reason:** ${reason}` : '') +
+            `\n\nFix the issue and resubmit on the [site](${SITE_TASKS_URL}).`
+        )
+        .setTimestamp();
+
+    await deliverSubmissionNotice(client, row, discordId, embed);
     await siteSubs.markRejectionNotified(row.id);
 }
 
@@ -162,6 +189,16 @@ async function runOnce(client) {
             await grantPackForRow(client, row);
         } catch (err) {
             console.error(`[SiteSubmissionPoller] row ${row.id} error: ${err.message}`);
+        }
+    }
+
+    // Approved → tell the player what they earned.
+    const approved = await siteSubs.fetchApprovedPendingNotify();
+    for (const row of approved) {
+        try {
+            await notifyApproval(client, row);
+        } catch (err) {
+            console.error(`[SiteSubmissionPoller] approve notify ${row.id} error: ${err.message}`);
         }
     }
 

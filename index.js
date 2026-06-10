@@ -88,6 +88,7 @@ const {
 } = require('./jobs/voiceLeaderboard.js');
 const { startSiteSubmissionPoller } = require('./jobs/siteSubmissionPoller.js');
 const { startTaskSyncPoller } = require('./jobs/taskSyncPoller.js');
+const { startEventAnnouncePoller } = require('./jobs/eventAnnouncePoller.js');
 const { createTaskEvent } = require('./commands/admin/event.js');
 const { runBridgeBackfill } = require('./handlers/bridge.js');
 
@@ -122,6 +123,10 @@ client.once(Events.ClientReady, async () => {
   // Keep Discord task threads in sync with the site's active tasks (post new,
   // refresh edited) — runs on startup + every 5 minutes
   startTaskSyncPoller(client);
+
+  // Announce the site's running events (vs_events, status='open') in the events
+  // channel with a link back to the site to submit — runs on startup + every 5 minutes
+  startEventAnnouncePoller(client);
 
   // Replay any site→bot bridge messages missed while the bot was offline
   await runBridgeBackfill(client);

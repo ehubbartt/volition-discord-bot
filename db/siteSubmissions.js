@@ -292,6 +292,26 @@ async function listAllActiveTasks() {
 }
 
 // ---------------------------------------------------------------------------
+// Site events (vs_events) — announced in Discord by the event-announce poller
+
+// Currently-running site events (status='open'). These are full vs_events rows
+// (bingo / duo / simple / sequential / custom), NOT the vs_tasks instances above.
+// The bot posts ONE describe-and-link embed per open event into the events channel
+// and points players at the site to submit. Newest first.
+async function listActiveSiteEvents() {
+    const { data, error } = await supabase
+        .from('vs_events')
+        .select('id, slug, name, kind, description, status, starts_at, ends_at')
+        .eq('status', 'open')
+        .order('starts_at', { ascending: false });
+    if (error) {
+        console.error('[SiteSubmissions] listActiveSiteEvents failed:', error.message);
+        return [];
+    }
+    return data || [];
+}
+
+// ---------------------------------------------------------------------------
 // Pack-payout poller helpers
 
 // Approved rows still awaiting bot-side processing (pack grant).
@@ -316,6 +336,38 @@ async function markPackAwarded(siteSubmissionId) {
         .eq('id', siteSubmissionId);
     if (error) {
         console.error('[SiteSubmissions] markPackAwarded failed:', error.message);
+        return false;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Approval-notification poller helpers
+
+// Approved rows whose "your submission was approved" notice hasn't been sent yet.
+// Carries the task name + rewards so the bot can tell the player what they earned,
+// plus the Discord message linkage so it can reply to their original proof post.
+async function fetchApprovedPendingNotify() {
+    const { data, error } = await supabase
+        .from('vs_submissions')
+        .select('id, task_id, user_id, discord_id, submitter_name, discord_message_id, discord_channel_id, vs_tasks!task_id(name, vp_reward, pack_reward)')
+        .eq('status', 'approved')
+        .eq('approval_notified', false)
+        .not('task_id', 'is', null);
+    if (error) {
+        console.error('[SiteSubmissions] fetchApprovedPendingNotify failed:', error.message);
+        return [];
+    }
+    return data || [];
+}
+
+async function markApprovalNotified(siteSubmissionId) {
+    const { error } = await supabase
+        .from('vs_submissions')
+        .update({ approval_notified: true })
+        .eq('id', siteSubmissionId);
+    if (error) {
+        console.error('[SiteSubmissions] markApprovalNotified failed:', error.message);
         return false;
     }
     return true;
@@ -373,8 +425,11 @@ module.exports = {
     createStandaloneInstance,
     listActiveInstancesOfKind,
     listAllActiveTasks,
+    listActiveSiteEvents,
     fetchApprovedPendingPack,
     markPackAwarded,
+    fetchApprovedPendingNotify,
+    markApprovalNotified,
     fetchRejectedPendingNotify,
     markRejectionNotified,
     getDiscordIdForUserId,

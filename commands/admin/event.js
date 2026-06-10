@@ -320,8 +320,10 @@ async function handleDescriptionModalSubmit(interaction) {
     // Select menu for checklist is added after DB insert (need event ID)
     let selectRow = null;
 
-    // Send the embed
+    // Send the embed (ping the events role for new custom events/tasks)
+    const pingContent = type === 'custom' && config.eventsRoleID ? `<@&${config.eventsRoleID}>` : undefined;
     const message = await channel.send({
+        content: pingContent,
         embeds: [embed]
     });
 
