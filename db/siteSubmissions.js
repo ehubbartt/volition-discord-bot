@@ -98,6 +98,8 @@ async function createSubmissionRow({
     targetLabel,
     proofUrls,
     proofPaths,
+    discordMessageId,
+    discordChannelId,
 }) {
     const { data, error } = await supabase
         .from('vs_submissions')
@@ -111,6 +113,8 @@ async function createSubmissionRow({
             target_label: targetLabel || null,
             proof_urls: proofUrls || [],
             proof_paths: proofPaths || [],
+            discord_message_id: discordMessageId ? String(discordMessageId) : null,
+            discord_channel_id: discordChannelId ? String(discordChannelId) : null,
             status: 'pending',
         })
         .select('id')
@@ -317,6 +321,47 @@ async function markPackAwarded(siteSubmissionId) {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Rejection-notification poller helpers
+
+// Rejected rows whose "your submission was rejected" notice hasn't been sent yet.
+// Carries the task name + review note so the bot can tell the player what + why.
+async function fetchRejectedPendingNotify() {
+    const { data, error } = await supabase
+        .from('vs_submissions')
+        .select('id, task_id, user_id, discord_id, submitter_name, review_note, discord_message_id, discord_channel_id, vs_tasks!task_id(name)')
+        .eq('status', 'rejected')
+        .eq('rejection_notified', false);
+    if (error) {
+        console.error('[SiteSubmissions] fetchRejectedPendingNotify failed:', error.message);
+        return [];
+    }
+    return data || [];
+}
+
+async function markRejectionNotified(siteSubmissionId) {
+    const { error } = await supabase
+        .from('vs_submissions')
+        .update({ rejection_notified: true })
+        .eq('id', siteSubmissionId);
+    if (error) {
+        console.error('[SiteSubmissions] markRejectionNotified failed:', error.message);
+        return false;
+    }
+    return true;
+}
+
+// Resolve a Discord id from a vs_users row id (for site-submitted rows that stored
+// user_id but not discord_id).
+async function getDiscordIdForUserId(userId) {
+    if (!userId) return null;
+    const { data } = await supabase
+        .from('vs_users').select('discord_id')
+        .eq('id', userId)
+        .maybeSingle();
+    return data?.discord_id || null;
+}
+
 module.exports = {
     PROOF_BUCKET,
     lookupSiteUser,
@@ -330,4 +375,7 @@ module.exports = {
     listAllActiveTasks,
     fetchApprovedPendingPack,
     markPackAwarded,
+    fetchRejectedPendingNotify,
+    markRejectionNotified,
+    getDiscordIdForUserId,
 };

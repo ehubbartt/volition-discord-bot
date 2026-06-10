@@ -141,6 +141,9 @@ async function handleThreadMessage(message) {
         targetLabel: event.title,
         proofUrls: proof_urls,
         proofPaths: proof_paths,
+        // Remember this message so a rejection can reply to it (instead of a DM).
+        discordMessageId: message.id,
+        discordChannelId: message.channel.id,
     });
 
     if (!siteSubmissionId) {

@@ -1,6 +1,6 @@
-// Poll vs_submissions for site-approved rows that still need a bot-side pack
-// grant. VP grants are handled by the site directly (its approve flow updates
-// vp on the user). Packs are bot territory — the site doesn't know about them.
+// Poll vs_submissions for site-reviewed rows the bot still needs to act on:
+//   • APPROVED rows that need a bot-side pack grant (VP is granted by the site).
+//   • REJECTED rows whose "your submission was rejected" notice hasn't been sent.
 //
 // For each approved row:
 //   1. find the linked bot event via vs_task_id
@@ -9,12 +9,17 @@
 //      (the row stays pack_awarded=false; the poll re-checks each cycle, but
 //       since rows that go through bingo / non-bot flows have no bot linkage,
 //       this is a tiny, harmless workload.)
+//
+// For each rejected row: DM the player (with the admin's reason if given); if their
+// DMs are closed, fall back to the task thread (tagging them), else the payout log.
 
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db/supabase');
 const cardPacks = require('../db/cardPacks');
 const siteSubs = require('../db/siteSubmissions');
+const eventsDb = require('../db/events');
 const config = require('../utils/config');
+const { SITE_TASKS_URL } = require('../handlers/taskThread');
 
 const POLL_INTERVAL_MS = 60 * 1000;
 
@@ -60,14 +65,113 @@ async function grantPackForRow(client, row) {
     return { ok: true };
 }
 
+// Tell a player their submission was rejected — posted in the channel (not a DM).
+// Order of preference, best-effort + exactly-once:
+//   1. reply to their original submission message (Discord-thread submissions), or
+//   2. @ them in that same channel (if the message is gone), or
+//   3. @ them in the linked task thread (site submissions have no Discord message), or
+//   4. the payout log channel.
+// Marks the row notified regardless so it isn't retried forever.
+async function notifyRejection(client, row) {
+    let discordId = row.discord_id;
+    if (!discordId && row.user_id) {
+        discordId = await siteSubs.getDiscordIdForUserId(row.user_id);
+    }
+    if (!discordId) {
+        // No way to reach this submitter — stop re-polling it.
+        await siteSubs.markRejectionNotified(row.id);
+        return;
+    }
+
+    const taskName = row.vs_tasks?.name || 'your submission';
+    const reason = (row.review_note || '').trim();
+    const mention = `<@${discordId}>`;
+    const allowedMentions = { users: [discordId] };
+    const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('❌ Submission Rejected')
+        .setDescription(
+            `Your submission for **${taskName}** was rejected by an admin.` +
+            (reason ? `\n\n**Reason:** ${reason}` : '') +
+            `\n\nFix the issue and resubmit on the [site](${SITE_TASKS_URL}) or in the task thread.`
+        )
+        .setTimestamp();
+
+    let delivered = false;
+
+    // 1) / 2) The channel the submission was posted in.
+    if (row.discord_channel_id) {
+        try {
+            const channel =
+                client.channels.cache.get(row.discord_channel_id) ||
+                (await client.channels.fetch(row.discord_channel_id).catch(() => null));
+            if (channel) {
+                // Reply to the original message if we can still fetch it...
+                if (row.discord_message_id) {
+                    const msg = await channel.messages.fetch(row.discord_message_id).catch(() => null);
+                    if (msg) {
+                        await msg.reply({ content: mention, embeds: [embed], allowedMentions });
+                        delivered = true;
+                    }
+                }
+                // ...otherwise just @ them in the same channel.
+                if (!delivered) {
+                    await channel.send({ content: mention, embeds: [embed], allowedMentions });
+                    delivered = true;
+                }
+            }
+        } catch (_) {
+            /* fall through */
+        }
+    }
+
+    // 3) Site submissions (no Discord message) → the linked task thread.
+    if (!delivered && row.task_id) {
+        try {
+            const ev = await eventsDb.getEventByVsTaskId(row.task_id);
+            if (ev?.thread_id) {
+                const thread =
+                    client.channels.cache.get(ev.thread_id) ||
+                    (await client.channels.fetch(ev.thread_id).catch(() => null));
+                if (thread) {
+                    await thread.send({ content: mention, embeds: [embed], allowedMentions });
+                    delivered = true;
+                }
+            }
+        } catch (_) {
+            /* fall through */
+        }
+    }
+
+    // 4) Payout log channel as a last resort.
+    if (!delivered) {
+        const logChannel = client.channels.cache.get(config.PAYOUT_LOG_CHANNEL_ID);
+        if (logChannel) {
+            await logChannel.send({ content: mention, embeds: [embed], allowedMentions }).catch(() => {});
+        }
+    }
+
+    await siteSubs.markRejectionNotified(row.id);
+}
+
 async function runOnce(client) {
+    // Approved → pack grants.
     const rows = await siteSubs.fetchApprovedPendingPack();
-    if (rows.length === 0) return;
     for (const row of rows) {
         try {
             await grantPackForRow(client, row);
         } catch (err) {
             console.error(`[SiteSubmissionPoller] row ${row.id} error: ${err.message}`);
+        }
+    }
+
+    // Rejected → notify the player.
+    const rejected = await siteSubs.fetchRejectedPendingNotify();
+    for (const row of rejected) {
+        try {
+            await notifyRejection(client, row);
+        } catch (err) {
+            console.error(`[SiteSubmissionPoller] reject notify ${row.id} error: ${err.message}`);
         }
     }
 }
