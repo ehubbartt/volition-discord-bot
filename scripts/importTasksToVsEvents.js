@@ -37,7 +37,7 @@ async function main() {
     }
 
     const { data: existing, error: exErr } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .select('id, name')
         .eq('is_template', true)
         .eq('kind', 'weekly_task');
@@ -83,7 +83,7 @@ async function main() {
         return;
     }
 
-    const { error: insErr } = await supabase.from('vs_events').insert(toInsert);
+    const { error: insErr } = await supabase.from('vs_tasks').insert(toInsert);
     if (insErr) {
         console.error('[import] insert failed:', insErr.message);
         process.exit(1);

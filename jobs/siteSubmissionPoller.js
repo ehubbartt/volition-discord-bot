@@ -3,7 +3,7 @@
 // vp on the user). Packs are bot territory — the site doesn't know about them.
 //
 // For each approved row:
-//   1. find the linked bot event via vs_event_id
+//   1. find the linked bot event via vs_task_id
 //   2. if it has pack_reward_name set → grant 1 pack, mark pack_awarded=true
 //   3. if no bot event found or no pack reward configured → skip silently
 //      (the row stays pack_awarded=false; the poll re-checks each cycle, but
@@ -11,7 +11,6 @@
 //       this is a tiny, harmless workload.)
 
 const { EmbedBuilder } = require('discord.js');
-const eventsDb = require('../db/events');
 const db = require('../db/supabase');
 const cardPacks = require('../db/cardPacks');
 const siteSubs = require('../db/siteSubmissions');
@@ -22,16 +21,16 @@ const POLL_INTERVAL_MS = 60 * 1000;
 let pollInterval = null;
 
 async function grantPackForRow(client, row) {
-    const botEvent = await eventsDb.getEventByVsEventId(row.event_id);
-    if (!botEvent) return { skipped: true, reason: 'no bot event linkage' };
-    if (!botEvent.pack_reward_name) {
-        // Bot event exists but no pack reward configured — silently mark
-        // processed so this row stops being re-polled.
+    // The task owns its reward (vs_tasks.pack_reward), joined in fetchApprovedPendingPack.
+    const task = row.vs_tasks || null;
+    const packName = task?.pack_reward || null;
+    if (!packName) {
+        // No pack reward configured (VP-only task, or non-task row) — mark processed
+        // so it stops being re-polled. VP is granted by the site's approve flow.
         await siteSubs.markPackAwarded(row.id);
         return { skipped: true, reason: 'no pack configured' };
     }
 
-    const packName = botEvent.pack_reward_name;
     const res = await cardPacks.grantPackToDiscordId(row.discord_id, packName, 1);
     if (!res.ok) {
         console.warn(`[SiteSubmissionPoller] pack grant failed for site row ${row.id} (${row.discord_id}): ${res.reason}`);
@@ -51,7 +50,7 @@ async function grantPackForRow(client, row) {
             .setDescription(
                 `**Player:** ${playerRsn}\n` +
                 `**Change:** +1 ${packName}\n` +
-                `**Reason:** ${botEvent.title}\n` +
+                `**Reason:** ${task?.name || 'Task'}\n` +
                 `**Approved on:** Volition site`
             )
             .setTimestamp();

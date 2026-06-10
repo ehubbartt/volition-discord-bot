@@ -1,15 +1,18 @@
-// vs_events / vs_submissions / vs_users mirror against the shared Supabase
-// project. Site team owns the schema, review, and VP grants. Bot owns:
-//   • picking a template + creating a vs_events instance per rotation
-//   • uploading proof images + writing the vs_submissions row
+// vs_tasks / vs_submissions / vs_users mirror against the shared Supabase
+// project. Tasks live in their OWN table (vs_tasks), separate from full events
+// (vs_events). Site team owns the schema, review, and VP grants. Bot owns:
+//   • picking a template + creating a vs_tasks instance per rotation
+//   • uploading proof images + writing the vs_submissions row (task_id)
 //   • polling for site-approved rows that need a pack grant (packs live on
 //     the bot side; the site doesn't know about them)
 //
-// Required schema (coordinate with site team — see SITE-SCHEMA-CHECKLIST.md):
-//   vs_events:      kind, recurrence, is_template, in_rotation, template_id,
-//                   vp_reward, requires_proof  (and existing cols)
-//   vs_submissions: discord_id, submitter_name, proof_urls[], proof_paths[],
-//                   pack_awarded boolean default false   (and existing cols)
+// Required schema (site migration 0029):
+//   vs_tasks:       id, name, slug, description, kind, recurrence, is_template,
+//                   in_rotation, template_id, vp_reward, requires_proof, status,
+//                   starts_at, ends_at
+//   vs_submissions: task_id (→ vs_tasks), discord_id, submitter_name,
+//                   proof_urls[], proof_paths[], pack_awarded
+//   events (bot):   vs_task_id  (link to the vs_tasks instance)
 
 const { supabase } = require('./supabase');
 
@@ -87,7 +90,7 @@ async function uploadAllProofs(attachments, ctx) {
 // vs_submissions insert
 
 async function createSubmissionRow({
-    eventId,
+    taskId,
     userId,
     discordId,
     submitterName,
@@ -99,7 +102,7 @@ async function createSubmissionRow({
     const { data, error } = await supabase
         .from('vs_submissions')
         .insert({
-            event_id: eventId,
+            task_id: taskId,
             user_id: userId || null,
             discord_id: String(discordId),
             submitter_name: submitterName || null,
@@ -128,7 +131,7 @@ async function createSubmissionRow({
 // instances. `kind` is e.g. 'weekly_task' or 'daily_task'.
 async function pickTemplateForKind(kind) {
     const { data: templates, error } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .select('id, name, slug, description, vp_reward, requires_proof, recurrence')
         .eq('is_template', true)
         .eq('in_rotation', true)
@@ -143,7 +146,7 @@ async function pickTemplateForKind(kind) {
     // Count instances per template — least-used wins.
     const ids = templates.map(t => t.id);
     const { data: counts } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .select('template_id')
         .in('template_id', ids)
         .eq('is_template', false);
@@ -164,7 +167,7 @@ async function pickTemplateForKind(kind) {
 // instance is active at a time per rotation kind. Idempotent.
 async function closeActiveInstancesOfKind(kind) {
     const { error } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .update({ status: 'closed' })
         .eq('kind', kind)
         .eq('is_template', false)
@@ -180,11 +183,12 @@ function makeSlug(name) {
 }
 
 // Insert an instance copy of `template` for the given window. Returns the
-// inserted row (or null on failure).
-async function createInstanceFromTemplate(template, { kind, recurrence, startsAt, endsAt, name, description }) {
+// inserted row (or null on failure). vpReward/packReward override the template's
+// reward (e.g. the weekly rotation awards a pack, so vpReward=0 + packReward set).
+async function createInstanceFromTemplate(template, { kind, recurrence, startsAt, endsAt, name, description, vpReward, packReward }) {
     const slug = makeSlug(name || template.name);
     const { data, error } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .insert({
             name: name || template.name,
             slug,
@@ -197,7 +201,8 @@ async function createInstanceFromTemplate(template, { kind, recurrence, startsAt
             status: 'open',
             starts_at: startsAt instanceof Date ? startsAt.toISOString() : startsAt,
             ends_at: endsAt instanceof Date ? endsAt.toISOString() : endsAt,
-            vp_reward: template.vp_reward ?? 5,
+            vp_reward: vpReward ?? template.vp_reward ?? 5,
+            pack_reward: packReward ?? template.pack_reward ?? null,
             requires_proof: template.requires_proof ?? true,
         })
         .select()
@@ -213,10 +218,10 @@ async function createInstanceFromTemplate(template, { kind, recurrence, startsAt
 // Insert a standalone (non-rotation) vs_events instance — used by /event task
 // and /event custom where the admin authored the title/description, not a
 // pre-existing template.
-async function createStandaloneInstance({ kind, name, description, startsAt, endsAt, vpReward, requiresProof = true }) {
+async function createStandaloneInstance({ kind, name, description, startsAt, endsAt, vpReward, packReward = null, requiresProof = true }) {
     const slug = makeSlug(name);
     const { data, error } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .insert({
             name,
             slug,
@@ -230,6 +235,7 @@ async function createStandaloneInstance({ kind, name, description, startsAt, end
             starts_at: startsAt instanceof Date ? startsAt.toISOString() : (startsAt || new Date().toISOString()),
             ends_at: endsAt instanceof Date ? endsAt.toISOString() : (endsAt || null),
             vp_reward: vpReward ?? 0,
+            pack_reward: packReward,
             requires_proof: requiresProof,
         })
         .select()
@@ -248,7 +254,7 @@ async function createStandaloneInstance({ kind, name, description, startsAt, end
 async function listActiveInstancesOfKind(kind) {
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
-        .from('vs_events')
+        .from('vs_tasks')
         .select('id, name, description, vp_reward, ends_at')
         .eq('is_template', false)
         .eq('kind', kind)
@@ -269,9 +275,10 @@ async function listActiveInstancesOfKind(kind) {
 async function fetchApprovedPendingPack() {
     const { data, error } = await supabase
         .from('vs_submissions')
-        .select('id, event_id, user_id, discord_id, submitter_name')
+        .select('id, task_id, user_id, discord_id, submitter_name, vs_tasks!task_id(name, pack_reward)')
         .eq('status', 'approved')
-        .eq('pack_awarded', false);
+        .eq('pack_awarded', false)
+        .not('task_id', 'is', null);
     if (error) {
         console.error('[SiteSubmissions] fetchApprovedPendingPack failed:', error.message);
         return [];

@@ -100,11 +100,11 @@ async function handleThreadMessage(message) {
     // shared bucket and writes a vs_submissions row on the website. Review and
     // VP grant happen on the site at /admin/submissions. No Discord buttons.
 
-    // If the bot event has no linked vs_events instance, we can't write a
+    // If the bot event has no linked vs_tasks instance, we can't write a
     // canonical submission. Acknowledge with a warning and bail.
-    if (!event.vs_event_id) {
+    if (!event.vs_task_id) {
         await message.reply({
-            content: '⚠️ This event is missing its vs_events linkage and can\'t be submitted from Discord. Ping an admin.',
+            content: '⚠️ This event is missing its vs_tasks linkage and can\'t be submitted from Discord. Ping an admin.',
             allowedMentions: { repliedUser: false }
         });
         return;
@@ -121,7 +121,7 @@ async function handleThreadMessage(message) {
 
     const { proof_urls, proof_paths } = await siteSubs.uploadAllProofs(
         message.attachments,
-        { eventId: event.vs_event_id, discordId: message.author.id, targetId: event.vs_event_id }
+        { eventId: event.vs_task_id, discordId: message.author.id, targetId: event.vs_task_id }
     );
 
     if (proof_urls.length === 0) {
@@ -133,11 +133,11 @@ async function handleThreadMessage(message) {
     }
 
     const siteSubmissionId = await siteSubs.createSubmissionRow({
-        eventId: event.vs_event_id,
+        taskId: event.vs_task_id,
         userId,
         discordId: message.author.id,
         submitterName,
-        targetId: event.vs_event_id,
+        targetId: event.vs_task_id,
         targetLabel: event.title,
         proofUrls: proof_urls,
         proofPaths: proof_paths,

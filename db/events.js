@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // ----------------------------------------------------------------------------
 // Events CRUD
 
-async function createEvent({ type, title, description, created_by, vp_reward, place_rewards, tasks, wom_competition_id, message_id, thread_id, channel_id, ends_at, pack_reward_name, vs_event_id }) {
+async function createEvent({ type, title, description, created_by, vp_reward, place_rewards, tasks, wom_competition_id, message_id, thread_id, channel_id, ends_at, pack_reward_name, vs_task_id }) {
     const { data, error } = await supabase
         .from('events')
         .insert({
@@ -30,7 +30,7 @@ async function createEvent({ type, title, description, created_by, vp_reward, pl
             channel_id: channel_id || null,
             ends_at: ends_at || null,
             pack_reward_name: pack_reward_name || null,
-            vs_event_id: vs_event_id || null,
+            vs_task_id: vs_task_id || null,
         })
         .select()
         .single();
@@ -53,11 +53,11 @@ async function getEvent(eventId) {
     return data;
 }
 
-async function getEventByVsEventId(vsEventId) {
+async function getEventByVsTaskId(vsTaskId) {
     const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('vs_event_id', vsEventId)
+        .eq('vs_task_id', vsTaskId)
         .maybeSingle();
     if (error) {
         if (error.code === 'PGRST116') return null;
@@ -259,7 +259,7 @@ async function approveSubmission(submissionId, approvedBy, vpAwarded) {
 module.exports = {
     createEvent,
     getEvent,
-    getEventByVsEventId,
+    getEventByVsTaskId,
     getEventByThreadId,
     getActiveEvents,
     getActiveCompetitionEvents,

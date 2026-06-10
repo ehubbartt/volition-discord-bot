@@ -343,10 +343,10 @@ async function handleDescriptionModalSubmit(interaction) {
         });
     }
 
-    // Create the canonical vs_events instance for this admin-authored event so
+    // Create the canonical vs_tasks instance for this admin-authored task so
     // submissions in its thread can be uploaded to the site as vs_submissions
     // rows. Non-checklist only — checklist mode keeps its bot-side approval.
-    let vsEventId = null;
+    let vsTaskId = null;
     if (!tasks) {
         const instance = await siteSubmissions.createStandaloneInstance({
             kind: type === 'custom' ? 'custom_task' : 'weekly_task',
@@ -355,9 +355,10 @@ async function handleDescriptionModalSubmit(interaction) {
             startsAt: new Date(),
             endsAt,
             vpReward: packReward ? 0 : vpReward,
+            packReward,
             requiresProof: true,
         });
-        if (instance) vsEventId = instance.id;
+        if (instance) vsTaskId = instance.id;
     }
 
     // Save to database
@@ -374,7 +375,7 @@ async function handleDescriptionModalSubmit(interaction) {
         channel_id: channel.id,
         ends_at: endsAt ? endsAt.toISOString() : null,
         pack_reward_name: packReward,
-        vs_event_id: vsEventId,
+        vs_task_id: vsTaskId,
     });
 
     // Now that we have the event ID, add the select menu for checklist events
@@ -1187,9 +1188,11 @@ module.exports.createTaskEvent = async function(client) {
         endsAt,
         name: template.name,
         description: template.description,
+        vpReward: 0,            // the weekly rotation rewards a pack, not VP
+        packReward: WEEKLY_TASK_PACK,
     });
     if (!instance) {
-        console.error('[Event] Failed to create vs_events instance for weekly task');
+        console.error('[Event] Failed to create vs_tasks instance for weekly task');
         return null;
     }
 
@@ -1229,7 +1232,7 @@ module.exports.createTaskEvent = async function(client) {
         created_by: null,
         vp_reward: 0,
         pack_reward_name: WEEKLY_TASK_PACK,
-        vs_event_id: instance.id,
+        vs_task_id: instance.id,
         message_id: message.id,
         thread_id: thread.id,
         channel_id: channel.id,
