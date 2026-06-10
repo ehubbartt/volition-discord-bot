@@ -294,15 +294,19 @@ async function listAllActiveTasks() {
 // ---------------------------------------------------------------------------
 // Site events (vs_events) — announced in Discord by the event-announce poller
 
-// Currently-running site events (status='open'). These are full vs_events rows
-// (bingo / duo / simple / sequential / custom), NOT the vs_tasks instances above.
-// The bot posts ONE describe-and-link embed per open event into the events channel
-// and points players at the site to submit. Newest first.
+// Currently-running site events: status='open' AND past their start time (a null
+// start means "live now"). These are full vs_events rows (bingo / duo / simple /
+// sequential / custom), NOT the vs_tasks instances above. The bot posts ONE
+// describe-and-link embed per live event into the events channel and points players
+// at the site to submit. An open event with a FUTURE starts_at is "scheduled" and is
+// intentionally excluded here so it isn't announced until it actually starts. Newest first.
 async function listActiveSiteEvents() {
+    const nowIso = new Date().toISOString();
     const { data, error } = await supabase
         .from('vs_events')
         .select('id, slug, name, kind, description, status, starts_at, ends_at')
         .eq('status', 'open')
+        .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
         .order('starts_at', { ascending: false });
     if (error) {
         console.error('[SiteSubmissions] listActiveSiteEvents failed:', error.message);
@@ -403,6 +407,39 @@ async function markRejectionNotified(siteSubmissionId) {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Revocation (un-approval) poller helpers
+
+// Rows an admin un-approved (approval_revoked) that still need the pack reclaimed +
+// a "reward removed" notice. The site already reversed the VP; the bot reclaims the
+// pack (if still unopened) and tells the player. Carries task rewards + the original
+// Discord proof linkage so the notice can reply to it.
+async function fetchRevokedPendingRemoval() {
+    const { data, error } = await supabase
+        .from('vs_submissions')
+        .select('id, task_id, user_id, discord_id, submitter_name, review_note, pack_awarded, discord_message_id, discord_channel_id, vs_tasks!task_id(name, vp_reward, pack_reward)')
+        .eq('status', 'rejected')
+        .eq('approval_revoked', true)
+        .eq('removal_notified', false);
+    if (error) {
+        console.error('[SiteSubmissions] fetchRevokedPendingRemoval failed:', error.message);
+        return [];
+    }
+    return data || [];
+}
+
+async function markRemovalNotified(siteSubmissionId) {
+    const { error } = await supabase
+        .from('vs_submissions')
+        .update({ removal_notified: true })
+        .eq('id', siteSubmissionId);
+    if (error) {
+        console.error('[SiteSubmissions] markRemovalNotified failed:', error.message);
+        return false;
+    }
+    return true;
+}
+
 // Resolve a Discord id from a vs_users row id (for site-submitted rows that stored
 // user_id but not discord_id).
 async function getDiscordIdForUserId(userId) {
@@ -432,5 +469,7 @@ module.exports = {
     markApprovalNotified,
     fetchRejectedPendingNotify,
     markRejectionNotified,
+    fetchRevokedPendingRemoval,
+    markRemovalNotified,
     getDiscordIdForUserId,
 };

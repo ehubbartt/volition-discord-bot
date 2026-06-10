@@ -209,6 +209,48 @@ async function notifyRejection(client, row) {
     await siteSubs.markRejectionNotified(row.id);
 }
 
+// An admin un-approved a previously-approved submission: reclaim the pack (if still
+// unopened) and tell the player their reward was removed. The site already reversed
+// the VP. Exactly-once (removal_notified).
+async function notifyRemoval(client, row) {
+    const discordId = await resolveDiscordId(row);
+    if (!discordId) {
+        await siteSubs.markRemovalNotified(row.id);
+        return;
+    }
+
+    const task = row.vs_tasks || null;
+    const taskName = task?.name || 'your submission';
+    const reason = (row.review_note || '').trim();
+
+    // Reclaim the pack only if one was awarded and it's still in their inventory
+    // (unopened). If they already opened it, removePackFromDiscordId reports none_owned
+    // and we leave the cards alone — just tell them.
+    let packLine = '';
+    if (row.pack_awarded && task?.pack_reward) {
+        const res = await cardPacks.removePackFromDiscordId(discordId, task.pack_reward, 1);
+        packLine = res?.ok
+            ? `\n• Reclaimed your unopened **${task.pack_reward}** pack.`
+            : `\n• Your **${task.pack_reward}** pack was already opened, so those cards stay.`;
+    }
+    const vpLine = Number(task?.vp_reward) > 0
+        ? `\n• **${task.vp_reward} VP** was taken back (your balance may go negative).`
+        : '';
+
+    const embed = new EmbedBuilder()
+        .setColor('DarkRed')
+        .setTitle('♻️ Reward Removed')
+        .setDescription(
+            `Your previously-approved submission for **${taskName}** was removed by an admin.` +
+            (reason ? `\n\n**Reason:** ${reason}` : '') +
+            (vpLine || packLine ? `\n${vpLine}${packLine}` : '')
+        )
+        .setTimestamp();
+
+    await deliverSubmissionNotice(client, row, discordId, embed);
+    await siteSubs.markRemovalNotified(row.id);
+}
+
 async function runOnce(client) {
     // Approved → pack grants.
     const rows = await siteSubs.fetchApprovedPendingPack();
@@ -237,6 +279,16 @@ async function runOnce(client) {
             await notifyRejection(client, row);
         } catch (err) {
             console.error(`[SiteSubmissionPoller] reject notify ${row.id} error: ${err.message}`);
+        }
+    }
+
+    // Revoked (un-approved) → reclaim pack + tell the player their reward was removed.
+    const revoked = await siteSubs.fetchRevokedPendingRemoval();
+    for (const row of revoked) {
+        try {
+            await notifyRemoval(client, row);
+        } catch (err) {
+            console.error(`[SiteSubmissionPoller] removal notify ${row.id} error: ${err.message}`);
         }
     }
 }
