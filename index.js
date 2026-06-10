@@ -76,7 +76,7 @@ for (const file of eventFiles) {
 // ----------------------------------------------------------------------------
 // On Ready: Init caches and schedule tasks
 
-const { getWeeklyTaskAndMove } = require('./commands/fun/weeklyTask.js');
+// getWeeklyTaskAndMove (tasks-table pool) replaced by vs_events template rotation.
 const { startSoftCloseChecker } = require('./jobs/softCloseChecker.js');
 const { startVoiceTracker } = require('./jobs/voiceTracker.js');
 const { startLfgExpiryChecker } = require('./jobs/lfgExpiry.js');
@@ -86,6 +86,7 @@ const {
   postWeeklyVoiceLeaderboard,
   startVoiceLeaderboardRefresh,
 } = require('./jobs/voiceLeaderboard.js');
+const { startSiteSubmissionPoller } = require('./jobs/siteSubmissionPoller.js');
 const { createTaskEvent } = require('./commands/admin/event.js');
 const { runBridgeBackfill } = require('./handlers/bridge.js');
 
@@ -113,6 +114,9 @@ client.once(Events.ClientReady, async () => {
 
   // Start weekly voice leaderboard refresh (runs on startup + every 15 minutes)
   startVoiceLeaderboardRefresh(client);
+
+  // Poll vs_submissions for site-approved rows that still need a VP/pack payout
+  startSiteSubmissionPoller(client);
 
   // Replay any site→bot bridge messages missed while the bot was offline
   await runBridgeBackfill(client);
@@ -184,18 +188,18 @@ async function runSokScheduler() {
   }
 }
 
-// Weekly task — creates an event in the unified events channel
+// Weekly task — picks a template from vs_events, creates an instance, posts
+// the Discord embed/thread for it.
 async function sendWeeklyTask() {
   try {
-    const taskText = await getWeeklyTaskAndMove();
-    const event = await createTaskEvent(client, taskText);
+    const event = await createTaskEvent(client);
 
     const testChannel = client.channels.cache.get(TEST_CHANNEL_ID);
     if (testChannel) {
       if (event) {
-        await testChannel.send(`✅ **[Auto-Run]** Weekly task event created at ${new Date().toLocaleString()}\nTask: ${taskText}\nEvent ID: ${event.id}`);
+        await testChannel.send(`✅ **[Auto-Run]** Weekly task event created at ${new Date().toLocaleString()}\nTask: ${event.title}\nEvent ID: ${event.id}`);
       } else {
-        await testChannel.send(`⚠️ **[Auto-Run]** Weekly task failed — events channel not found`);
+        await testChannel.send(`⚠️ **[Auto-Run]** Weekly task failed — no template found or events channel missing`);
       }
     }
   } catch (error) {

@@ -2,6 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const eventsDb = require('../db/events');
 const db = require('../db/supabase');
 const cardPacks = require('../db/cardPacks');
+const siteSubs = require('../db/siteSubmissions');
 const config = require('../utils/config');
 const { isAdmin } = require('../utils/permissions');
 
@@ -95,52 +96,72 @@ async function handleThreadMessage(message) {
         return;
     }
 
-    // Standard submission flow (non-checklist events)
+    // Standard submission flow (non-checklist events) — uploads proof to the
+    // shared bucket and writes a vs_submissions row on the website. Review and
+    // VP grant happen on the site at /admin/submissions. No Discord buttons.
 
-    // Check for duplicate submission (already approved for this event)
-    // Skip for leagues events — allow multiple submissions per player
-    const isLeaguesEvent = event.channel_id === config.LEAGUES_EVENTS_CHANNEL_ID;
-    if (!isLeaguesEvent) {
-        const existing = await eventsDb.getApprovedSubmission(event.id, message.author.id);
-        if (existing) {
-            await message.reply({
-                content: '⚠️ You already have an approved submission for this event.',
-                allowedMentions: { repliedUser: false }
-            });
-            return;
-        }
+    // If the bot event has no linked vs_events instance, we can't write a
+    // canonical submission. Acknowledge with a warning and bail.
+    if (!event.vs_event_id) {
+        await message.reply({
+            content: '⚠️ This event is missing its vs_events linkage and can\'t be submitted from Discord. Ping an admin.',
+            allowedMentions: { repliedUser: false }
+        });
+        return;
     }
 
-    // Create submission record
-    const submission = await eventsDb.createSubmission({
-        event_id: event.id,
-        discord_id: message.author.id,
-        message_id: message.id,
+    const siteUser = await siteSubs.lookupSiteUser(message.author.id);
+    const userId = siteUser?.id || null;
+
+    let submitterName = siteUser?.rsn || null;
+    if (!submitterName) {
+        const player = await db.getPlayerByDiscordId(message.author.id);
+        submitterName = player?.rsn || message.member?.displayName || message.author.username;
+    }
+
+    const { proof_urls, proof_paths } = await siteSubs.uploadAllProofs(
+        message.attachments,
+        { eventId: event.vs_event_id, discordId: message.author.id, targetId: event.vs_event_id }
+    );
+
+    if (proof_urls.length === 0) {
+        await message.reply({
+            content: '⚠️ Couldn\'t upload your proof image. Try again, and if it keeps failing, ping an admin.',
+            allowedMentions: { repliedUser: false }
+        });
+        return;
+    }
+
+    const siteSubmissionId = await siteSubs.createSubmissionRow({
+        eventId: event.vs_event_id,
+        userId,
+        discordId: message.author.id,
+        submitterName,
+        targetId: event.vs_event_id,
+        targetLabel: event.title,
+        proofUrls: proof_urls,
+        proofPaths: proof_paths,
     });
 
-    // Build approve button
-    const approveButton = new ButtonBuilder()
-        .setCustomId(`event_approve_${submission.id}`)
-        .setLabel('Approve')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('✅');
-
-    const rejectButton = new ButtonBuilder()
-        .setCustomId(`event_reject_${submission.id}`)
-        .setLabel('Reject')
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji('❌');
-
-    const row = new ActionRowBuilder().addComponents(approveButton, rejectButton);
+    if (!siteSubmissionId) {
+        await message.reply({
+            content: '⚠️ Couldn\'t register your submission with the website. Try again, and if it keeps failing, ping an admin.',
+            allowedMentions: { repliedUser: false }
+        });
+        return;
+    }
 
     const embed = new EmbedBuilder()
         .setColor('Yellow')
-        .setDescription(`**Submission by** <@${message.author.id}>\n**Reward:** ${event.vp_reward} ${vpEmoji} VP`)
-        .setFooter({ text: `Submission #${submission.id} • Event: ${event.title}` });
+        .setDescription(
+            `📥 **Submission received** from <@${message.author.id}>\n` +
+            `Your proof is queued for review on the **Volition site**. ` +
+            `VP / rewards are granted there once an admin approves.`
+        )
+        .setFooter({ text: `Event: ${event.title}` });
 
     await message.reply({
         embeds: [embed],
-        components: [row],
         allowedMentions: { repliedUser: false }
     });
 }

@@ -5,6 +5,7 @@ const config = require('../../utils/config');
 const eventsDb = require('../../db/events');
 const db = require('../../db/supabase');
 const cardPacks = require('../../db/cardPacks');
+const siteSubmissions = require('../../db/siteSubmissions');
 const { womApi } = require('../../utils/api');
 
 // Temporary cache for slash command options while the modal is open
@@ -342,6 +343,23 @@ async function handleDescriptionModalSubmit(interaction) {
         });
     }
 
+    // Create the canonical vs_events instance for this admin-authored event so
+    // submissions in its thread can be uploaded to the site as vs_submissions
+    // rows. Non-checklist only — checklist mode keeps its bot-side approval.
+    let vsEventId = null;
+    if (!tasks) {
+        const instance = await siteSubmissions.createStandaloneInstance({
+            kind: type === 'custom' ? 'custom_task' : 'weekly_task',
+            name: title,
+            description,
+            startsAt: new Date(),
+            endsAt,
+            vpReward: packReward ? 0 : vpReward,
+            requiresProof: true,
+        });
+        if (instance) vsEventId = instance.id;
+    }
+
     // Save to database
     const event = await eventsDb.createEvent({
         type,
@@ -356,6 +374,7 @@ async function handleDescriptionModalSubmit(interaction) {
         channel_id: channel.id,
         ends_at: endsAt ? endsAt.toISOString() : null,
         pack_reward_name: packReward,
+        vs_event_id: vsEventId,
     });
 
     // Now that we have the event ID, add the select menu for checklist events
@@ -1134,8 +1153,10 @@ module.exports.handleTaskClaim = handleTaskClaim;
 module.exports.handleTaskApprove = handleTaskApprove;
 module.exports.handleTaskReject = handleTaskReject;
 
-// Export for automated weekly task creation (called from index.js)
-module.exports.createTaskEvent = async function(client, taskText) {
+// Export for automated weekly task creation (called from index.js).
+// Reads the rotation pool from vs_events (templates), picks one, creates a
+// vs_events instance, and posts the Discord embed/thread for that instance.
+module.exports.createTaskEvent = async function(client) {
     const eventsChannelId = config.EVENTS_CHANNEL_ID;
     const channel = client.channels.cache.get(eventsChannelId);
     if (!channel) {
@@ -1145,11 +1166,37 @@ module.exports.createTaskEvent = async function(client, taskText) {
 
     const WEEKLY_TASK_PACK = 'White Pack';
     const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const startsAt = new Date();
     const timestamp = Math.floor(endsAt.getTime() / 1000);
 
+    // Close any prior open weekly_task instances so only this week's is active.
+    await siteSubmissions.closeActiveInstancesOfKind('weekly_task');
+
+    // Pick a template (least-recently-activated, random tiebreak) and create
+    // the vs_events instance for this rotation period.
+    const template = await siteSubmissions.pickTemplateForKind('weekly_task');
+    if (!template) {
+        console.error('[Event] No weekly_task templates found in vs_events — run the import script first');
+        return null;
+    }
+
+    const instance = await siteSubmissions.createInstanceFromTemplate(template, {
+        kind: 'weekly_task',
+        recurrence: 'weekly',
+        startsAt,
+        endsAt,
+        name: template.name,
+        description: template.description,
+    });
+    if (!instance) {
+        console.error('[Event] Failed to create vs_events instance for weekly task');
+        return null;
+    }
+
+    const taskText = instance.description || instance.name;
     const embed = new EmbedBuilder()
         .setColor('Blue')
-        .setTitle(`📋 Weekly Task`)
+        .setTitle(`📋 Weekly Task — ${instance.name}`)
         .setDescription(taskText)
         .setThumbnail(config.CLAN_ICON_URL)
         .addFields(
@@ -1157,7 +1204,7 @@ module.exports.createTaskEvent = async function(client, taskText) {
             { name: 'Type', value: 'Weekly Task', inline: true },
             { name: 'Deadline', value: `<t:${timestamp}:F> (<t:${timestamp}:R>)`, inline: false },
         )
-        .setFooter({ text: 'Submit your proof in the thread below!' })
+        .setFooter({ text: 'Submit your proof in the thread below — reviewed on the site.' })
         .setTimestamp();
 
     const message = await channel.send({
@@ -1171,17 +1218,18 @@ module.exports.createTaskEvent = async function(client, taskText) {
     });
 
     await thread.send({
-        content: '📸 **Post your screenshot proof here!** An admin will review and approve submissions.\n\n' +
-            '> Only messages with image attachments will be tracked as submissions.'
+        content: '📸 **Post your screenshot proof here.** Your submission is queued for review on the **Volition site**, where an admin approves it.\n\n' +
+            '> Only messages with image attachments are tracked as submissions.'
     });
 
     const event = await eventsDb.createEvent({
         type: 'task',
-        title: 'Weekly Task',
+        title: `Weekly Task — ${instance.name}`,
         description: taskText,
         created_by: null,
         vp_reward: 0,
         pack_reward_name: WEEKLY_TASK_PACK,
+        vs_event_id: instance.id,
         message_id: message.id,
         thread_id: thread.id,
         channel_id: channel.id,
