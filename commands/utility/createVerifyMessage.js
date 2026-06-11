@@ -15,6 +15,17 @@ const { isAdmin } = require('../../utils/permissions');
 const features = require('../../utils/features');
 const db = require('../../db/supabase');
 
+// ADMINS_TO_PING minus any head-admin role IDs — head admins don't want to be
+// pinged on join tickets, but the same list is used elsewhere (e.g. sync.js
+// former-member alerts) so the filter lives here, not in config.
+function joinTicketAdminRoles() {
+    const heads = new Set(config.HEAD_ADMIN_ROLE_IDS || []);
+    return (config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS || []).filter(roleId => !heads.has(roleId));
+}
+function joinTicketAdminMentions() {
+    return joinTicketAdminRoles().map(roleId => `<@&${roleId}>`).join(' ');
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('createverifymessage')
@@ -407,8 +418,8 @@ async function handleVerifySubmit (interaction) {
 
         // If requirements not met, send admin ping as a follow-up (appears after embed)
         if (!meetsRequirements) {
-            const adminsToPing = config.ADMINS_TO_PING || config.ADMIN_ROLE_IDS;
-            const adminMentions = adminsToPing.map(roleId => `<@&${roleId}>`).join(' ');
+            const adminsToPing = joinTicketAdminRoles();
+            const adminMentions = joinTicketAdminMentions();
 
             await interaction.channel.send({
                 content: `${adminMentions} - User needs assistance with requirements`,
@@ -597,7 +608,7 @@ async function handleGuestJoinSubmit (interaction) {
 
         if (!friendInClan) {
             // Friend NOT in clan - error and ping admins
-            const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+            const adminMentions = joinTicketAdminMentions();
 
             const errorEmbed = new EmbedBuilder()
                 .setColor('Red')
@@ -655,7 +666,7 @@ async function handleGuestJoinSubmit (interaction) {
         }
 
         // Send admin notification and welcome message
-        const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+        const adminMentions = joinTicketAdminMentions();
 
         const welcomeEmbed = new EmbedBuilder()
             .setColor('Green')
@@ -690,7 +701,7 @@ async function handleGuestJoinSubmit (interaction) {
     } catch (error) {
         console.error('[GuestJoin] Error during guest join:', error);
 
-        const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+        const adminMentions = joinTicketAdminMentions();
 
         const errorEmbed = new EmbedBuilder()
             .setColor('Red')
@@ -853,7 +864,7 @@ async function handleIntroSubmit (interaction) {
 
         if (interaction.channel && ticketCategories.includes(interaction.channel.parentId)) {
             // Ping admins in the join ticket
-            const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+            const adminMentions = joinTicketAdminMentions();
             await interaction.channel.send({
                 content: `${adminMentions} - New member introduction posted!\n📝 **Introduction Posted!** ${interaction.user}'s introduction has been submitted: ${introUrl}`,
                 allowedMentions: { roles: config.ADMIN_ROLE_IDS }
@@ -934,7 +945,7 @@ async function handleGuestKnowsNobody (interaction) {
     });
 
     try {
-        const adminMentions = config.ADMINS_TO_PING.map(roleId => `<@&${roleId}>`).join(' ');
+        const adminMentions = joinTicketAdminMentions();
 
         const reviewEmbed = new EmbedBuilder()
             .setColor('Orange')
