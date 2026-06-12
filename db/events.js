@@ -150,6 +150,12 @@ async function getExpiredActiveEvents() {
         .from('events')
         .select('*')
         .eq('status', 'active')
+        // site_event rows mirror a site vs_events row; their lifecycle is owned solely
+        // by jobs/eventAnnouncePoller.js (it closes them when the site event leaves the
+        // open set). Deadline-closing them here too caused a loop: this job closed the
+        // row while the site event was still 'open', then the announce poller re-posted
+        // it — repeating "event has ended" every cycle. Leave site events to that poller.
+        .neq('type', 'site_event')
         .not('ends_at', 'is', null)
         .lte('ends_at', new Date().toISOString());
 

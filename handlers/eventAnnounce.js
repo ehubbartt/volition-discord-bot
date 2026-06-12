@@ -170,9 +170,11 @@ async function ensureReviewThread(client, botEvent) {
     }
 }
 
-// A site event left 'open' (closed on the site without its deadline passing — the
-// deadline case is handled by jobs/eventLifecycle.js). Grey the embed, drop the
-// button, and close the bot row so eventLifecycle deletes it after 12h.
+// A site event left the active set — either closed on the site, OR past its ends_at
+// (listActiveSiteEvents excludes both). This poller is the SOLE owner of site_event
+// lifecycle (eventLifecycle no longer deadline-closes them, which used to fight this
+// and spam "event has ended" every cycle). Grey the embed, drop the button, and close
+// the bot row so eventLifecycle deletes it after 12h.
 async function closeEventAnnounce(client, row) {
     try {
         const ch =
