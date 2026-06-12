@@ -5,6 +5,9 @@ const lootcrateAnalytics = require('../db/lootcrate_analytics');
 const walletDb = require('../db/wallet');
 const hybridConfig = require('../utils/hybridConfig');
 
+// Deep link to the site's gamba store, Crates tab — players can also open crates there.
+const SITE_CRATE_URL = 'https://volition-osrs.com/gamba?tab=crates';
+
 function getNextDailyReset () {
   const now = new Date();
   const reset = new Date(now);
@@ -181,6 +184,9 @@ function lootButtons (paidEnabled = true) {
       new ButtonBuilder().setCustomId('lootcrate_spin_paid').setLabel('Open for 5 VP').setStyle(ButtonStyle.Primary)
     );
   }
+  row.addComponents(
+    new ButtonBuilder().setLabel('Open on site').setStyle(ButtonStyle.Link).setURL(SITE_CRATE_URL).setEmoji('🌐')
+  );
   return row;
 }
 

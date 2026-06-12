@@ -1,6 +1,9 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const hybridConfig = require('../../utils/hybridConfig');
 
+// Deep link to the site's gamba store, Crates tab — players can also open crates there.
+const SITE_CRATE_URL = 'https://volition-osrs.com/gamba?tab=crates';
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('lootcrate')
@@ -31,6 +34,13 @@ module.exports = {
           .setStyle(ButtonStyle.Primary)
       );
     }
+    row.addComponents(
+      new ButtonBuilder()
+        .setLabel('Open on site')
+        .setStyle(ButtonStyle.Link)
+        .setURL(SITE_CRATE_URL)
+        .setEmoji('🌐')
+    );
 
     await interaction.reply({ embeds: [embed], components: [row] });
   }
