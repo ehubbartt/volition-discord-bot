@@ -300,6 +300,12 @@ async function listAllActiveTasks() {
 // describe-and-link embed per live event into the events channel and points players
 // at the site to submit. An open event with a FUTURE starts_at is "scheduled" and is
 // intentionally excluded here so it isn't announced until it actually starts. Newest first.
+//
+// A site event that's PAST its ends_at is also excluded, even if it's still status='open'
+// on the site (events stay 'open' until an admin closes them). Otherwise it stays in the
+// "active" set after the bot's eventLifecycle has already closed its announcement by the
+// deadline — so the announce poller would re-create + re-end the embed every cycle (the
+// repeated "event has ended" spam). Leaving the set once lets it be closed exactly once.
 async function listActiveSiteEvents() {
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
@@ -307,6 +313,7 @@ async function listActiveSiteEvents() {
         .select('id, slug, name, kind, description, status, starts_at, ends_at')
         .eq('status', 'open')
         .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
+        .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
         .order('starts_at', { ascending: false });
     if (error) {
         console.error('[SiteSubmissions] listActiveSiteEvents failed:', error.message);
