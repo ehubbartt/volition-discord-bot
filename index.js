@@ -195,8 +195,7 @@ async function runDailyRankUpdate() {
     const {
       formatRank,
       getRankName,
-      applyRank,
-      getWomRole
+      applyRankByWomRole
     } = require('./utils/ranks');
     const { EmbedBuilder } = require('discord.js');
 
@@ -214,12 +213,14 @@ async function runDailyRankUpdate() {
     const clanMembers = clanData.memberships;
     const existingPlayers = await db.getAllPlayers();
 
+    // Mirror the site-computed rank (players.rank) onto the Discord role — the site is
+    // now the source of truth, so we map discord_id → stored rank (not EHB).
     const discordIdToRsnMap = {};
-    const discordIdToPlayerIdMap = {};
+    const discordIdToRankMap = {};
     existingPlayers.forEach(player => {
       if (player.discord_id && player.rsn) {
         discordIdToRsnMap[player.discord_id] = player.rsn;
-        discordIdToPlayerIdMap[player.discord_id] = player.id;
+        if (player.rank) discordIdToRankMap[player.discord_id] = player.rank;
       }
     });
 
@@ -235,20 +236,24 @@ async function runDailyRankUpdate() {
       const member = allMembers.get(discordId);
       if (member) {
         const rsn = discordIdToRsnMap[discordId];
-        const clanMember = clanMembers.find(m => m.player.username === rsn);
 
-        // Skip players not in the WOM clan
-        if (!clanMember) {
-          console.log(`[Daily Rank Update] ⏭️ Skipped ${rsn} - not found in WOM clan data`);
+        // Skip players the site hasn't assigned a rank to yet.
+        const storedRank = discordIdToRankMap[discordId];
+        if (!storedRank) {
+          console.log(`[Daily Rank Update] ⏭️ Skipped ${rsn} - no site-computed rank yet`);
           continue;
         }
 
-        const ehb = Math.round(clanMember.player.ehb || 0);
-        const rankResult = await applyRank({ ehb, member, allowDowngrade: false });
+        // EHB is only used for display/announcements now; rank comes from players.rank.
+        const clanMember = clanMembers.find(m => m.player.username === rsn);
+        const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
+
+        const rankResult = await applyRankByWomRole({ womRole: storedRank, member, allowDowngrade: true });
 
         if (rankResult.changed) {
           userMentions.push(`<@${member.id}>`);
 
+          const action = rankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
           if (rankResult.oldRankIndex === -1) {
             mismatchOutput.push(
               `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, rankResult.newRankIndex)}`
@@ -261,25 +266,23 @@ async function runDailyRankUpdate() {
             });
           } else {
             mismatchOutput.push(
-              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, rankResult.oldRankIndex)} - Upgraded to: ${formatRank(guild, rankResult.newRankIndex)}`
+              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, rankResult.oldRankIndex)} - ${action} to: ${formatRank(guild, rankResult.newRankIndex)}`
             );
-            rankUpAnnouncements.push({
-              member, rsn, ehb,
-              oldRankIndex: rankResult.oldRankIndex,
-              newRankIndex: rankResult.newRankIndex,
-              isInitial: false
-            });
+            // Only announce upgrades to #rank-ups (downgrades are silent, just logged).
+            if (rankResult.isUpgrade) {
+              rankUpAnnouncements.push({
+                member, rsn, ehb,
+                oldRankIndex: rankResult.oldRankIndex,
+                newRankIndex: rankResult.newRankIndex,
+                isInitial: false
+              });
+            }
           }
 
-          console.log(`[Daily Rank Update] ⬆️ Upgraded rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, rankResult.newRankIndex)} (${ehb} EHB)`);
-
-          // Persist rank to database
-          const playerId = discordIdToPlayerIdMap[discordId];
-          if (playerId) {
-            await db.updatePlayer(playerId, { rank: getWomRole(rankResult.newRankIndex) });
-          }
-        } else if (rankResult.oldRankIndex !== rankResult.newRankIndex) {
-          console.log(`[Daily Rank Update] ⏭️ Skipped downgrade for ${rsn}: keeping ${getRankName(guild, rankResult.oldRankIndex)} (earned rank: ${getRankName(guild, rankResult.newRankIndex)}, ${ehb} EHB)`);
+          const arrow = rankResult.isUpgrade ? '⬆️' : '⬇️';
+          console.log(`[Daily Rank Update] ${arrow} ${action} rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, rankResult.newRankIndex)} (rank: ${storedRank})`);
+        } else if (rankResult.error) {
+          console.log(`[Daily Rank Update] ⚠️ ${rsn}: ${rankResult.error}`);
         }
       }
     }
