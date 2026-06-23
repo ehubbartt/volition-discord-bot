@@ -1,5 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const config = require('../../config.json');
+const hybridConfig = require('../../utils/hybridConfig');
+const { renderMessage } = require('../../utils/templateRenderer');
+const commandMessages = require('../../config/commandMessages.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,33 +22,41 @@ module.exports = {
             });
         }
 
-        // Build custom emojis
-        const vpEmoji = `<:VP:${config.VP_EMOJI_ID}>`;
-        const lcEmoji = config.LC_EMOJI_ID !== 'NEEDS_ID' ? `<:LC:${config.LC_EMOJI_ID}>` : ':package:';
-        const alertEmoji = config.ALERT_2_EMOJI_ID !== 'NEEDS_ID' ? `<:ALERT_2:${config.ALERT_2_EMOJI_ID}>` : ':bell:';
-        const hasbgrinEmoji = config.HASBGRIN_EMOJI_ID !== 'NEEDS_ID' ? `<:hasbgrin:${config.HASBGRIN_EMOJI_ID}>` : '😁';
+        // Load the editable template (bot_config → command_messages.allset). Defensively
+        // fall back to the bundled JSON if the remote row is missing or malformed, so a
+        // bad edit can never crash the command.
+        let template = commandMessages.allset;
+        try {
+            const group = await hybridConfig.getConfigGroup('command_messages', commandMessages);
+            if (group && typeof group === 'object' && group.allset && typeof group.allset === 'object') {
+                template = group.allset;
+            }
+        } catch (err) {
+            console.error('[allset] Failed to load command_messages, using local fallback:', err.message);
+        }
 
-        // Build channel mentions
-        const vpChannel = config.VOLITION_POINTS_CHANNEL_ID !== 'NEEDS_ID' ? `<#${config.VOLITION_POINTS_CHANNEL_ID}>` : '⁠⚠️・volition-points';
-        const lootCrateChannel = config.LOOT_CRATE_INFO_CHANNEL_ID !== 'NEEDS_ID' ? `<#${config.LOOT_CRATE_INFO_CHANNEL_ID}>` : '⁠📦・volition-loot-crate-info';
-        const assignRolesChannel = config.ASSIGN_ROLES_CHANNEL_ID !== 'NEEDS_ID' ? `<#${config.ASSIGN_ROLES_CHANNEL_ID}>` : '⁠📧・assign-roles';
+        const ctx = {
+            user: {
+                id: interaction.user.id,
+                displayName: interaction.member?.displayName ?? interaction.user.username
+            }
+        };
 
-        const allSetEmbed = new EmbedBuilder()
-            .setColor('Green')
-            .setTitle('🎉 You\'re All Set!')
-            .setDescription(
-                `Welcome to Volition! Here are some areas of interest on this Discord server:\n\n` +
-                `${vpChannel} - Gain an understanding of our Volition Points system ${vpEmoji}\n` +
-                `${lootCrateChannel} - Claim your daily loot crate & see how you can win prizes! ${lcEmoji}\n` +
-                `${assignRolesChannel} - Customise your pings according to your interests ${alertEmoji}\n\n` +
-                `Welcome to Volition and happy scaping! 🥳${hasbgrinEmoji}`
-            )
-            .setThumbnail(config.CLAN_ICON_URL)
-            .setFooter({ text: 'Enjoy your stay with us!' })
-            .setTimestamp();
+        let message;
+        try {
+            message = renderMessage(template, ctx);
+        } catch (err) {
+            console.error('[allset] Render failed, using local fallback template:', err.message);
+            message = renderMessage(commandMessages.allset, ctx);
+        }
 
-        // Send the embed to the channel
-        await interaction.channel.send({ embeds: [allSetEmbed] });
+        // Send the embed to the channel (explicit allowedMentions keeps DB-authored text
+        // from pinging @everyone/@here or roles).
+        await interaction.channel.send({
+            embeds: message.embeds,
+            allowedMentions: message.allowedMentions,
+            ...(message.content ? { content: message.content } : {})
+        });
 
         // Confirm to admin (ephemeral)
         await interaction.reply({
