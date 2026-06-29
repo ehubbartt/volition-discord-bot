@@ -748,10 +748,11 @@ async function handleIntroButton (interaction) {
     // Input 3: Clan History - Freeform paragraph
     const clanHistoryInput = new TextInputBuilder()
         .setCustomId('clan_history')
-        .setLabel('Previous Clan & Why You Left (optional)')
+        .setLabel('Previous Clan & Why You Left')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Share your clan history or just put "None" if this is your first clan')
-        .setRequired(false)
+        .setPlaceholder('Share your clan history, or put "None" if this is your first clan')
+        .setRequired(true)
+        .setMinLength(2)
         .setMaxLength(500);
 
     // Input 4: Goals & Favorites - Freeform paragraph
