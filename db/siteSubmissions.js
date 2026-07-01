@@ -312,6 +312,7 @@ async function listActiveSiteEvents() {
         .from('vs_events')
         .select('id, slug, name, kind, description, status, starts_at, ends_at')
         .eq('status', 'open')
+        .neq('kind', 'personal') // personal bingo boards are per-user vs_events rows, NOT public events
         .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
         .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
         .order('starts_at', { ascending: false });
