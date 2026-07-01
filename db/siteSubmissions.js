@@ -312,7 +312,6 @@ async function listActiveSiteEvents() {
         .from('vs_events')
         .select('id, slug, name, kind, description, status, starts_at, ends_at')
         .eq('status', 'open')
-        .neq('kind', 'personal') // personal bingo boards are per-user vs_events rows, NOT public events
         .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
         .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
         .order('starts_at', { ascending: false });
@@ -320,7 +319,11 @@ async function listActiveSiteEvents() {
         console.error('[SiteSubmissions] listActiveSiteEvents failed:', error.message);
         return [];
     }
-    return data || [];
+    // Drop personal bingo boards (per-user vs_events rows, NOT public events). Filter
+    // in JS rather than a `.neq('kind','personal')` on the query: in SQL `kind <> 'personal'`
+    // is NULL (excluded) for rows with a null kind, which would silently drop legacy/custom
+    // events (the null-kind "default" events) and make the announce poller end + re-post them.
+    return (data || []).filter((e) => e.kind !== 'personal');
 }
 
 // ---------------------------------------------------------------------------
