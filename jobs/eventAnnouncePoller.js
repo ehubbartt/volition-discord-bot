@@ -12,9 +12,16 @@ const { ensureEventAnnounce, closeEventAnnounce } = require('../handlers/eventAn
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
+// KILL SWITCH: site-event announcement forwarding is temporarily disabled while a
+// close/re-open churn bug is investigated. While true the poller does NOTHING — it
+// posts nothing, refreshes nothing, and (critically) closes nothing, so existing
+// announcements are left exactly as-is. Flip back to false to re-enable forwarding.
+const FORWARDING_DISABLED = true;
+
 let pollInterval = null;
 
 async function runOnce(client) {
+    if (FORWARDING_DISABLED) return;
     const open = await siteSubs.listActiveSiteEvents();
     const openIds = new Set(open.map((e) => e.id));
 
@@ -45,6 +52,10 @@ async function runOnce(client) {
 }
 
 function startEventAnnouncePoller(client) {
+    if (FORWARDING_DISABLED) {
+        console.log('[EventAnnounce] DISABLED (forwarding kill switch on) — not starting poller');
+        return;
+    }
     console.log('[EventAnnounce] Starting (every 5m)');
     runOnce(client).catch((err) => console.error('[EventAnnounce] startup run error:', err.message));
     pollInterval = setInterval(() => {
