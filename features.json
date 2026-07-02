@@ -7,7 +7,8 @@
     "handleGuildMemberAdd": true,
     "womMessageListener": true,
     "reactionAwardPoints": false,
-    "eventSubmissions": true
+    "eventSubmissions": true,
+    "siteEventAnnouncements": true
   },
   "verification": {
     "_description": "Player verification system features",

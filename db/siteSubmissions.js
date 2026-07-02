@@ -306,6 +306,11 @@ async function listAllActiveTasks() {
 // "active" set after the bot's eventLifecycle has already closed its announcement by the
 // deadline — so the announce poller would re-create + re-end the embed every cycle (the
 // repeated "event has ended" spam). Leaving the set once lets it be closed exactly once.
+//
+// Returns NULL on query failure — never an empty array. The announce poller's close-sweep
+// treats "not in this list" as "event ended", so conflating error with empty made one
+// transient DB error close EVERY announcement, and the next clean cycle re-posted them all
+// (with role pings). Callers must skip the whole cycle when this returns null.
 async function listActiveSiteEvents() {
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
@@ -317,13 +322,30 @@ async function listActiveSiteEvents() {
         .order('starts_at', { ascending: false });
     if (error) {
         console.error('[SiteSubmissions] listActiveSiteEvents failed:', error.message);
-        return [];
+        return null;
     }
     // Drop personal bingo boards (per-user vs_events rows, NOT public events). Filter
     // in JS rather than a `.neq('kind','personal')` on the query: in SQL `kind <> 'personal'`
     // is NULL (excluded) for rows with a null kind, which would silently drop legacy/custom
     // events (the null-kind "default" events) and make the announce poller end + re-post them.
     return (data || []).filter((e) => e.kind !== 'personal');
+}
+
+// Direct single-event re-check, used by the announce poller before it closes an
+// announcement: "this event fell out of the active list — is it REALLY not open?"
+// Distinguishes "row is gone / not open" ({ row }) from "couldn't check" ({ error }):
+// the caller must never close an announcement on a failed check.
+async function getSiteEventById(id) {
+    const { data, error } = await supabase
+        .from('vs_events')
+        .select('id, status, kind, starts_at, ends_at')
+        .eq('id', id)
+        .maybeSingle();
+    if (error) {
+        console.error('[SiteSubmissions] getSiteEventById failed:', error.message);
+        return { error: error.message };
+    }
+    return { row: data || null };
 }
 
 // ---------------------------------------------------------------------------
@@ -474,6 +496,7 @@ module.exports = {
     listActiveInstancesOfKind,
     listAllActiveTasks,
     listActiveSiteEvents,
+    getSiteEventById,
     fetchApprovedPendingPack,
     markPackAwarded,
     fetchApprovedPendingNotify,

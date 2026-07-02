@@ -79,12 +79,18 @@ async function getEventsChannel(client) {
 }
 
 // Ensure an open site event has a Discord announcement, kept in sync.
-//   - linked + unchanged  → no-op
-//   - linked + changed    → edit the embed + update cached fields
-//   - not linked yet      → post embed (ping events role) + link the bot event row
-// Returns { created } | { refreshed } | { error } | {}.
+//   - active row + unchanged      → no-op
+//   - active row + changed        → edit the embed + update cached fields
+//   - closed row, message intact  → REOPEN in place: un-grey the same message (no new
+//                                   post, no ping) and revive the bot row
+//   - no row ever                 → post embed WITH the events-role ping + link a row
+//   - prior row but message gone  → post a fresh embed WITHOUT any ping
+// The events role is only ever pinged on the FIRST announcement of an event: any prior
+// bot row for this vs_event_id (whatever its status — rows are never hard-deleted, only
+// marked 'deleted') means members were already pinged, so re-creations stay silent.
+// Returns { created } | { reopened } | { refreshed } | { error } | {}.
 async function ensureEventAnnounce(client, ev) {
-    const existing = await eventsDb.getEventByVsEventId(ev.id);
+    const existing = await eventsDb.getLatestEventByVsEventId(ev.id);
 
     if (existing && existing.status === 'active' && existing.message_id) {
         if (!eventChanged(ev, existing)) return {};
@@ -111,11 +117,39 @@ async function ensureEventAnnounce(client, ev) {
         return { refreshed: true };
     }
 
+    // A closed announcement whose message still exists: the event came back into the
+    // open set (closed in error, or reopened on the site). Restore the ORIGINAL message
+    // — rebuilding the embed from `ev` replaces the "— ENDED" title/footer — instead of
+    // posting a duplicate, and revive the row so later cycles refresh it normally.
+    if (existing && existing.status === 'closed' && existing.message_id) {
+        try {
+            const ch =
+                client.channels.cache.get(existing.channel_id) ||
+                (existing.channel_id ? await client.channels.fetch(existing.channel_id).catch(() => null) : null);
+            const msg = ch ? await ch.messages.fetch(existing.message_id).catch(() => null) : null;
+            if (msg) {
+                await msg.edit({ embeds: [buildSiteEventEmbed(ev)], components: [linkRow(ev)] });
+                await eventsDb.reopenEvent(existing.id);
+                await eventsDb.updateEvent(existing.id, {
+                    title: ev.name,
+                    description: ev.description,
+                    ends_at: ev.ends_at || null,
+                });
+                return { reopened: true };
+            }
+        } catch (err) {
+            console.warn('[EventAnnounce] reopen failed, falling back to fresh post:', err.message);
+        }
+        // Message is gone (or reopen failed) — fall through to a fresh, PING-LESS post.
+    }
+
     const channel = await getEventsChannel(client);
     if (!channel) return { error: 'events channel not found' };
 
+    // Ping the events role only if this event has never had an announcement row.
+    const firstAnnounce = !existing;
     const message = await channel.send({
-        content: config.eventsRoleID ? `<@&${config.eventsRoleID}>` : undefined,
+        content: firstAnnounce && config.eventsRoleID ? `<@&${config.eventsRoleID}>` : undefined,
         embeds: [buildSiteEventEmbed(ev)],
         components: [linkRow(ev)],
     });

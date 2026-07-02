@@ -93,6 +93,31 @@ async function getEventByVsEventId(vsEventId) {
     return (data && data[0]) || null;
 }
 
+// Newest bot row for a site event REGARDLESS of status. The announce handler uses this
+// to (a) reopen a closed announcement's message in place instead of posting a duplicate,
+// and (b) treat any prior row — active, closed, or deleted — as proof the events role was
+// already pinged for this event, so it is never mass-pinged twice.
+async function getLatestEventByVsEventId(vsEventId) {
+    const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('vs_event_id', vsEventId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+    if (error) {
+        console.error('[events] getLatestEventByVsEventId failed:', error.message);
+        return null;
+    }
+    return (data && data[0]) || null;
+}
+
+// Bring a closed announcement row back to life (its site event re-entered the open set
+// and the original Discord message still exists). Clearing closed_at keeps the 12h
+// cleanup job from deleting the message out from under the revived announcement.
+async function reopenEvent(eventId) {
+    return updateEvent(eventId, { status: 'active', closed_at: null });
+}
+
 async function getEventByThreadId(threadId) {
     const { data, error } = await supabase
         .from('events')
@@ -294,6 +319,8 @@ module.exports = {
     getEvent,
     getEventByVsTaskId,
     getEventByVsEventId,
+    getLatestEventByVsEventId,
+    reopenEvent,
     getEventByThreadId,
     getActiveEvents,
     getActiveCompetitionEvents,

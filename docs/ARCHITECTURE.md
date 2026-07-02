@@ -116,6 +116,24 @@ soft-close, LFG expiry, voice-leaderboard refresh, and the site→bot pollers
 weekly/daily (weekly task creation, voice-reward payout, daily rank update, Skill-or-Kill
 scheduling). Confirm exact cadences in `index.js`/the job files before relying on them.
 
+### Event announcements (`jobs/eventAnnouncePoller.js` + `handlers/eventAnnounce.js`)
+
+Mirrors open site events (`vs_events`, `status='open'`, personal boards excluded) into the
+events channel: one describe-and-link embed per event, refreshed on edit, marked ENDED when
+the event leaves the open set. Hardened after an incident where a transient DB error read
+as "no open events" and mass-ended + re-posted (re-pinging) every announcement:
+
+- **Toggle:** `features.events.siteEventAnnouncements` in `bot_config` — flip it on the
+  site's `/admin/config` (Features tab) to pause all announce activity within ~60s.
+- **Error ≠ empty:** a failed active-events query skips the whole cycle.
+- **Verified closes:** each close candidate is re-fetched by id first; announcements are
+  never ended on a failed or contradicting check.
+- **Reopen, don't repost:** an event returning to the open set un-greys its ORIGINAL
+  message; the events role is only pinged on an event's first-ever announcement.
+- **Circuit breaker:** >5 posts/reopens or >3 closes in one 5-minute cycle aborts the
+  cycle, flips the toggle off in `bot_config`, and posts a no-ping alert to
+  `TEST_CHANNEL_ID`. Re-enable from `/admin/config` after investigating.
+
 ## External integrations
 
 - **Discord API** (bot token) — gateway + REST.
