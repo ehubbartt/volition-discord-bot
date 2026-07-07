@@ -17,7 +17,7 @@ const SITE_URL = 'https://volition-osrs.com';
 function eventLink(ev) {
     switch (ev.kind) {
         case 'bingo':
-            return { url: `${SITE_URL}/bingo/${ev.slug}`, label: 'Bingo Event' };
+            return { url: `${SITE_URL}/events/${ev.slug}`, label: 'Bingo Event' };
         case 'duo':
             return { url: `${SITE_URL}/events/${ev.slug}`, label: 'Duo Event' };
         case 'simple':
