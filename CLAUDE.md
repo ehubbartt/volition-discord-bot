@@ -63,5 +63,6 @@ whose names are fixed by the tooling that loads them.
   to `config/commandMessages.json`. The renderer forces a safe `allowedMentions`
   allow-list so admin-authored text can never `@everyone` or mass-ping a role.
 - **Env/secrets** (`.env`, gitignored): Discord bot token + application/guild IDs,
-  `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and optional Cloudflare/Dink vars. Confirm names
+  `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (RLS is deny-all; `SUPABASE_ANON_KEY` is a
+  dev-only fallback), and optional Cloudflare/Dink vars. Confirm names
   against `index.js`, `db/supabase.js`, and `config.json` before relying on them.

@@ -63,7 +63,10 @@ others are converted one at a time.
 
 ## Database (`db/`)
 
-- **`db/supabase.js`** initialises the client (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) and
+- **`db/supabase.js`** initialises the client (`SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY` with `SUPABASE_ANON_KEY` as dev fallback — every table
+  has RLS enabled deny-all, which the service key bypasses; several `db/*.js` modules
+  create their own client from the same vars) and
   holds core player/points/warnings/bans helpers.
 - Per-feature data modules: `events.js`, `tile_event.js`, `bingo_event.js`, `wallet.js`,
   `lfg.js`, `voice_analytics.js`, `lootcrate_analytics.js`, `gamification_analytics.js`,
@@ -146,7 +149,8 @@ as "no open events" and mass-ended + re-posted (re-pinging) every announcement:
 ## Environment & testing
 
 - **`.env`** (gitignored): Discord bot token + application/guild IDs, `SUPABASE_URL`,
-  `SUPABASE_ANON_KEY`, optional Cloudflare/Dink vars.
+  `SUPABASE_SERVICE_ROLE_KEY` (falls back to `SUPABASE_ANON_KEY`, which only works
+  while RLS is off), optional Cloudflare/Dink vars.
 - **Tests:** Jest (`jest.config.js`, `tests/`) with a 70% coverage threshold — DB modules,
   command/event/handler logic, and an integration suite. `npm test`.
 
