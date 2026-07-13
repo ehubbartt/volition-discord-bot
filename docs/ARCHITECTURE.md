@@ -46,7 +46,7 @@ A single dispatcher handles all interactions:
    verification, tickets, ranks, points, gamification, per-command toggles).
 3. **`config.json`** — **static IDs**: channels, roles, emojis, `CLAN_ICON_URL`,
    `ADMIN_ROLE_IDS`/`HEAD_ADMIN_ROLE_IDS`, client/guild IDs, `pointsAward`.
-4. **`config/*.json`** — game data: `ranks.json` (EHB→role mapping), `bosses.json` (LFG),
+4. **`config/*.json`** — game data: `ranks.json` (rank→role mapping; `ehbMin` is legacy), `bosses.json` (LFG),
    `walletPrices.json`, `bingoTiles.json` + `bingoBoardCoordinates.json`,
    `boardConfig.json`. Some have CRUD managers in `utils/` (`bingoConfigManager`,
    `boardConfigManager`).
@@ -84,8 +84,12 @@ others are converted one at a time.
   intro button opens a modal; the bot looks the RSN up on WiseOldMan, checks requirements,
   and assigns the verified role (or pings admins on failure). The intro modal is the
   template the data-driven forms work generalises.
-- **Ranks / WiseOldMan** (`utils/api.js`, `utils/ranks.js`): periodic clan sync maps EHB
-  to a Discord role; manual `sync` commands exist too.
+- **Ranks / WiseOldMan** (`utils/api.js`, `utils/ranks.js`): rank is computed ONLY on the
+  site (composite score written to `players.rank`); the bot never derives rank from EHB.
+  The daily job, `/updateranks`, `/sync`, `/syncuser`, and the WOM join listener all just
+  MIRROR the stored rank to the matching Discord role, and brand-new players the site
+  hasn't scored yet start at the fixed entry rank (`ENTRY_RANK_INDEX`). `ranks.json`'s
+  `ehbMin` values are legacy metadata only.
 - **Points / VP economy** (`db/supabase.js` players): VP comes from loot crates, duels,
   event submissions, voice rewards, and site submissions; `checkpoints`/`adjustpoints`/
   `leaderboard` commands read/write it.
