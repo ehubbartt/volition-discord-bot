@@ -15,8 +15,9 @@ const { isAdmin } = require('../../utils/permissions');
 const {
     formatRank,
     getRankName,
-    applyRank,
-    getWomRole
+    applyRankByWomRole,
+    getWomRole,
+    ENTRY_RANK_INDEX
 } = require('../../utils/ranks');
 const { broadcastRankUps } = require('../../utils/rankAnnouncements');
 
@@ -92,18 +93,19 @@ async function fullClanSync (interaction, clanId) {
             const existingPlayer = existingWomIds.get(womId);
 
             if (!existingPlayer) {
-                // New member - add to database
+                // New member - add to database at the ENTRY rank. The bot never computes
+                // rank; the site scores them later and writes players.rank, which the
+                // daily sync then mirrors to their Discord role.
                 try {
-                    const rankResult = await applyRank({ ehb });
                     await db.createPlayer({
                         rsn: rsn,
                         discord_id: null,
                         wom_id: womId,
                         clan_joined_at: clanJoinedAt,
-                        rank: getWomRole(rankResult.newRankIndex)
+                        rank: getWomRole(ENTRY_RANK_INDEX)
                     }, 0);
                     newMembersAdded++;
-                    newMembers.push({ rsn, womId, ehb, rankIndex: rankResult.newRankIndex });
+                    newMembers.push({ rsn, womId, ehb, rankIndex: ENTRY_RANK_INDEX });
                     console.log(`[FullSync] Added new member: ${rsn} (${womId})`);
 
                     // Check if this is a returning former member
@@ -160,19 +162,15 @@ async function fullClanSync (interaction, clanId) {
                     console.error(`[FullSync] Failed to add ${rsn}:`, error.message);
                 }
             } else {
-                // Existing member - update RSN, clan join date, and rank
+                // Existing member - update RSN and clan join date. players.rank is NOT
+                // touched: the site owns it (composite score), and writing an EHB-derived
+                // value here would clobber it on every sync.
                 const updates = {};
                 if (existingPlayer.rsn !== rsn) {
                     updates.rsn = rsn;
                 }
                 if (clanJoinedAt && existingPlayer.clan_joined_at !== clanJoinedAt) {
                     updates.clan_joined_at = clanJoinedAt;
-                }
-                // Always update rank based on current EHB
-                const rankResult = await applyRank({ ehb });
-                const currentRank = getWomRole(rankResult.newRankIndex);
-                if (existingPlayer.rank !== currentRank) {
-                    updates.rank = currentRank;
                 }
 
                 if (Object.keys(updates).length > 0) {
@@ -184,11 +182,12 @@ async function fullClanSync (interaction, clanId) {
                     }
                 }
 
-                // Existing member - check Discord rank if they have a discord_id
-                if (existingPlayer.discord_id) {
+                // Existing member - mirror their stored (site-computed) rank to Discord
+                // if they have a discord_id. No stored rank yet → leave the role alone.
+                if (existingPlayer.discord_id && existingPlayer.rank) {
                     try {
                         const discordMember = await interaction.guild.members.fetch(existingPlayer.discord_id);
-                        const discordRankResult = await applyRank({ ehb, member: discordMember });
+                        const discordRankResult = await applyRankByWomRole({ womRole: existingPlayer.rank, member: discordMember });
 
                         if (discordRankResult.changed) {
                             ranksUpdated++;
@@ -239,9 +238,12 @@ async function fullClanSync (interaction, clanId) {
                             console.error(`[FullSync] Failed to check rank for ${rsn}:`, error.message);
                         }
                     }
-                } else {
+                } else if (!existingPlayer.discord_id) {
                     // Player in clan but has no discord_id - they're not linked yet, just skip
                     console.log(`[FullSync] Skipped ${rsn} - in clan but not linked to Discord`);
+                } else {
+                    // Linked but the site hasn't computed a rank for them yet.
+                    console.log(`[FullSync] Skipped ${rsn} - no site-computed rank yet`);
                 }
             }
         }

@@ -15,8 +15,10 @@ const { isAdmin } = require('../../utils/permissions');
 const {
     formatRank,
     getRankName,
-    applyRank,
-    getWomRole
+    applyRankByWomRole,
+    applyRankIndex,
+    getWomRole,
+    ENTRY_RANK_INDEX
 } = require('../../utils/ranks');
 
 module.exports = {
@@ -216,7 +218,11 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
         // Fetch member for role assignment
         const member = await interaction.guild.members.fetch(targetUser.id);
 
-        const rankResult = await applyRank({ ehb, member });
+        // Mirror the stored (site-computed) rank to Discord; a player the site hasn't
+        // scored yet starts at the ENTRY rank. The bot never derives rank from EHB.
+        const rankResult = existingPlayer?.rank
+            ? await applyRankByWomRole({ womRole: existingPlayer.rank, member })
+            : await applyRankIndex(ENTRY_RANK_INDEX, member, true);
         const rankIndex = rankResult.newRankIndex;
         const rankAssigned = !rankResult.error;
         const rankError = rankResult.error;
@@ -240,14 +246,15 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 `Step 5/5: Syncing to database...`
         });
 
-        // Sync to database
+        // Sync to database. players.rank belongs to the site — keep an existing player's
+        // stored rank untouched; only a brand-new player gets the ENTRY rank default.
         if (existingPlayer) {
             await db.updatePlayer(existingPlayer.id, {
                 discord_id: targetUser.id,
                 rsn: actualRsn,
                 wom_id: womId.toString(),
                 clan_joined_at: clanJoinedAt,
-                rank: getWomRole(rankResult.newRankIndex)
+                ...(existingPlayer.rank ? {} : { rank: getWomRole(ENTRY_RANK_INDEX) })
             });
             console.log(`[SyncUser] Updated existing player in database`);
         } else {
@@ -256,7 +263,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 discord_id: targetUser.id,
                 wom_id: womId.toString(),
                 clan_joined_at: clanJoinedAt,
-                rank: getWomRole(rankResult.newRankIndex)
+                rank: getWomRole(ENTRY_RANK_INDEX)
             }, 0);
             console.log(`[SyncUser] Created new player in database`);
         }

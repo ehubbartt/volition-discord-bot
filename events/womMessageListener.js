@@ -8,9 +8,11 @@ const config = require('../config.json');
 const {
     formatRank,
     getRankName,
-    determineRankIndex,
-    applyRank,
-    getWomRole
+    applyRankByWomRole,
+    applyRankIndex,
+    getRankIndexByWomRole,
+    getWomRole,
+    ENTRY_RANK_INDEX
 } = require('../utils/ranks');
 
 // Parse and handle join messages
@@ -382,8 +384,11 @@ async function processMemberJoin (rsn, originalMessage) {
                 // Nickname changes disabled
                 console.log(`[JOIN] Nickname update skipped (disabled)`);
 
-                // Assign Discord rank
-                const rankResult = await applyRank({ ehb, member });
+                // Assign Discord rank: mirror the stored (site-computed) rank if there is
+                // one; a fresh joiner starts at the ENTRY rank until the site scores them.
+                const rankResult = existingPlayer?.rank
+                    ? await applyRankByWomRole({ womRole: existingPlayer.rank, member })
+                    : await applyRankIndex(ENTRY_RANK_INDEX, member, true);
                 rankIndex = rankResult.newRankIndex;
                 rankAssigned = rankResult.changed || (rankResult.oldRankIndex === rankResult.newRankIndex && !rankResult.error);
 
@@ -400,17 +405,22 @@ async function processMemberJoin (rsn, originalMessage) {
             }
         } else {
             console.log(`[JOIN] No Discord ID linked for this player`);
-            rankIndex = determineRankIndex(Math.round(ehb));
+            // Display-only: the stored (site-computed) rank if any, else the entry rank.
+            rankIndex = existingPlayer?.rank
+                ? getRankIndexByWomRole(existingPlayer.rank)
+                : ENTRY_RANK_INDEX;
+            if (rankIndex < 0) rankIndex = ENTRY_RANK_INDEX;
         }
 
-        // Update or create player in database
+        // Update or create player in database. players.rank belongs to the site — keep an
+        // existing stored rank; only a player without one gets the ENTRY rank default.
         if (existingPlayer) {
             await db.updatePlayer(existingPlayer.id, {
                 rsn: rsn,
                 wom_id: womId,
                 discord_id: discordId, // Update with auto-linked ID if found
                 clan_joined_at: clanJoinedAt,
-                rank: getWomRole(rankIndex)
+                ...(existingPlayer.rank ? {} : { rank: getWomRole(ENTRY_RANK_INDEX) })
             });
             console.log(`[JOIN] ✅ Updated existing player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
         } else {
@@ -419,7 +429,7 @@ async function processMemberJoin (rsn, originalMessage) {
                 wom_id: womId,
                 discord_id: discordId, // Use auto-linked ID if found, otherwise null
                 clan_joined_at: clanJoinedAt,
-                rank: getWomRole(rankIndex)
+                rank: getWomRole(ENTRY_RANK_INDEX)
             }, 0);
             console.log(`[JOIN] ✅ Created new player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
         }
