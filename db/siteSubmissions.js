@@ -339,7 +339,7 @@ async function listActiveSiteEvents() {
 async function getSiteEventById(id) {
     const { data, error } = await supabase
         .from('vs_events')
-        .select('id, status, kind, starts_at, ends_at')
+        .select('id, status, kind, starts_at, ends_at, unlisted')
         .eq('id', id)
         .maybeSingle();
     if (error) {
