@@ -32,10 +32,18 @@ const { supabase } = require('../db/supabase');
 const DEFAULT_ARCHIVE_ID = '1240751449281921054'; // #join-ticket-archive
 
 // ── Funnel stages (message evidence only) ────────────────────────────────────
+// Matched against every transcript line, INCLUDING continuation lines (multi-line
+// content and "[Embed: …]" lines sit below their "[timestamp] user:" line).
+// Markers are the messages that post PUBLICLY in the ticket channel:
+//  - the auto-opened ticket's welcome embed (🔰) carries the verify button,
+//  - handleVerifySubmit replies publicly: "✅|⚠️ Verification Results" (✅ = met reqs),
+//  - the intro submit's ephemeral confirm never shows, but the admin ping
+//    "📝 **Introduction Posted!**" does.
 const STAGES = [
-	{ key: 'verify_prompt', label: 'Saw verify prompt', re: /\[Embed: 🎮 Verify Your RuneScape Account/i },
-	{ key: 'verified', label: 'Verified RSN', re: /\[Embed: [^\]]*Verification Results|\[Embed: ✅ User Force Verified|\[Embed: 🔄 Former Member Returning!/i },
-	{ key: 'intro', label: 'Posted introduction', re: /Your introduction has been posted/i }
+	{ key: 'verify_prompt', label: 'Got welcome + verify prompt', re: /\[Embed: 🔰 Welcome to Volition!|\[Embed: 🎮 Verify Your RuneScape Account/i },
+	{ key: 'verify_attempted', label: 'Attempted verification', re: /\[Embed: (✅|⚠️) Verification Results|\[Embed: ✅ User Force Verified|\[Embed: 🔄 Former Member Returning!/i },
+	{ key: 'verified', label: 'Verified (met requirements)', re: /\[Embed: ✅ Verification Results|\[Embed: ✅ User Force Verified|\[Embed: 🔄 Former Member Returning!/i },
+	{ key: 'intro', label: 'Posted introduction', re: /Introduction Posted!|Your introduction has been posted/i }
 ];
 
 // Guest-flow markers: these tickets chose the guest path, not the clan-join path.
@@ -86,15 +94,27 @@ function parseTranscript(text) {
 		}
 	}
 
+	// Message content spans multiple lines: embeds and attachments are appended as
+	// "[Embed: …]" / "[Attachment: …]" lines BELOW the "[timestamp] user:" line, and
+	// multi-line text continues the same way. Track the current message's timestamp
+	// and run the matchers over continuation lines too — that's where the embeds live.
+	let curTs = null;
 	for (const raw of text.split('\n')) {
 		const m = raw.match(LINE_RE);
-		if (!m) continue;
-		const ts = parseLineTs(m[1], m[2]);
-		if (!t.openedAt) t.openedAt = ts;
-		t.lastMessageAt = ts;
-		if (!t.isGuest && GUEST_RE.test(m[4])) t.isGuest = true;
+		let hay;
+		if (m) {
+			curTs = parseLineTs(m[1], m[2]);
+			if (!t.openedAt) t.openedAt = curTs;
+			t.lastMessageAt = curTs;
+			hay = m[4];
+		} else if (curTs) {
+			hay = raw; // continuation line of the current message
+		} else {
+			continue; // still in the header blocks
+		}
+		if (!t.isGuest && GUEST_RE.test(hay)) t.isGuest = true;
 		for (const s of STAGES) {
-			if (!t.stages[s.key] && s.re.test(m[4])) t.stages[s.key] = ts;
+			if (!t.stages[s.key] && s.re.test(hay)) t.stages[s.key] = curTs;
 		}
 	}
 	return t;
@@ -258,10 +278,12 @@ async function main() {
 		const still = n((t) => t.status === 'in_clan');
 		const left = n((t) => t.status === 'left');
 
+		const attempted = n((t) => t.stages.verify_attempted);
 		console.log('════ JOIN FUNNEL (message evidence + database) ════');
 		console.log(`${String(total).padStart(5)}  Join tickets opened          100%`);
-		console.log(`${String(n((t) => t.stages.verify_prompt)).padStart(5)}  Saw verify prompt          ${pct(n((t) => t.stages.verify_prompt), total).padStart(6)}`);
-		console.log(`${String(verified).padStart(5)}  Verified RSN               ${pct(verified, total).padStart(6)}`);
+		console.log(`${String(n((t) => t.stages.verify_prompt)).padStart(5)}  Got welcome + verify prompt ${pct(n((t) => t.stages.verify_prompt), total).padStart(6)}`);
+		console.log(`${String(attempted).padStart(5)}  Attempted verification     ${pct(attempted, total).padStart(6)}`);
+		console.log(`${String(verified).padStart(5)}  Verified (met reqs)        ${pct(verified, total).padStart(6)}  (${pct(verified, attempted)} of attempts)`);
 		console.log(`${String(intro).padStart(5)}  Posted introduction        ${pct(intro, total).padStart(6)}  (${pct(intro, verified)} of verified)`);
 		console.log(`${String(joined).padStart(5)}  Actually joined (in DB)    ${pct(joined, total).padStart(6)}  (${pct(joined, verified)} of verified)`);
 		console.log(`${String(still).padStart(5)}  … still in the clan        ${pct(still, total).padStart(6)}  (${pct(still, joined)} of joiners)`);
