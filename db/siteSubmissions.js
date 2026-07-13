@@ -315,7 +315,7 @@ async function listActiveSiteEvents() {
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
         .from('vs_events')
-        .select('id, slug, name, kind, description, status, starts_at, ends_at')
+        .select('id, slug, name, kind, description, status, starts_at, ends_at, unlisted')
         .eq('status', 'open')
         .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
         .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
@@ -324,11 +324,12 @@ async function listActiveSiteEvents() {
         console.error('[SiteSubmissions] listActiveSiteEvents failed:', error.message);
         return null;
     }
-    // Drop personal bingo boards (per-user vs_events rows, NOT public events). Filter
-    // in JS rather than a `.neq('kind','personal')` on the query: in SQL `kind <> 'personal'`
+    // Drop personal bingo boards (per-user vs_events rows, NOT public events) and
+    // unlisted utility events (e.g. the permanent Dink self-test) — neither should be
+    // announced. Filter in JS rather than SQL `.neq()`: in SQL `kind <> 'personal'`
     // is NULL (excluded) for rows with a null kind, which would silently drop legacy/custom
     // events (the null-kind "default" events) and make the announce poller end + re-post them.
-    return (data || []).filter((e) => e.kind !== 'personal');
+    return (data || []).filter((e) => e.kind !== 'personal' && e.unlisted !== true);
 }
 
 // Direct single-event re-check, used by the announce poller before it closes an
