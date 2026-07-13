@@ -10,7 +10,7 @@ const { isAdmin } = require('../../utils/permissions');
 const {
     formatRank,
     getRankName,
-    applyRank,
+    applyRankByWomRole,
     getWomRole,
     getRankIndexByWomRole,
     standardWomRoles
@@ -44,12 +44,14 @@ module.exports = {
 
       const existingPlayers = await db.getAllPlayers();
 
+      // The site computes rank into players.rank; we mirror it onto Discord roles and
+      // still flag WOM in-game clan-rank mismatches against that stored rank.
       const discordIdToRsnMap = {};
-      const discordIdToPlayerIdMap = {};
+      const discordIdToRankMap = {};
       existingPlayers.forEach(player => {
         if (player.discord_id && player.rsn) {
           discordIdToRsnMap[player.discord_id] = player.rsn;
-          discordIdToPlayerIdMap[player.discord_id] = player.id;
+          if (player.rank) discordIdToRankMap[player.discord_id] = player.rank;
         }
       });
 
@@ -74,16 +76,18 @@ module.exports = {
         if (member) {
           const rsn = discordIdToRsnMap[discordId];
 
-          const clanMember = clanMembers.find(m => m.player.username === rsn);
-
-          // Skip players not in the WOM clan
-          if (!clanMember) {
-            console.log(`[UpdateRanks] ⏭️ Skipped ${rsn} - not found in WOM clan data`);
+          // Skip players the site hasn't assigned a rank to yet.
+          const storedRank = discordIdToRankMap[discordId];
+          if (!storedRank) {
+            console.log(`[UpdateRanks] ⏭️ Skipped ${rsn} - no site-computed rank yet`);
             continue;
           }
 
-          const ehb = Math.round(clanMember.player.ehb || 0);
-          const rankResult = await applyRank({ ehb, member });
+          // EHB is for display + the WOM mismatch reason; rank comes from players.rank.
+          const clanMember = clanMembers.find(m => m.player.username === rsn);
+          const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
+
+          const rankResult = await applyRankByWomRole({ womRole: storedRank, member });
           const calculatedRankIndex = rankResult.newRankIndex;
 
           if (rankResult.changed) {
@@ -116,13 +120,7 @@ module.exports = {
               }
             }
 
-            console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (${ehb} EHB)`);
-
-            // Persist rank to database
-            const playerId = discordIdToPlayerIdMap[discordId];
-            if (playerId) {
-              await db.updatePlayer(playerId, { rank: getWomRole(calculatedRankIndex) });
-            }
+            console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (rank: ${storedRank})`);
           }
 
           // Check if in-game clan rank matches what it should be based on EHB

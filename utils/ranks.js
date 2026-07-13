@@ -136,17 +136,38 @@ function getRankCount() {
 }
 
 /**
- * Calculate rank from EHB, optionally update Discord roles, and return change info.
- * Centralizes the rank determination + role assignment pattern used across the bot.
- *
- * @param {Object} options
- * @param {number}            options.ehb                  - Player's EHB value
- * @param {GuildMember|null}  [options.member=null]         - Discord guild member, or null if not linked
- * @param {boolean}           [options.allowDowngrade=true]  - Whether to apply downgrades
+ * Mechanically swap a member's rank role to the one for newRankIndex (removes any
+ * existing rank role first). Shared by applyRank (EHB) and applyRankByWomRole (the
+ * site-driven path). Caller decides WHEN to swap; this just does it.
+ * @param {GuildMember} member
+ * @param {number} newRankIndex
+ * @returns {Promise<{changed: boolean, error: string|null}>}
+ */
+async function swapRankRole(member, newRankIndex) {
+    const newRoleId = getRoleIdByIndex(newRankIndex);
+    if (!newRoleId) return { changed: false, error: `Role ID not configured for rank index ${newRankIndex}` };
+
+    try {
+        const allRankRoleIds = getAllRoleIds();
+        const currentRoleObj = member.roles.cache.find(r => allRankRoleIds.includes(r.id));
+        if (currentRoleObj) await member.roles.remove(currentRoleObj);
+        await member.roles.add(newRoleId);
+        return { changed: true, error: null };
+    } catch (err) {
+        return { changed: false, error: err.message };
+    }
+}
+
+/**
+ * Apply a target rank to a member and return change info. The shared core behind
+ * both rank paths — given a resolved newRankIndex, it figures out the member's
+ * current rank, honours allowDowngrade, and swaps the role if needed.
+ * @param {number} newRankIndex
+ * @param {GuildMember|null} member
+ * @param {boolean} allowDowngrade
  * @returns {Promise<{newRankIndex: number, oldRankIndex: number, changed: boolean, isUpgrade: boolean, error: string|null}>}
  */
-async function applyRank({ ehb, member = null, allowDowngrade = true }) {
-    const newRankIndex = determineRankIndex(Math.round(ehb));
+async function applyRankIndex(newRankIndex, member, allowDowngrade) {
     const oldRankIndex = member ? getMemberRankIndex(member) : -1;
 
     const result = {
@@ -157,33 +178,48 @@ async function applyRank({ ehb, member = null, allowDowngrade = true }) {
         error: null,
     };
 
-    // No Discord member — just return the calculation
-    if (!member) return result;
-
-    // Already correct rank
-    if (oldRankIndex === newRankIndex) return result;
-
-    // Skip downgrades when not allowed
-    if (!result.isUpgrade && !allowDowngrade) return result;
-
-    // Apply the role change
-    try {
-        const allRankRoleIds = getAllRoleIds();
-        const currentRoleObj = member.roles.cache.find(r => allRankRoleIds.includes(r.id));
-        if (currentRoleObj) await member.roles.remove(currentRoleObj);
-
-        const newRoleId = getRoleIdByIndex(newRankIndex);
-        if (newRoleId) {
-            await member.roles.add(newRoleId);
-            result.changed = true;
-        } else {
-            result.error = `Role ID not configured for rank index ${newRankIndex}`;
-        }
-    } catch (err) {
-        result.error = err.message;
+    if (newRankIndex === -1) {
+        result.error = 'No valid target rank';
+        return result;
     }
+    if (!member) return result;            // No Discord member — just the calculation
+    if (oldRankIndex === newRankIndex) return result; // Already correct
+    if (!result.isUpgrade && !allowDowngrade) return result; // Skip disallowed downgrade
 
+    const swap = await swapRankRole(member, newRankIndex);
+    result.changed = swap.changed;
+    result.error = swap.error;
     return result;
+}
+
+/**
+ * Calculate rank from EHB, optionally update Discord roles, and return change info.
+ * Legacy EHB-based path (kept for any remaining callers); the live source of truth
+ * for rank is now the site, which writes players.rank — see applyRankByWomRole.
+ *
+ * @param {Object} options
+ * @param {number}            options.ehb                  - Player's EHB value
+ * @param {GuildMember|null}  [options.member=null]         - Discord guild member, or null if not linked
+ * @param {boolean}           [options.allowDowngrade=true]  - Whether to apply downgrades
+ * @returns {Promise<{newRankIndex: number, oldRankIndex: number, changed: boolean, isUpgrade: boolean, error: string|null}>}
+ */
+async function applyRank({ ehb, member = null, allowDowngrade = true }) {
+    return applyRankIndex(determineRankIndex(Math.round(ehb)), member, allowDowngrade);
+}
+
+/**
+ * Sync a member's Discord rank role to a stored WOM role string (players.rank, which
+ * the SITE now computes). This is the mirror path: the bot no longer derives rank from
+ * EHB for role assignment — it reflects whatever the site wrote.
+ *
+ * @param {Object} options
+ * @param {string}            options.womRole               - Stored rank womRole (e.g. "dragon")
+ * @param {GuildMember|null}  [options.member=null]         - Discord guild member, or null if not linked
+ * @param {boolean}           [options.allowDowngrade=true]  - Whether to apply downgrades
+ * @returns {Promise<{newRankIndex: number, oldRankIndex: number, changed: boolean, isUpgrade: boolean, error: string|null}>}
+ */
+async function applyRankByWomRole({ womRole, member = null, allowDowngrade = true }) {
+    return applyRankIndex(getRankIndexByWomRole(womRole), member, allowDowngrade);
 }
 
 /**
@@ -207,6 +243,9 @@ module.exports = {
     getMemberRankIndex,
     getRankByIndex,
     getRankCount,
+    swapRankRole,
+    applyRankIndex,
     applyRank,
+    applyRankByWomRole,
     standardWomRoles
 };
