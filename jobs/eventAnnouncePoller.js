@@ -123,9 +123,14 @@ async function runOnce(client) {
                 continue;
             }
             const evRow = check.row;
+            // An unlisted event (e.g. the permanent Dink self-test) counts as "not open"
+            // for announce purposes even while its row is open — otherwise an existing
+            // announcement for it could never be closed (the list excludes unlisted, so
+            // this recheck would report "still open / list was stale" every cycle).
             const stillOpen =
                 evRow &&
                 evRow.status === 'open' &&
+                evRow.unlisted !== true &&
                 (!evRow.ends_at || new Date(evRow.ends_at).getTime() > Date.now());
             if (stillOpen) {
                 console.warn(`[EventAnnounce] NOT closing "${row.title}" — event is still open (list was stale)`);
