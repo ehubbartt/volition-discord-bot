@@ -42,20 +42,11 @@ function getRankName(guild, rankIndex) {
     return role?.name || 'Unknown';
 }
 
-/**
- * Determine rank index based on EHB and time in clan
- * @param {number} ehb - Efficient Hours Bossed
- * @param {number|null} clanJoinTimestamp - Timestamp when player joined clan
- * @returns {number} Rank index (0 = lowest)
- */
-function determineRankIndex(ehb) {
-    // Check from highest to lowest
-    for (let i = ranksConfig.ranks.length - 1; i >= 0; i--) {
-        if (ehb >= ranksConfig.ranks[i].ehbMin) return i;
-    }
-
-    return 0; // Default to lowest rank
-}
+// Rank is NEVER calculated in the bot. The site computes the composite rank and
+// writes players.rank; the bot only mirrors that stored value to Discord roles
+// (applyRankByWomRole) or assigns the fixed ENTRY rank (index 0) to brand-new
+// members the site hasn't scored yet (applyRankIndex(ENTRY_RANK_INDEX, ...)).
+const ENTRY_RANK_INDEX = 0;
 
 /**
  * Check if newIndex is higher than currentIndex (rank upgrade)
@@ -137,8 +128,7 @@ function getRankCount() {
 
 /**
  * Mechanically swap a member's rank role to the one for newRankIndex (removes any
- * existing rank role first). Shared by applyRank (EHB) and applyRankByWomRole (the
- * site-driven path). Caller decides WHEN to swap; this just does it.
+ * existing rank role first). Caller decides WHEN to swap; this just does it.
  * @param {GuildMember} member
  * @param {number} newRankIndex
  * @returns {Promise<{changed: boolean, error: string|null}>}
@@ -193,21 +183,6 @@ async function applyRankIndex(newRankIndex, member, allowDowngrade) {
 }
 
 /**
- * Calculate rank from EHB, optionally update Discord roles, and return change info.
- * Legacy EHB-based path (kept for any remaining callers); the live source of truth
- * for rank is now the site, which writes players.rank — see applyRankByWomRole.
- *
- * @param {Object} options
- * @param {number}            options.ehb                  - Player's EHB value
- * @param {GuildMember|null}  [options.member=null]         - Discord guild member, or null if not linked
- * @param {boolean}           [options.allowDowngrade=true]  - Whether to apply downgrades
- * @returns {Promise<{newRankIndex: number, oldRankIndex: number, changed: boolean, isUpgrade: boolean, error: string|null}>}
- */
-async function applyRank({ ehb, member = null, allowDowngrade = true }) {
-    return applyRankIndex(determineRankIndex(Math.round(ehb)), member, allowDowngrade);
-}
-
-/**
  * Sync a member's Discord rank role to a stored WOM role string (players.rank, which
  * the SITE now computes). This is the mirror path: the bot no longer derives rank from
  * EHB for role assignment — it reflects whatever the site wrote.
@@ -231,10 +206,10 @@ const standardWomRoles = ranksConfig.ranks
 
 module.exports = {
     ranksConfig,
+    ENTRY_RANK_INDEX,
     getAllRoleIds,
     formatRank,
     getRankName,
-    determineRankIndex,
     isRankUpgrade,
     getRankIndexByRoleId,
     getRoleIdByIndex,
@@ -245,7 +220,6 @@ module.exports = {
     getRankCount,
     swapRankRole,
     applyRankIndex,
-    applyRank,
     applyRankByWomRole,
     standardWomRoles
 };

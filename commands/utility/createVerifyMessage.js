@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 const { womApi } = require('../../utils/api');
 const config = require('../../config.json');
-const { determineRankIndex, formatRank } = require('../../utils/ranks');
+// Rank is site-computed (players.rank); verification no longer estimates it from EHB.
 const { isAdmin } = require('../../utils/permissions');
 const features = require('../../utils/features');
 const db = require('../../db/supabase');
@@ -285,9 +285,6 @@ async function handleVerifySubmit (interaction) {
         const MIN_EHB = 150;
         const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
-        // Determine rank
-        const rankIndex = determineRankIndex(ehb);
-
         // Handle nickname change and role updates if requirements met
         let nicknameChanged = false;
         let nicknameError = null;
@@ -384,8 +381,7 @@ async function handleVerifySubmit (interaction) {
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
-                { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Expected Rank', value: formatRank(interaction.guild, rankIndex), inline: false }
+                { name: 'EHP', value: ehp.toString(), inline: true }
             );
 
         if (nicknameChanged) {

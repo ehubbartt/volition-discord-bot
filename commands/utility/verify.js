@@ -9,7 +9,7 @@ const {
     TextInputStyle
 } = require('discord.js');
 const { womApi } = require('../../utils/api');
-const { determineRankIndex, formatRank } = require('../../utils/ranks');
+// Rank is site-computed (players.rank); verification no longer estimates it from EHB.
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -112,9 +112,6 @@ async function handleVerifySubmit(interaction) {
         const MIN_EHB = 150;
         const meetsRequirements = totalLevel >= MIN_TOTAL_LEVEL && ehb >= MIN_EHB;
 
-        // Determine rank
-        const rankIndex = determineRankIndex(ehb);
-
         // Nickname changes disabled
         const nicknameChanged = false;
         const nicknameError = 'Nickname updates disabled';
@@ -143,7 +140,6 @@ async function handleVerifySubmit(interaction) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Expected Rank', value: formatRank(interaction.guild, rankIndex), inline: false },
                 { name: 'Discord Nickname', value: nicknameChanged ? `✅ Updated to ${actualRsn}` : `⚠️ ${nicknameError || 'Could not update'}`, inline: false },
                 { name: 'WOM Profile', value: `[View Profile](https://wiseoldman.net/players/${womId})`, inline: false }
             )
