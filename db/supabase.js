@@ -10,6 +10,32 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Dedicated service-role client for tables that have RLS ENABLED (deny-all). Such a
+// write MUST use the service_role key — the anon key is refused by the policy
+// ("new row violates row-level security policy"). The default `supabase` client above
+// falls back to the anon key for the pre-lockdown deploy, so it can't be relied on to
+// bypass RLS; this one REQUIRES the service key and fails loudly if it's missing.
+// First RLS-locked table to use it: vs_onboarding_tokens (site onboarding). This is
+// the incremental foothold for turning RLS on for the bot, one table at a time.
+let _serviceClient = null;
+function getServiceClient () {
+  if (_serviceClient) return _serviceClient;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !key) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is not set — it is required to write RLS-locked tables ' +
+      '(e.g. vs_onboarding_tokens). Set it as a bot env var / Fly secret.',
+    );
+  }
+  _serviceClient = createClient(supabaseUrl, key);
+  return _serviceClient;
+}
+
+// Whether the service-role key is configured (for a startup log / diagnostics).
+function hasServiceRole () {
+  return !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
 async function getPlayerByRSN(rsn) {
   const { data, error } = await supabase
     .from('players')
@@ -376,6 +402,8 @@ async function getBan(discordId) {
 
 module.exports = {
   supabase,
+  getServiceClient,
+  hasServiceRole,
   getPlayerByRSN,
   getPlayerByDiscordId,
   getPlayerByWomId,
