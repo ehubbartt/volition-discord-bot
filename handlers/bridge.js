@@ -73,6 +73,52 @@ const typeHandlers = {
         await member.roles.add(payload.role_id, payload.reason ?? 'site bridge');
         return `granted role ${payload.role_id} to ${member.user.tag} (${payload.discord_id})`;
     },
+
+    // Site onboarding (Version B) posts a member's introduction on their behalf. We
+    // render the SAME 5-field format the Discord intro modal produces (createVerifyMessage.js)
+    // and drop it into the intro channel — handling thread / forum (type 15) / text — with a
+    // mention-safe allow-list so admin-relayed text can never mass-ping.
+    async post_intro (payload, message) {
+        if (!payload.discord_id) throw new Error('missing discord_id');
+        const introChannel = await message.client.channels.fetch(config.INTRO_THREAD_ID);
+        if (!introChannel) throw new Error('intro channel not found');
+
+        const body =
+            `**Introduction from <@${payload.discord_id}>**\n\n` +
+            `**Basic Info:** ${payload.basic_info ?? '—'}\n` +
+            `**Stats & Location:** ${payload.stats_info ?? '—'}\n` +
+            `**Previous Clan:** ${payload.clan_history ?? '—'}\n` +
+            `**Favorites & Goals:** ${payload.goals_interests ?? '—'}\n` +
+            `**What I'm Looking For:** ${payload.additional_info ?? '—'}`;
+        // Only the introducing member may be pinged — never @everyone / roles.
+        const allowedMentions = { parse: [], users: [payload.discord_id] };
+
+        if (introChannel.isThread()) {
+            await introChannel.send({ content: body, allowedMentions });
+        } else if (introChannel.type === 15) {
+            const name = payload.rsn || payload.username || 'New member';
+            await introChannel.threads.create({ name: `${name}'s Introduction`, message: { content: body, allowedMentions } });
+        } else {
+            await introChannel.send({ content: body, allowedMentions });
+        }
+        return `posted intro for ${payload.discord_id}`;
+    },
+
+    // Site onboarding (Version B) verified the member on the site (RSN → WiseOldMan
+    // gate). Mirror the Discord-side effects of verification: verified role, drop the
+    // unverified role, nickname = RSN. Rank + the in-game invite still ride the WOM
+    // listener / /syncuser (untouched).
+    async onboard_verified (payload, message) {
+        if (!payload.discord_id || !payload.rsn) throw new Error('missing discord_id or rsn');
+        const member = await message.guild.members.fetch(payload.discord_id);
+        await member.roles.add(config.verifiedRoleID, 'site onboarding verify');
+        if (config.unverifiedRoleID && member.roles.cache.has(config.unverifiedRoleID)) {
+            await member.roles.remove(config.unverifiedRoleID, 'site onboarding verify').catch(() => {});
+        }
+        // Nickname can fail for members ranked above the bot — non-fatal.
+        await member.setNickname(payload.rsn, 'site onboarding verify').catch(() => {});
+        return `verified ${member.user.tag} as ${payload.rsn}`;
+    },
 };
 
 /**
