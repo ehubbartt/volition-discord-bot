@@ -28,13 +28,16 @@ function mintTokenString () {
     return crypto.randomBytes(24).toString('hex');
 }
 
-async function mintOnboardingToken (discordId, variant, createdBy) {
+async function mintOnboardingToken (discordId, variant, createdBy, channelId) {
     const token = mintTokenString();
     const { error } = await getServiceClient().from('vs_onboarding_tokens').insert({
         token,
         discord_id: discordId,
         variant,
         created_by: createdBy,
+        // Stash the origin channel so the site can call back to it at the join step
+        // (the join-ticket channel in the real flow) — no schema change, rides in `data`.
+        data: channelId ? { channel_id: channelId } : {},
     });
     if (error) throw new Error(`mint onboarding token: ${error.message}`);
     return token;
@@ -49,7 +52,7 @@ async function sendOnboardingTest (interaction, variant) {
     const target = interaction.options.getUser('user') || interaction.user;
     let token;
     try {
-        token = await mintOnboardingToken(target.id, variant, interaction.user.id);
+        token = await mintOnboardingToken(target.id, variant, interaction.user.id, interaction.channelId);
     } catch (err) {
         return interaction.reply({ ephemeral: true, content: `❌ Could not mint the link: ${err.message}` });
     }

@@ -25,6 +25,10 @@ const config = require('../config.json');
 const SUCCESS_EMOJI = '✅';
 const FAILURE_EMOJI = '❌';
 
+// The "how to join" banner shown in join tickets today (createVerifyMessage.js /
+// introThreadListener.js) — reused when the site's onboarding hands off at the join step.
+const JOIN_IMAGE_URL = 'https://media.discordapp.net/attachments/1085149045456126064/1197653854859313284/Join_Volition_3.png?ex=6913aa92&is=69125912&hm=72f1a38dbc6f80e27af7667560ddb2e865056f0e585cc40c377b2945bf49176d&format=webp&quality=lossless&width=1242&height=936';
+
 // Resolved at call time (not module load) so dotenv ordering and tests both work.
 // The bridge reuses the existing bot test channel by default; only the webhook id
 // (the public middle segment of the site's webhook URL — NOT the secret token) is
@@ -118,6 +122,33 @@ const typeHandlers = {
         // Nickname can fail for members ranked above the bot — non-fatal.
         await member.setNickname(payload.rsn, 'site onboarding verify').catch(() => {});
         return `verified ${member.user.tag} as ${payload.rsn}`;
+    },
+
+    // Site onboarding reached the join step — call back to the ORIGIN channel (the
+    // join-ticket channel in the real flow) prompting an admin to invite the member
+    // in-game, with the same "How to join" banner tickets show today.
+    async onboard_ready_to_join (payload, message) {
+        if (!payload.channel_id) throw new Error('missing channel_id');
+        const channel = await message.client.channels.fetch(payload.channel_id).catch(() => null);
+        if (!channel || !channel.isTextBased()) throw new Error('origin channel not found / not text-based');
+
+        const who = payload.rsn ? `**${payload.rsn}** (<@${payload.discord_id}>)` : `<@${payload.discord_id}>`;
+        const adminRoleIds = Array.isArray(config.ADMIN_ROLE_IDS) ? config.ADMIN_ROLE_IDS : [];
+        const pings = adminRoleIds.map((id) => `<@&${id}>`).join(' ');
+        await channel.send({
+            content: `${pings} ${who} finished onboarding on the site and is **ready to be invited in-game**.`,
+            embeds: [
+                {
+                    title: 'How to join.',
+                    description: '1️⃣ Jump in the clan chat in game.\n1️⃣ Someone will help you in & rank you ✅',
+                    color: 0xff982f,
+                    image: { url: JOIN_IMAGE_URL },
+                },
+            ],
+            // Ping the member + admin roles only — never @everyone.
+            allowedMentions: { parse: [], users: [payload.discord_id], roles: adminRoleIds },
+        });
+        return `ready-to-join callback for ${payload.discord_id} → channel ${payload.channel_id}`;
     },
 };
 
