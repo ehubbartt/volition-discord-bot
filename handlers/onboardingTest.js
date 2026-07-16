@@ -12,7 +12,11 @@
  */
 
 const crypto = require('crypto');
-const { supabase } = require('../db/supabase');
+// vs_onboarding_tokens has RLS enabled (deny-all), so the insert must use the
+// service-role client — the anon key is refused by the policy. getServiceClient()
+// throws a clear "SUPABASE_SERVICE_ROLE_KEY is not set" error if it's unconfigured,
+// which surfaces to the admin instead of a cryptic RLS violation.
+const { getServiceClient } = require('../db/supabase');
 
 const SITE_URL = process.env.SITE_URL || 'https://volition-osrs.com';
 
@@ -23,7 +27,7 @@ function mintTokenString () {
 
 async function mintOnboardingToken (discordId, variant, createdBy) {
     const token = mintTokenString();
-    const { error } = await supabase.from('vs_onboarding_tokens').insert({
+    const { error } = await getServiceClient().from('vs_onboarding_tokens').insert({
         token,
         discord_id: discordId,
         variant,
