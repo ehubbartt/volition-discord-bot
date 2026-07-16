@@ -97,13 +97,30 @@ const typeHandlers = {
         // Only the introducing member may be pinged — never @everyone / roles.
         const allowedMentions = { parse: [], users: [payload.discord_id] };
 
+        let introUrl = null;
         if (introChannel.isThread()) {
-            await introChannel.send({ content: body, allowedMentions });
+            const sent = await introChannel.send({ content: body, allowedMentions });
+            introUrl = sent.url;
         } else if (introChannel.type === 15) {
             const name = payload.rsn || payload.username || 'New member';
-            await introChannel.threads.create({ name: `${name}'s Introduction`, message: { content: body, allowedMentions } });
+            const thread = await introChannel.threads.create({ name: `${name}'s Introduction`, message: { content: body, allowedMentions } });
+            introUrl = thread.url ?? null;
         } else {
-            await introChannel.send({ content: body, allowedMentions });
+            const sent = await introChannel.send({ content: body, allowedMentions });
+            introUrl = sent.url;
+        }
+
+        // Visible confirmation in the ORIGIN channel (where /onboard-test ran), so the
+        // relay is seen in the test channel — not just silently in the intros channel.
+        if (payload.channel_id) {
+            const origin = await message.client.channels.fetch(payload.channel_id).catch(() => null);
+            if (origin && origin.isTextBased()) {
+                const who = payload.rsn ? `**${payload.rsn}** (<@${payload.discord_id}>)` : `<@${payload.discord_id}>`;
+                await origin.send({
+                    content: `📝 ${who} posted their introduction from the site${introUrl ? ` — relayed to the intros channel: ${introUrl}` : ' — relayed to the intros channel.'}`,
+                    allowedMentions: { parse: [], users: [payload.discord_id] },
+                }).catch(() => {});
+            }
         }
         return `posted intro for ${payload.discord_id}`;
     },
