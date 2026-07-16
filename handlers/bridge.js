@@ -84,8 +84,6 @@ const typeHandlers = {
     // mention-safe allow-list so admin-relayed text can never mass-ping.
     async post_intro (payload, message) {
         if (!payload.discord_id) throw new Error('missing discord_id');
-        const introChannel = await message.client.channels.fetch(config.INTRO_THREAD_ID);
-        if (!introChannel) throw new Error('intro channel not found');
 
         const body =
             `**Introduction from <@${payload.discord_id}>**\n\n` +
@@ -97,32 +95,15 @@ const typeHandlers = {
         // Only the introducing member may be pinged — never @everyone / roles.
         const allowedMentions = { parse: [], users: [payload.discord_id] };
 
-        let introUrl = null;
-        if (introChannel.isThread()) {
-            const sent = await introChannel.send({ content: body, allowedMentions });
-            introUrl = sent.url;
-        } else if (introChannel.type === 15) {
-            const name = payload.rsn || payload.username || 'New member';
-            const thread = await introChannel.threads.create({ name: `${name}'s Introduction`, message: { content: body, allowedMentions } });
-            introUrl = thread.url ?? null;
-        } else {
-            const sent = await introChannel.send({ content: body, allowedMentions });
-            introUrl = sent.url;
-        }
-
-        // Visible confirmation in the ORIGIN channel (where /onboard-test ran), so the
-        // relay is seen in the test channel — not just silently in the intros channel.
-        if (payload.channel_id) {
-            const origin = await message.client.channels.fetch(payload.channel_id).catch(() => null);
-            if (origin && origin.isTextBased()) {
-                const who = payload.rsn ? `**${payload.rsn}** (<@${payload.discord_id}>)` : `<@${payload.discord_id}>`;
-                await origin.send({
-                    content: `📝 ${who} posted their introduction from the site${introUrl ? ` — relayed to the intros channel: ${introUrl}` : ' — relayed to the intros channel.'}`,
-                    allowedMentions: { parse: [], users: [payload.discord_id] },
-                }).catch(() => {});
-            }
-        }
-        return `posted intro for ${payload.discord_id}`;
+        // TEST MODE: post the FULL introduction into the ORIGIN channel (where
+        // /onboard-test ran) so the data can be inspected — do NOT post to the real
+        // intros channel (config.INTRO_THREAD_ID) yet. Flip this back once verified.
+        const channelId = payload.channel_id;
+        if (!channelId) throw new Error('missing channel_id (test mode posts to the origin channel)');
+        const origin = await message.client.channels.fetch(channelId).catch(() => null);
+        if (!origin || !origin.isTextBased()) throw new Error('origin channel not found / not text-based');
+        await origin.send({ content: `🧪 **[test]** intro received — this would go to the intros channel:\n\n${body}`, allowedMentions });
+        return `posted intro (test → origin channel ${channelId}) for ${payload.discord_id}`;
     },
 
     // Site onboarding (Version B) verified the member on the site (RSN → WiseOldMan
