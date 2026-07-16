@@ -18,7 +18,10 @@ const crypto = require('crypto');
 // which surfaces to the admin instead of a cryptic RLS violation.
 const { getServiceClient } = require('../db/supabase');
 
-const SITE_URL = process.env.SITE_URL || 'https://volition-osrs.com';
+// These are TEST commands, so the link points at STAGING by default (override with
+// ONBOARD_TEST_SITE_URL when testing elsewhere). Flip to the prod SITE_URL when the
+// flow graduates out of testing.
+const SITE_URL = process.env.ONBOARD_TEST_SITE_URL || 'https://volition-site-staging.fly.dev';
 
 // 24 random bytes as hex — matches the site's onboarding + dink token format.
 function mintTokenString () {
@@ -38,8 +41,9 @@ async function mintOnboardingToken (discordId, variant, createdBy) {
 }
 
 /**
- * Mint a link for the target user (default: the caller) and DM it, replying
- * ephemerally with the outcome. Assumes the caller already passed the admin gate.
+ * Mint a link for the target user (default: the caller) and post it into the
+ * channel the command was run in (not a DM — during testing we want it visible in
+ * the chat). Assumes the caller already passed the admin gate.
  */
 async function sendOnboardingTest (interaction, variant) {
     const target = interaction.options.getUser('user') || interaction.user;
@@ -51,22 +55,14 @@ async function sendOnboardingTest (interaction, variant) {
     }
 
     const link = `${SITE_URL}/welcome/${token}`;
-    let dmOk = true;
-    try {
-        await target.send(
-            `👋 **Volition onboarding — test (variant ${variant.toUpperCase()})**\n` +
-            `Open this link and sign in with Discord to walk the flow:\n${link}\n` +
-            `_This link is just for your account and expires in 14 days._`
-        );
-    } catch {
-        dmOk = false;
-    }
-
+    // Post the link into the current channel (visible, not a DM). Only the target
+    // may be pinged — never @everyone / roles.
     await interaction.reply({
-        ephemeral: true,
-        content: dmOk
-            ? `✅ Onboarding **${variant.toUpperCase()}** link sent to ${target}.\nLink: ${link}`
-            : `⚠️ Couldn't DM ${target} (their DMs may be closed). Send them this link:\n${link}`,
+        allowedMentions: { parse: [], users: [target.id] },
+        content:
+            `👋 **Volition onboarding — test (variant ${variant.toUpperCase()})** for ${target}\n` +
+            `Open this link and sign in with Discord to walk the flow:\n${link}\n` +
+            `_This link is tied to that account and expires in 14 days._`,
     });
 }
 
