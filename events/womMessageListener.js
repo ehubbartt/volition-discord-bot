@@ -414,12 +414,14 @@ async function processMemberJoin (rsn, originalMessage) {
 
         // Update or create player in database. players.rank belongs to the site — keep an
         // existing stored rank; only a player without one gets the ENTRY rank default.
+        // clan_joined_at is only backfilled when missing: once set (by WOM or a manual
+        // admin edit) it's authoritative, so this auto-firing listener never overwrites it.
         if (existingPlayer) {
             await db.updatePlayer(existingPlayer.id, {
                 rsn: rsn,
                 wom_id: womId,
                 discord_id: discordId, // Update with auto-linked ID if found
-                clan_joined_at: clanJoinedAt,
+                ...(existingPlayer.clan_joined_at ? {} : { clan_joined_at: clanJoinedAt }),
                 ...(existingPlayer.rank ? {} : { rank: getWomRole(ENTRY_RANK_INDEX) })
             });
             console.log(`[JOIN] ✅ Updated existing player in database${autoLinked ? ' (auto-linked Discord account)' : ''}`);
