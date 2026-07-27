@@ -169,7 +169,10 @@ async function fullClanSync (interaction, clanId) {
                 if (existingPlayer.rsn !== rsn) {
                     updates.rsn = rsn;
                 }
-                if (clanJoinedAt && existingPlayer.clan_joined_at !== clanJoinedAt) {
+                // Only backfill clan_joined_at when it's missing. Once set (by WOM or a
+                // manual admin edit) it's authoritative and we never overwrite it — admins
+                // correct join dates by hand and those edits must survive re-syncs.
+                if (clanJoinedAt && !existingPlayer.clan_joined_at) {
                     updates.clan_joined_at = clanJoinedAt;
                 }
 

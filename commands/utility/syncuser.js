@@ -248,12 +248,14 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
 
         // Sync to database. players.rank belongs to the site — keep an existing player's
         // stored rank untouched; only a brand-new player gets the ENTRY rank default.
+        // clan_joined_at is only backfilled when missing: once set (by WOM or a manual
+        // admin edit) it's authoritative, so re-syncing a user never clobbers it.
         if (existingPlayer) {
             await db.updatePlayer(existingPlayer.id, {
                 discord_id: targetUser.id,
                 rsn: actualRsn,
                 wom_id: womId.toString(),
-                clan_joined_at: clanJoinedAt,
+                ...(existingPlayer.clan_joined_at ? {} : { clan_joined_at: clanJoinedAt }),
                 ...(existingPlayer.rank ? {} : { rank: getWomRole(ENTRY_RANK_INDEX) })
             });
             console.log(`[SyncUser] Updated existing player in database`);
