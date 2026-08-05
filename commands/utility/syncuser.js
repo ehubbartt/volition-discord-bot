@@ -13,9 +13,9 @@ const dinkProxy = require('../../services/dinkProxy');
 const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
-    formatRank,
-    getRankName,
-    applyRankByWomRole,
+    formatRoleById,
+    getRoleIdByIndex,
+    applyEffectiveRank,
     applyRankIndex,
     getWomRole,
     ENTRY_RANK_INDEX
@@ -220,21 +220,27 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
 
         // Mirror the stored (site-computed) rank to Discord; a player the site hasn't
         // scored yet starts at the ENTRY rank. The bot never derives rank from EHB.
+        // Existing player → their chosen effective rank (signature or composite); a brand-new
+        // player the site hasn't scored yet → the ENTRY rank. The bot never derives rank from EHB.
         const rankResult = existingPlayer?.rank
-            ? await applyRankByWomRole({ womRole: existingPlayer.rank, member })
+            ? await applyEffectiveRank({ player: existingPlayer, member })
             : await applyRankIndex(ENTRY_RANK_INDEX, member, true);
-        const rankIndex = rankResult.newRankIndex;
+        // Unify the display role across both paths (effective returns role ids, the ENTRY
+        // path returns a ladder index).
+        const newRoleId = rankResult.newRoleId ?? getRoleIdByIndex(rankResult.newRankIndex);
+        const oldRoleId = rankResult.oldRoleId ?? (rankResult.oldRankIndex >= 0 ? getRoleIdByIndex(rankResult.oldRankIndex) : null);
+        const rankLabel = formatRoleById(interaction.guild, newRoleId);
         const rankAssigned = !rankResult.error;
         const rankError = rankResult.error;
 
         if (rankResult.changed) {
             const arrow = rankResult.isUpgrade ? '⬆️' : '⬇️';
             const action = rankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
-            console.log(`[SyncUser] ${arrow} ${action} rank for ${targetUser.tag}: ${rankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, rankIndex)}`);
+            console.log(`[SyncUser] ${arrow} ${action} rank for ${targetUser.tag}: ${formatRoleById(interaction.guild, oldRoleId)} -> ${rankLabel}`);
         } else if (rankResult.error) {
             console.error('[SyncUser] Failed to assign rank:', rankResult.error);
         } else {
-            console.log(`[SyncUser] ✅ Rank already correct for ${targetUser.tag}: ${getRankName(interaction.guild, rankIndex)}`);
+            console.log(`[SyncUser] ✅ Rank already correct for ${targetUser.tag}: ${rankLabel}`);
         }
 
         await interaction.editReply({
@@ -274,13 +280,13 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
             .setTitle('✅ Sync Complete!')
             .setDescription(
                 `<@${targetUser.id}> has been successfully synced!\n\n` +
-                `**Assigned Rank:** ${formatRank(interaction.guild, rankIndex)}\n\n` +
+                `**Assigned Rank:** ${rankLabel}\n\n` +
                 `**Completed:**\n` +
                 `• ${rankAssigned ? '✅' : '⚠️'} Discord rank ${rankAssigned ? 'assigned' : 'failed'}\n` +
                 `• ✅ Database synced\n\n` +
                 `**Next Steps:**\n` +
                 `• ${rankAssigned ? '✅ Discord rank assigned' : '⚠️ Manually assign Discord rank'}\n` +
-                `• Verify in-game rank matches (${formatRank(interaction.guild, rankIndex)})`
+                `• Verify in-game rank matches (${rankLabel})`
             )
             .addFields(
                 { name: 'Discord User', value: `<@${targetUser.id}>`, inline: true },
@@ -289,7 +295,7 @@ async function syncUser(interaction, targetUser, rsn, clanId) {
                 { name: 'Total Level', value: totalLevel.toString(), inline: true },
                 { name: 'EHB', value: ehb.toString(), inline: true },
                 { name: 'EHP', value: ehp.toString(), inline: true },
-                { name: 'Rank', value: formatRank(interaction.guild, rankIndex), inline: true },
+                { name: 'Rank', value: rankLabel, inline: true },
                 { name: '\u200B', value: '\u200B', inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }
             );

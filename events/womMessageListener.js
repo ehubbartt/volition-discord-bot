@@ -8,7 +8,7 @@ const config = require('../config.json');
 const {
     formatRank,
     getRankName,
-    applyRankByWomRole,
+    applyEffectiveRank,
     applyRankIndex,
     getRankIndexByWomRole,
     getWomRole,
@@ -387,9 +387,13 @@ async function processMemberJoin (rsn, originalMessage) {
                 // Assign Discord rank: mirror the stored (site-computed) rank if there is
                 // one; a fresh joiner starts at the ENTRY rank until the site scores them.
                 const rankResult = existingPlayer?.rank
-                    ? await applyRankByWomRole({ womRole: existingPlayer.rank, member })
+                    ? await applyEffectiveRank({ player: existingPlayer, member })
                     : await applyRankIndex(ENTRY_RANK_INDEX, member, true);
+                // The join notification shows a ladder rank; for a member displaying a
+                // signature rank (no ladder index), fall back to their composite ladder rank.
                 rankIndex = rankResult.newRankIndex;
+                if (rankIndex < 0) rankIndex = getRankIndexByWomRole(existingPlayer?.rank);
+                if (rankIndex < 0) rankIndex = ENTRY_RANK_INDEX;
                 rankAssigned = rankResult.changed || (rankResult.oldRankIndex === rankResult.newRankIndex && !rankResult.error);
 
                 if (rankResult.changed) {

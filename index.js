@@ -236,9 +236,8 @@ async function runDailyRankUpdate() {
     const { womApi } = require('./utils/api');
     const db = require('./db/supabase');
     const {
-      formatRank,
-      getRankName,
-      applyRankByWomRole
+      formatRoleById,
+      applyEffectiveRank
     } = require('./utils/ranks');
     const { EmbedBuilder } = require('discord.js');
 
@@ -260,9 +259,11 @@ async function runDailyRankUpdate() {
     // now the source of truth, so we map discord_id → stored rank (not EHB).
     const discordIdToRsnMap = {};
     const discordIdToRankMap = {};
+    const discordIdToPlayerMap = {};
     existingPlayers.forEach(player => {
       if (player.discord_id && player.rsn) {
         discordIdToRsnMap[player.discord_id] = player.rsn;
+        discordIdToPlayerMap[player.discord_id] = player;
         if (player.rank) discordIdToRankMap[player.discord_id] = player.rank;
       }
     });
@@ -291,39 +292,45 @@ async function runDailyRankUpdate() {
         const clanMember = clanMembers.find(m => m.player.username === rsn);
         const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
-        const rankResult = await applyRankByWomRole({ womRole: storedRank, member, allowDowngrade: true });
+        // Mirror the member's CHOSEN rank (signature when opted in + earned, else composite).
+        const player = discordIdToPlayerMap[discordId];
+        const rankResult = await applyEffectiveRank({ player, member, allowDowngrade: true });
 
         if (rankResult.changed) {
           userMentions.push(`<@${member.id}>`);
 
           const action = rankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
-          if (rankResult.oldRankIndex === -1) {
+          const oldStr = formatRoleById(guild, rankResult.oldRoleId);
+          const newStr = formatRoleById(guild, rankResult.newRoleId);
+          if (rankResult.isInitial) {
             mismatchOutput.push(
-              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, rankResult.newRankIndex)}`
+              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${newStr}`
             );
             rankUpAnnouncements.push({
               member, rsn, ehb,
-              oldRankIndex: rankResult.oldRankIndex,
-              newRankIndex: rankResult.newRankIndex,
-              isInitial: true
+              oldRoleId: rankResult.oldRoleId,
+              newRoleId: rankResult.newRoleId,
+              isInitial: true,
+              isSignature: rankResult.isSignature
             });
           } else {
             mismatchOutput.push(
-              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, rankResult.oldRankIndex)} - ${action} to: ${formatRank(guild, rankResult.newRankIndex)}`
+              `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${oldStr} - ${action} to: ${newStr}`
             );
             // Only announce upgrades to #rank-ups (downgrades are silent, just logged).
             if (rankResult.isUpgrade) {
               rankUpAnnouncements.push({
                 member, rsn, ehb,
-                oldRankIndex: rankResult.oldRankIndex,
-                newRankIndex: rankResult.newRankIndex,
-                isInitial: false
+                oldRoleId: rankResult.oldRoleId,
+                newRoleId: rankResult.newRoleId,
+                isInitial: false,
+                isSignature: rankResult.isSignature
               });
             }
           }
 
           const arrow = rankResult.isUpgrade ? '⬆️' : '⬇️';
-          console.log(`[Daily Rank Update] ${arrow} ${action} rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, rankResult.newRankIndex)} (rank: ${storedRank})`);
+          console.log(`[Daily Rank Update] ${arrow} ${action} rank for ${rsn}: ${oldStr} -> ${newStr} (rank: ${storedRank})`);
         } else if (rankResult.error) {
           console.log(`[Daily Rank Update] ⚠️ ${rsn}: ${rankResult.error}`);
         }
