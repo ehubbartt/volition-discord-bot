@@ -87,9 +87,16 @@ others are converted one at a time.
 - **Ranks / WiseOldMan** (`utils/api.js`, `utils/ranks.js`): rank is computed ONLY on the
   site (composite score written to `players.rank`); the bot never derives rank from EHB.
   The daily job, `/updateranks`, `/sync`, `/syncuser`, and the WOM join listener all just
-  MIRROR the stored rank to the matching Discord role, and brand-new players the site
-  hasn't scored yet start at the fixed entry rank (`ENTRY_RANK_INDEX`). `ranks.json`'s
+  MIRROR the member's chosen rank to the matching Discord role, and brand-new players the
+  site hasn't scored yet start at the fixed entry rank (`ENTRY_RANK_INDEX`). `ranks.json`'s
   `ehbMin` values are legacy metadata only.
+- **Signature (prestige) ranks** (`config/signatureRanks.json`, `utils/ranks.js`
+  `applyEffectiveRank`): Savant / Curator / Paragon are a separate set of roles earned on the
+  site by fully completing whole rank categories. The site writes `players.signature_rank` +
+  `players.prefer_signature_rank`; every mirror path resolves the member's **effective** rank
+  — their signature role when they opted in AND earned one, otherwise their composite ladder
+  role — via `applyEffectiveRank`, so the choice sticks (a member holds exactly one rank role).
+  Signature unlocks get their own celebratory `#rank-ups` announcement.
 - **Points / VP economy** (`db/supabase.js` players): VP comes from loot crates, duels,
   event submissions, voice rewards, and site submissions; `checkpoints`/`adjustpoints`/
   `leaderboard` commands read/write it.

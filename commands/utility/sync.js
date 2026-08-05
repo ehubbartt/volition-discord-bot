@@ -14,8 +14,8 @@ const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
     formatRank,
-    getRankName,
-    applyRankByWomRole,
+    formatRoleById,
+    applyEffectiveRank,
     getWomRole,
     ENTRY_RANK_INDEX
 } = require('../../utils/ranks');
@@ -190,36 +190,41 @@ async function fullClanSync (interaction, clanId) {
                 if (existingPlayer.discord_id && existingPlayer.rank) {
                     try {
                         const discordMember = await interaction.guild.members.fetch(existingPlayer.discord_id);
-                        const discordRankResult = await applyRankByWomRole({ womRole: existingPlayer.rank, member: discordMember });
+                        // Mirror the member's CHOSEN rank (signature when they opted in + earned
+                        // one, else their composite ladder rank) to Discord.
+                        const discordRankResult = await applyEffectiveRank({ player: existingPlayer, member: discordMember });
 
                         if (discordRankResult.changed) {
                             ranksUpdated++;
                             const arrow = discordRankResult.isUpgrade ? '⬆️' : '⬇️';
                             const action = discordRankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
-                            console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${discordRankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, discordRankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, discordRankResult.newRankIndex)} (${ehb} EHB)`);
+                            const oldStr = formatRoleById(interaction.guild, discordRankResult.oldRoleId);
+                            const newStr = formatRoleById(interaction.guild, discordRankResult.newRoleId);
+                            console.log(`[FullSync] ${arrow} ${action} rank for ${rsn}: ${oldStr} -> ${newStr} (${ehb} EHB)`);
 
                             rankMismatches.push({
                                 rsn,
-                                currentRankIndex: discordRankResult.oldRankIndex,
-                                expectedRankIndex: discordRankResult.newRankIndex,
+                                oldRoleId: discordRankResult.oldRoleId,
+                                newRoleId: discordRankResult.newRoleId,
                                 ehb,
-                                issue: `${action}: ${discordRankResult.oldRankIndex >= 0 ? getRankName(interaction.guild, discordRankResult.oldRankIndex) : 'None'} -> ${getRankName(interaction.guild, discordRankResult.newRankIndex)}`
+                                issue: `${action}: ${oldStr} -> ${newStr}`
                             });
 
-                            // Track rank-ups for announcement
+                            // Track rank-ups for announcement (signature unlocks included).
                             if (discordRankResult.isUpgrade) {
                                 rankUpAnnouncements.push({
                                     member: discordMember,
                                     rsn,
                                     ehb,
-                                    oldRankIndex: discordRankResult.oldRankIndex,
-                                    newRankIndex: discordRankResult.newRankIndex,
-                                    isInitial: discordRankResult.oldRankIndex === -1
+                                    oldRoleId: discordRankResult.oldRoleId,
+                                    newRoleId: discordRankResult.newRoleId,
+                                    isInitial: discordRankResult.isInitial,
+                                    isSignature: discordRankResult.isSignature
                                 });
                             }
                         } else if (discordRankResult.error) {
                             rankUpdatesFailed++;
-                            rankMismatches.push({ rsn, currentRankIndex: discordRankResult.oldRankIndex, expectedRankIndex: discordRankResult.newRankIndex, ehb, issue: `Failed: ${discordRankResult.error}` });
+                            rankMismatches.push({ rsn, oldRoleId: discordRankResult.oldRoleId, newRoleId: discordRankResult.newRoleId, ehb, issue: `Failed: ${discordRankResult.error}` });
                             console.error(`[FullSync] Failed to update rank for ${rsn}:`, discordRankResult.error);
                         }
                     } catch (error) {
@@ -344,7 +349,7 @@ async function fullClanSync (interaction, clanId) {
         // Add rank mismatch alerts if any
         if (rankMismatches.length > 0) {
             let mismatchText = rankMismatches.slice(0, 10).map(m =>
-                `• **${m.rsn}**: ${m.currentRankIndex >= 0 ? formatRank(interaction.guild, m.currentRankIndex) : 'None'} -> ${formatRank(interaction.guild, m.expectedRankIndex)} (${m.ehb} EHB)`
+                `• **${m.rsn}**: ${formatRoleById(interaction.guild, m.oldRoleId)} -> ${formatRoleById(interaction.guild, m.newRoleId)} (${m.ehb} EHB)`
             ).join('\n');
 
             if (rankMismatches.length > 10) {

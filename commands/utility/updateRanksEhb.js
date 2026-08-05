@@ -9,8 +9,8 @@ const config = require('../../config.json');
 const { isAdmin } = require('../../utils/permissions');
 const {
     formatRank,
-    getRankName,
-    applyRankByWomRole,
+    formatRoleById,
+    applyEffectiveRank,
     getWomRole,
     getRankIndexByWomRole,
     standardWomRoles
@@ -48,9 +48,11 @@ module.exports = {
       // still flag WOM in-game clan-rank mismatches against that stored rank.
       const discordIdToRsnMap = {};
       const discordIdToRankMap = {};
+      const discordIdToPlayerMap = {};
       existingPlayers.forEach(player => {
         if (player.discord_id && player.rsn) {
           discordIdToRsnMap[player.discord_id] = player.rsn;
+          discordIdToPlayerMap[player.discord_id] = player;
           if (player.rank) discordIdToRankMap[player.discord_id] = player.rank;
         }
       });
@@ -87,40 +89,48 @@ module.exports = {
           const clanMember = clanMembers.find(m => m.player.username === rsn);
           const ehb = clanMember ? Math.round(clanMember.player.ehb || 0) : 0;
 
-          const rankResult = await applyRankByWomRole({ womRole: storedRank, member });
-          const calculatedRankIndex = rankResult.newRankIndex;
+          // Apply the member's CHOSEN rank (signature or composite) to Discord.
+          const player = discordIdToPlayerMap[discordId];
+          const rankResult = await applyEffectiveRank({ player, member });
+          // The in-game WOM clan-rank mismatch check below is about the LADDER rank (prestige
+          // ranks aren't in-game clan ranks), so it uses the composite index, not the effective one.
+          const calculatedRankIndex = getRankIndexByWomRole(storedRank);
 
           if (rankResult.changed) {
             userMentions.push(`<@${member.id}>`);
 
             const arrow = rankResult.isUpgrade ? '⬆️' : '⬇️';
             const action = rankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
+            const oldStr = formatRoleById(guild, rankResult.oldRoleId);
+            const newStr = formatRoleById(guild, rankResult.newRoleId);
 
-            if (rankResult.oldRankIndex === -1) {
+            if (rankResult.isInitial) {
               mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${formatRank(guild, calculatedRankIndex)}`
+                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${newStr}`
               );
               rankUpAnnouncements.push({
                 member, rsn, ehb,
-                oldRankIndex: rankResult.oldRankIndex,
-                newRankIndex: calculatedRankIndex,
-                isInitial: true
+                oldRoleId: rankResult.oldRoleId,
+                newRoleId: rankResult.newRoleId,
+                isInitial: true,
+                isSignature: rankResult.isSignature
               });
             } else {
               mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${formatRank(guild, rankResult.oldRankIndex)} - ${action} to: ${formatRank(guild, calculatedRankIndex)}`
+                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${oldStr} - ${action} to: ${newStr}`
               );
               if (rankResult.isUpgrade) {
                 rankUpAnnouncements.push({
                   member, rsn, ehb,
-                  oldRankIndex: rankResult.oldRankIndex,
-                  newRankIndex: calculatedRankIndex,
-                  isInitial: false
+                  oldRoleId: rankResult.oldRoleId,
+                  newRoleId: rankResult.newRoleId,
+                  isInitial: false,
+                  isSignature: rankResult.isSignature
                 });
               }
             }
 
-            console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${rankResult.oldRankIndex >= 0 ? getRankName(guild, rankResult.oldRankIndex) : 'None'} -> ${getRankName(guild, calculatedRankIndex)} (rank: ${storedRank})`);
+            console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${oldStr} -> ${newStr} (rank: ${storedRank})`);
           }
 
           // Check if in-game clan rank matches what it should be based on EHB

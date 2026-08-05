@@ -1,0 +1,8 @@
+{
+  "_comment": "Signature (prestige) ranks — earned on the site by fully completing whole rank categories (Savant 5/7, Curator 6/7, Paragon 7/7). The site writes players.signature_rank + players.prefer_signature_rank; the bot mirrors the CHOSEN rank (signature when the member opted in, otherwise their composite ladder rank in config/ranks.json). Ordered low → high for upgrade detection.",
+  "signatureRanks": [
+    { "key": "savant", "roleId": "1534619435103686706" },
+    { "key": "curator", "roleId": "1534619856232513536" },
+    { "key": "paragon", "roleId": "1534620385453146303" }
+  ]
+}

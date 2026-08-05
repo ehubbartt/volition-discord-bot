@@ -1,12 +1,16 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config.json');
-const { formatRank } = require('./ranks');
+const { formatRoleById, getRoleIdByIndex } = require('./ranks');
 
 /**
- * Broadcast rank-up announcements to the #rank-ups channel
+ * Broadcast rank-up announcements to the #rank-ups channel. Handles both the composite
+ * ladder ranks and the signature (prestige) ranks — signature unlocks get their own flavour.
+ *
  * @param {Guild} guild - Discord guild object
- * @param {Array} announcements - Array of { member, rsn, ehb, oldRankIndex, newRankIndex, isInitial }
- * @param {string} logPrefix - Prefix for console logs (e.g. '[UpdateRanks]' or '[Daily Rank Update]')
+ * @param {Array} announcements - Array of announcement objects. Preferred shape carries role
+ *   ids: { member, rsn, ehb, oldRoleId, newRoleId, isInitial, isSignature }. Legacy index
+ *   fields (oldRankIndex / newRankIndex) are still accepted as a fallback.
+ * @param {string} logPrefix - Prefix for console logs
  */
 async function broadcastRankUps (guild, announcements, logPrefix = '[RankAnnouncements]') {
     if (announcements.length === 0) return;
@@ -19,32 +23,40 @@ async function broadcastRankUps (guild, announcements, logPrefix = '[RankAnnounc
         }
 
         for (const announcement of announcements) {
-            const { member, rsn, ehb, oldRankIndex, newRankIndex, isInitial } = announcement;
+            const { member, rsn, ehb, isInitial, isSignature } = announcement;
+
+            // Prefer explicit role ids; fall back to ladder indices for legacy callers.
+            const newRoleId = announcement.newRoleId
+                ?? (announcement.newRankIndex >= 0 ? getRoleIdByIndex(announcement.newRankIndex) : null);
+            const oldRoleId = announcement.oldRoleId
+                ?? (announcement.oldRankIndex >= 0 ? getRoleIdByIndex(announcement.oldRankIndex) : null);
 
             const embed = new EmbedBuilder()
-                .setColor('Gold')
-                .setTitle('Rank Up!')
+                .setColor(isSignature ? 'Purple' : 'Gold')
+                .setTitle(isSignature ? '✨ Signature Rank Unlocked!' : 'Rank Up!')
                 .setDescription(
-                    isInitial
-                        ? `Congratulations <@${member.id}>! You've been assigned your first rank!`
-                        : `Congratulations <@${member.id}>! You've ranked up!`
+                    isSignature
+                        ? `Congratulations <@${member.id}>! You've earned a **signature rank** — a mark of full clan completion. 👑`
+                        : isInitial
+                            ? `Congratulations <@${member.id}>! You've been assigned your first rank!`
+                            : `Congratulations <@${member.id}>! You've ranked up!`
                 )
                 .addFields(
                     { name: 'RSN', value: rsn, inline: true },
                     { name: 'EHB', value: ehb.toString(), inline: true },
-                    { name: '\u200B', value: '\u200B', inline: true }
+                    { name: '​', value: '​', inline: true }
                 )
                 .setThumbnail(member.user.displayAvatarURL())
                 .setTimestamp();
 
-            if (!isInitial) {
+            if (!isInitial && oldRoleId) {
                 embed.addFields(
-                    { name: 'Previous Rank', value: formatRank(guild, oldRankIndex), inline: true },
-                    { name: 'New Rank', value: formatRank(guild, newRankIndex), inline: true }
+                    { name: 'Previous Rank', value: formatRoleById(guild, oldRoleId), inline: true },
+                    { name: 'New Rank', value: formatRoleById(guild, newRoleId), inline: true }
                 );
             } else {
                 embed.addFields(
-                    { name: 'Rank', value: formatRank(guild, newRankIndex), inline: false }
+                    { name: 'Rank', value: formatRoleById(guild, newRoleId), inline: false }
                 );
             }
 
