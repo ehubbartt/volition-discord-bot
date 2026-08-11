@@ -71,14 +71,42 @@ module.exports = {
       let clanRankDowngradeNeeded = [];
       let rankUpAnnouncements = []; // For broadcasting to #rank-ups channel
 
+      // Retired legacy rank roles (e.g. Maxed / Grandmaster / Master / Clogger) that the clan
+      // is removing — stripped from every non-admin member so they collapse onto the composite
+      // ladder. Config-driven so the list is easy to adjust later.
+      const legacyRoleIds = config.LEGACY_RANK_ROLE_IDS || [];
+
       for (const discordId in discordIdToRsnMap) {
         const member = allMembers.get(discordId);
         if (member) {
           const rsn = discordIdToRsnMap[discordId];
 
-          // Skip players the site hasn't assigned a rank to yet.
+          // Never touch admins — leave their roles exactly as-is.
+          if (isAdmin(member)) {
+            console.log(`[UpdateRanks] ⏭️ Skipped ${rsn} - admin role`);
+            continue;
+          }
+
+          // Strip any retired legacy rank roles this member still holds.
+          const legacyHeld = member.roles.cache.filter(r => legacyRoleIds.includes(r.id));
+          let removedLegacy = [];
+          if (legacyHeld.size > 0) {
+            try {
+              await member.roles.remove([...legacyHeld.keys()]);
+              removedLegacy = [...legacyHeld.values()].map(r => r.name);
+              console.log(`[UpdateRanks] 🧹 Removed legacy role(s) for ${rsn}: ${removedLegacy.join(', ')}`);
+            } catch (err) {
+              console.error(`[UpdateRanks] ⚠️ Could not remove legacy role(s) for ${rsn}: ${err.message}`);
+            }
+          }
+          const legacyNote = removedLegacy.length ? ` — removed legacy: ${removedLegacy.join(', ')}` : '';
+
+          // Skip players the site hasn't assigned a rank to yet (but still surface a legacy cleanup).
           const storedRank = discordIdToRankMap[discordId];
           if (!storedRank) {
+            if (removedLegacy.length) {
+              mismatchOutput.push(`RSN: **${rsn}** - Removed legacy role(s): ${removedLegacy.join(', ')} - (no site rank yet)`);
+            }
             console.log(`[UpdateRanks] ⏭️ Skipped ${rsn} - no site-computed rank yet`);
             continue;
           }
@@ -102,7 +130,7 @@ module.exports = {
 
             if (rankResult.isInitial) {
               mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${newStr}`
+                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: **None** - Updated to: ${newStr}${legacyNote}`
               );
               rankUpAnnouncements.push({
                 member, rsn, ehb,
@@ -113,7 +141,7 @@ module.exports = {
               });
             } else {
               mismatchOutput.push(
-                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${oldStr} - ${action} to: ${newStr}`
+                `RSN: **${rsn}** - EHB: **${ehb}** - Old Rank: ${oldStr} - ${action} to: ${newStr}${legacyNote}`
               );
               if (rankResult.isUpgrade) {
                 rankUpAnnouncements.push({
@@ -127,6 +155,13 @@ module.exports = {
             }
 
             console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${oldStr} -> ${newStr} (rank: ${storedRank})`);
+          } else if (removedLegacy.length) {
+            // Rank role was already correct, but we cleaned up a retired legacy role — report it.
+            const curStr = formatRoleById(guild, rankResult.newRoleId);
+            mismatchOutput.push(
+              `RSN: **${rsn}** - EHB: **${ehb}** - Removed legacy role(s): ${removedLegacy.join(', ')} - Rank: ${curStr}`
+            );
+            console.log(`[UpdateRanks] 🧹 ${rsn}: legacy role(s) removed, rank already ${storedRank}`);
           }
 
           // Check if in-game clan rank matches what it should be based on EHB

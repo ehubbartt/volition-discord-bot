@@ -89,7 +89,11 @@ others are converted one at a time.
   The daily job, `/updateranks`, `/sync`, `/syncuser`, and the WOM join listener all just
   MIRROR the member's chosen rank to the matching Discord role, and brand-new players the
   site hasn't scored yet start at the fixed entry rank (`ENTRY_RANK_INDEX`). `ranks.json`'s
-  `ehbMin` values are legacy metadata only.
+  `ehbMin` values are legacy metadata only. `/updateranks` additionally **skips admins**
+  (`isAdmin` / `config.ADMIN_ROLE_IDS`) and **strips retired legacy rank roles**
+  (`config.LEGACY_RANK_ROLE_IDS` — the old Maxed/Grandmaster/Master/Clogger roles) from
+  everyone else, collapsing those holders onto the composite ladder and surfacing the cleanup
+  in the summary; it no longer @-mentions members (the summary/warnings are embeds).
 - **Signature (prestige) ranks** (`config/signatureRanks.json`, `utils/ranks.js`
   `applyEffectiveRank`): Savant / Curator / Paragon are a separate set of roles earned on the
   site by fully completing whole rank categories. The site writes `players.signature_rank` +
