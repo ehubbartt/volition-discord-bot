@@ -70,8 +70,6 @@ module.exports = {
       let clanRankUpgradeNeeded = [];
       let clanRankDowngradeNeeded = [];
       let rankUpAnnouncements = []; // For broadcasting to #rank-ups channel
-      // Store user mentions for later use
-      let userMentions = [];
 
       for (const discordId in discordIdToRsnMap) {
         const member = allMembers.get(discordId);
@@ -97,8 +95,6 @@ module.exports = {
           const calculatedRankIndex = getRankIndexByWomRole(storedRank);
 
           if (rankResult.changed) {
-            userMentions.push(`<@${member.id}>`);
-
             const arrow = rankResult.isUpgrade ? '⬆️' : '⬇️';
             const action = rankResult.isUpgrade ? 'Upgraded' : 'Downgraded';
             const oldStr = formatRoleById(guild, rankResult.oldRoleId);
@@ -155,14 +151,14 @@ module.exports = {
                 // WOM rank is lower than it should be - needs upgrade in WOM
                 clanRankUpgradeNeeded.push({
                   rsn,
-                  message: `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, calculatedRankIndex)}`
+                  message: `RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, calculatedRankIndex)}`
                 });
                 console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               } else if (currentWomRankIndex > calculatedRankIndex) {
                 // WOM rank is higher than it should be - needs downgrade in WOM
                 clanRankDowngradeNeeded.push({
                   rsn,
-                  message: `<@${member.id}> - RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
+                  message: `RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
                 });
                 console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               }
@@ -175,12 +171,6 @@ module.exports = {
             console.log(`[UpdateRanks] ⚠️ ${rsn}: Not found in WOM clan data`);
           }
         }
-      }
-
-      // Send regular mentions FIRST (push notification bug-fix)
-      if (userMentions.length > 0) {
-        const mentionMessage = userMentions.join('');
-        await interaction.followUp({ content: mentionMessage });
       }
 
       // Helper function for splitting long outputs (1024 char limit)
