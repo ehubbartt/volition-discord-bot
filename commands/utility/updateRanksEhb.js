@@ -12,10 +12,14 @@ const {
     formatRoleById,
     applyEffectiveRank,
     getWomRole,
-    getRankIndexByWomRole,
-    standardWomRoles
+    getRankIndexByWomRole
 } = require('../../utils/ranks');
 const { broadcastRankUps } = require('../../utils/rankAnnouncements');
+
+// WOM group roles that are staff/leadership — never flagged for an in-game rank change, even
+// when their current role isn't a ladder rank. Discord admins are already skipped in the loop;
+// this is the WOM-side safety net for any staff member who lacks the Discord admin role.
+const WOM_STAFF_ROLES = ['owner', 'deputy_owner', 'administrator', 'moderator'];
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -135,43 +139,42 @@ module.exports = {
             console.log(`[UpdateRanks] ${arrow} ${action} rank for ${rsn}: ${oldStr} -> ${newStr} (rank: ${storedRank})`);
           }
 
-          // Check if in-game clan rank matches what it should be based on EHB
+          // Flag in-game (WOM) clan-rank mismatches so admins can fix them at wiseoldman.net.
+          // We flag ANY non-staff WOM role that doesn't match the member's composite rank —
+          // including the retired special ranks (Maxed/Grandmaster/Master), which sit above the
+          // ladder and should be set to the composite in-game (they stay as cosmetic Discord
+          // roles). WOM staff roles are never flagged; Discord admins are already skipped above.
           if (clanMember) {
             const womRole = clanMember.role;
             const expectedWomRole = getWomRole(calculatedRankIndex);
+            const currentWomRankIndex = getRankIndexByWomRole(womRole); // -1 = non-ladder (special/staff/other)
 
-            // Debug logging
-            console.log(`[UpdateRanks] Checking ${rsn}: WOM role="${womRole}", expected="${expectedWomRole}", ehb=${ehb}, calcRankIdx=${calculatedRankIndex}`);
-            console.log(`[UpdateRanks]   - standardWomRoles includes "${womRole}": ${standardWomRoles.includes(womRole)}`);
+            console.log(`[UpdateRanks] Checking ${rsn}: WOM role="${womRole}", expected="${expectedWomRole}", ehb=${ehb}, calcRankIdx=${calculatedRankIndex}, curWomIdx=${currentWomRankIndex}`);
 
-            // Only check if:
-            // 1. Calculated rank has a WOM equivalent
-            // 2. Current WOM role is a standard role (not moderator, maxed, etc.)
-            if (expectedWomRole && womRole !== expectedWomRole && standardWomRoles.includes(womRole)) {
+            if (expectedWomRole && womRole && womRole !== expectedWomRole && !WOM_STAFF_ROLES.includes(womRole)) {
               const reason = getRankReason(ehb);
 
-              // Get current WOM rank index
-              const currentWomRankIndex = getRankIndexByWomRole(womRole);
-
-              if (currentWomRankIndex < calculatedRankIndex) {
-                // WOM rank is lower than it should be - needs upgrade in WOM
+              if (currentWomRankIndex !== -1 && currentWomRankIndex < calculatedRankIndex) {
+                // In-game rank is BELOW the composite → needs an upgrade in WOM.
                 clanRankUpgradeNeeded.push({
                   rsn,
-                  message: `RSN: **${rsn}** (${reason}) - WOM: ${currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole} → Should be: ${formatRank(guild, calculatedRankIndex)}`
+                  message: `RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
                 });
                 console.log(`[UpdateRanks] 🔼 Clan rank upgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
-              } else if (currentWomRankIndex > calculatedRankIndex) {
-                // WOM rank is higher than it should be - needs downgrade in WOM
+              } else {
+                // In-game rank is ABOVE the composite, or a non-ladder special role (Maxed/
+                // Grandmaster/Master, index -1) → needs a downgrade to the composite in WOM.
+                const currentLabel = currentWomRankIndex >= 0 ? formatRank(guild, currentWomRankIndex) : womRole;
                 clanRankDowngradeNeeded.push({
                   rsn,
-                  message: `RSN: **${rsn}** (${reason}) - WOM: ${formatRank(guild, currentWomRankIndex)} → Should be: ${formatRank(guild, calculatedRankIndex)}`
+                  message: `RSN: **${rsn}** (${reason}) - WOM: ${currentLabel} → Should be: ${formatRank(guild, calculatedRankIndex)}`
                 });
                 console.log(`[UpdateRanks] 🔽 Clan rank downgrade needed for ${rsn}: WOM role ${womRole} -> ${expectedWomRole} (${reason})`);
               }
             } else if (womRole === expectedWomRole) {
               console.log(`[UpdateRanks] ✅ ${rsn}: WOM role matches expected (${womRole})`);
             } else {
-              console.log(`[UpdateRanks] ⏭️ ${rsn}: Skipped - expectedWomRole=${expectedWomRole}, womRole="${womRole}" not in standardWomRoles`);
+              console.log(`[UpdateRanks] ⏭️ ${rsn}: Skipped - expectedWomRole=${expectedWomRole}, womRole="${womRole}" (staff or unset)`);
             }
           } else {
             console.log(`[UpdateRanks] ⚠️ ${rsn}: Not found in WOM clan data`);

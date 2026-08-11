@@ -92,7 +92,10 @@ others are converted one at a time.
   `ehbMin` values are legacy metadata only. `/updateranks` **skips admins**
   (`isAdmin` / `config.ADMIN_ROLE_IDS`) and no longer @-mentions members (the summary and the
   WOM discrepancy warnings are embeds, which don't ping). The old cosmetic Discord roles
-  (Maxed/Grandmaster/Master) are left in place — they're display-only and not clan ranks.
+  (Maxed/Grandmaster/Master) are left in place — they're display-only and not clan ranks. Its
+  in-game (WOM) discrepancy list to `#test` flags **any non-staff** WOM role that doesn't match
+  the member's composite rank (`WOM_STAFF_ROLES` is the only exclusion), so members whose *WOM*
+  rank is a retired special role are surfaced as a downgrade-to-composite for a manual in-game fix.
 - **Signature (prestige) ranks** (`config/signatureRanks.json`, `utils/ranks.js`
   `applyEffectiveRank`): Savant / Curator / Paragon are a separate set of roles earned on the
   site by fully completing whole rank categories. The site writes `players.signature_rank` +
