@@ -83,7 +83,6 @@ others are converted one at a time.
 - **Discord-link explainer** (`commands/utility/whylink.js`): admin-only `/whylink` posts a
   standalone embed explaining why the site uses "Sign in with Discord" (OAuth), what the
   `identify` scope does/doesn't expose, that the site is open source, and how to avoid phishing.
-  Attaches `assets/whylink-permissions.png` when that file is present; posts text-only otherwise.
 - **Verification / intro** (`commands/utility/createVerifyMessage.js`, `verify.js`): an
   intro button opens a modal; the bot looks the RSN up on WiseOldMan, checks requirements,
   and assigns the verified role (or pings admins on failure). The intro modal is the
