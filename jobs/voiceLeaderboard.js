@@ -11,6 +11,7 @@ const eventsDb = require('../db/events');
 const voiceAnalytics = require('../db/voice_analytics');
 const hybridConfig = require('../utils/hybridConfig');
 const config = require('../utils/config');
+const { resolveDisplayNames } = require('../utils/displayNames');
 const { getThisSunday23UTC } = require('./sokScheduler');
 
 const TOP_N = 10;
@@ -34,20 +35,6 @@ async function isMessageAlive(client, channelId, messageId) {
         if (err?.code === 10008 || err?.code === 10003) return false;
         return true;
     }
-}
-
-async function resolveDisplayNames(client, userIds) {
-    const map = new Map();
-    if (!client || userIds.length === 0) return map;
-    try {
-        const guild = client.guilds.cache.get(config.guildId);
-        if (!guild) return map;
-        const members = await guild.members.fetch({ user: userIds });
-        for (const [id, member] of members) map.set(id, member.displayName);
-    } catch (err) {
-        console.error('[VoiceLeaderboard] Failed to resolve nicknames:', err.message);
-    }
-    return map;
 }
 
 async function buildLeaderboardEmbed(client) {
