@@ -1,5 +1,15 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const voiceAnalytics = require('../../db/voice_analytics');
+const { resolveDisplayNames } = require('../../utils/displayNames');
+
+// A "tick" is one 5-minute poll sample (jobs/voiceTracker.js), NOT a voice session.
+// This embed used to call them sessions, which turned ~107 hours of voice into
+// "1,286 sessions" and read as nonsense next to the time beside it.
+function formatTime(totalMinutes) {
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours}h ${mins}m`;
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,15 +47,23 @@ module.exports = {
                 if (!leaderboard || leaderboard.length === 0) {
                     embed.setDescription('No voice activity recorded yet.');
                 } else {
+                    // Stored usernames are whatever was true at tick time, so a rename
+                    // leaves this board showing a name nobody recognises. Resolve live,
+                    // the way the weekly leaderboard embed already does.
+                    const nameById = await resolveDisplayNames(
+                        interaction.client,
+                        leaderboard.map(e => e.user_id)
+                    );
+
                     let description = '';
                     for (let i = 0; i < leaderboard.length; i++) {
                         const entry = leaderboard[i];
-                        const hours = Math.floor(entry.total_minutes / 60);
-                        const mins = entry.total_minutes % 60;
                         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `\`${i + 1}.\``;
-                        description += `${medal} **${entry.username || 'Unknown'}** — ${hours}h ${mins}m (${entry.total_ticks} sessions)\n`;
+                        const name = nameById.get(entry.user_id) || entry.username || 'Unknown';
+                        description += `${medal} **${name}** — ${formatTime(entry.total_minutes)}\n`;
                     }
                     embed.setDescription(description);
+                    embed.setFooter({ text: 'All-time top 10. Use /voicestats to see your own position.' });
                 }
 
                 return interaction.editReply({ embeds: [embed] });
@@ -63,16 +81,28 @@ module.exports = {
                 });
             }
 
-            const hours = Math.floor(stats.total_minutes / 60);
-            const mins = stats.total_minutes % 60;
+            // The leaderboards are top-10 cuts, so most members never appear on one and
+            // have no way to tell "below the cut" from "not tracked". Standing is the
+            // whole point of the personal view; a failure here must not lose the stats.
+            let standing = null;
+            try {
+                standing = await voiceAnalytics.getVoiceStanding(stats.total_minutes);
+            } catch (error) {
+                console.error('[VoiceStats] Failed to resolve standing:', error.message);
+            }
 
             const embed = new EmbedBuilder()
                 .setColor('Green')
                 .setTitle('Voice Activity Stats')
                 .addFields(
                     { name: 'User', value: `<@${targetUser.id}>`, inline: true },
-                    { name: 'Total Time', value: `${hours}h ${mins}m`, inline: true },
-                    { name: 'Sessions', value: `${stats.total_ticks}`, inline: true },
+                    { name: 'Total Time', value: formatTime(stats.total_minutes), inline: true },
+                    {
+                        name: 'Rank',
+                        value: standing ? `#${standing.rank} of ${standing.tracked}` : 'Unavailable',
+                        inline: true
+                    },
+                    { name: 'Check-ins', value: `${stats.total_ticks}`, inline: true },
                     {
                         name: 'Last Active',
                         value: stats.last_active_at
@@ -81,6 +111,7 @@ module.exports = {
                         inline: true
                     }
                 )
+                .setFooter({ text: 'Rank is all-time. The weekly leaderboard counts only this week.' })
                 .setTimestamp();
 
             await interaction.editReply({ embeds: [embed] });

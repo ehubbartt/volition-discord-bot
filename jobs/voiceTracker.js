@@ -88,22 +88,31 @@ async function checkVoiceChannels(client) {
 
         // Award minutes to each eligible member
         for (const [memberId, member] of eligibleMembers) {
-            // Must be a registered player
-            const player = await db.getPlayerByDiscordId(memberId);
-            if (!player) continue;
+            // One member must not be able to end the tick for everyone after them.
+            // getPlayerByDiscordId rethrows anything that isn't "no rows" — a duplicate
+            // players row for one discord_id makes its .single() error — and this loop
+            // IS the job, so an escaping throw silently drops every remaining member in
+            // iteration order and the next channel with them.
+            try {
+                // Must be a registered player
+                const player = await db.getPlayerByDiscordId(memberId);
+                if (!player) continue;
 
-            // Log the tick (non-blocking)
-            voiceAnalytics.logVoiceTick(
-                memberId,
-                member.user.username,
-                channelId,
-                channel.name,
-                eligibleMembers.size,
-                minutesPerTick
-            ).catch(err => console.error('[VoiceTracker] Analytics error:', err.message));
+                // Log the tick (non-blocking)
+                voiceAnalytics.logVoiceTick(
+                    memberId,
+                    member.user.username,
+                    channelId,
+                    channel.name,
+                    eligibleMembers.size,
+                    minutesPerTick
+                ).catch(err => console.error('[VoiceTracker] Analytics error:', err.message));
 
-            awardedUsers.add(memberId);
-            totalTicks++;
+                awardedUsers.add(memberId);
+                totalTicks++;
+            } catch (err) {
+                console.error(`[VoiceTracker] Skipped ${memberId} this tick: ${err.message}`);
+            }
         }
     }
 

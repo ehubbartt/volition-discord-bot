@@ -124,6 +124,26 @@ others are converted one at a time.
   board images.
 - **Voice rewards** (`jobs/voiceTracker.js`, `utils/voiceRewards.js`): polls voice
   channels for eligible users and awards VP on a weekly cadence with a leaderboard post.
+  - **A "tick" is one 5-minute poll sample, not a voice session.** `voice_user_stats
+    .total_ticks` counts samples, so 1,286 of them is ~107 hours, not 1,286 visits.
+    Never label them sessions.
+  - **Three surfaces, three different windows.** The weekly embed
+    (`jobs/voiceLeaderboard.js`) ranks minutes since the Sunday 23:00 UTC anchor;
+    `/voicestats view:Leaderboard` ranks **all-time** `total_minutes`; the site's
+    `/admin/voice` also ranks all-time. All are top-N cuts, so a member can be well
+    tracked and appear on none of them — `/voicestats` therefore shows each member
+    their own all-time standing (`getVoiceStanding`), which is the only place below
+    the cut is distinguishable from untracked.
+  - **Names shown to members must be resolved live** (`utils/displayNames.js`). The
+    voice tables store the Discord username captured at tick time, which goes stale on
+    a rename, and they carry no RSN at all.
+  - **The tick loop is the only writer, and it runs once every 5 minutes.** Per-member
+    work is individually try/caught: `getPlayerByDiscordId` rethrows anything that
+    isn't "no rows" (a duplicate `players` row makes its `.single()` error), and an
+    escaping throw would cost every member later in iteration order that whole tick.
+    `logVoiceTick` reports its log-row insert and its `increment_voice_user_stats` RPC
+    **separately** — the insert commits first, so a silent RPC failure leaves the two
+    tables permanently out of step and every stats-derived leaderboard undercounting.
 - **LFG / party finder** (`handlers/lfg.js`, `db/lfg.js`, `jobs/lfgExpiry.js`): boss/exp/
   time select-menu flow with auto-expiry.
 - **Moderation** (`commands/utility/warn.js`, `warnings.js`, `ban.js`): warnings (expiring)

@@ -10,9 +10,16 @@ const { supabase } = require('./supabase');
  * Log a single voice tick for a user and update their aggregate stats
  */
 async function logVoiceTick(userId, username, channelId, channelName, eligibleUsers, minutesAwarded) {
+    // The two writes are reported SEPARATELY on purpose. They used to share one
+    // try/catch, and because the log insert commits first, an RPC failure left a log
+    // row with no matching stats row and said nothing distinctive about it — the two
+    // tables drift apart and every leaderboard reading voice_user_stats quietly
+    // undercounts that member. Whoever reads the logs needs to know WHICH half failed.
+    let logged = false;
+    let counted = false;
+
     try {
-        // 1. Insert detailed log record
-        const { error: logError } = await supabase
+        const { error } = await supabase
             .from('voice_activity_log')
             .insert({
                 user_id: userId,
@@ -22,21 +29,29 @@ async function logVoiceTick(userId, username, channelId, channelName, eligibleUs
                 eligible_users: eligibleUsers,
                 minutes_awarded: minutesAwarded
             });
+        if (error) throw error;
+        logged = true;
+    } catch (error) {
+        console.error(`[VoiceAnalytics] Failed to log tick for ${userId}: ${error.message}`);
+    }
 
-        if (logError) throw logError;
-
-        // 2. Update aggregated user stats via RPC
-        const { error: statsError } = await supabase.rpc('increment_voice_user_stats', {
+    try {
+        const { error } = await supabase.rpc('increment_voice_user_stats', {
             p_user_id: userId,
             p_username: username,
             p_ticks: 1,
             p_minutes: minutesAwarded
         });
-
-        if (statsError) throw statsError;
+        if (error) throw error;
+        counted = true;
     } catch (error) {
-        console.error('[VoiceAnalytics] Error logging voice tick:', error.message);
+        console.error(
+            `[VoiceAnalytics] Failed to update stats for ${userId}: ${error.message}` +
+            (logged ? ' — the tick IS logged, so voice_user_stats now undercounts them.' : '')
+        );
     }
+
+    return { logged, counted };
 }
 
 /**
@@ -73,6 +88,29 @@ async function getUserVoiceStats(userId) {
         throw error;
     }
     return data;
+}
+
+/**
+ * Where a member stands in the all-time table: their position and how many members
+ * are tracked at all. Ties share a position (two members on 500 minutes are both #4).
+ *
+ * The leaderboards are top-10 cuts, so most of the clan never appears on one — without
+ * this a member below the cut has no way to see they are tracked at all, which reads
+ * as broken tracking.
+ */
+async function getVoiceStanding(totalMinutes) {
+    const [ahead, tracked] = await Promise.all([
+        supabase
+            .from('voice_user_stats')
+            .select('user_id', { count: 'exact', head: true })
+            .gt('total_minutes', totalMinutes),
+        supabase.from('voice_user_stats').select('user_id', { count: 'exact', head: true })
+    ]);
+
+    if (ahead.error) throw ahead.error;
+    if (tracked.error) throw tracked.error;
+
+    return { rank: (ahead.count || 0) + 1, tracked: tracked.count || 0 };
 }
 
 /**
@@ -149,6 +187,7 @@ module.exports = {
     logVoiceTick,
     logDailyMetrics,
     getUserVoiceStats,
+    getVoiceStanding,
     getVoiceLeaderboard,
     getDailyMetrics,
     getWeeklyVoiceLeaderboard
